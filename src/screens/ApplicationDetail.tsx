@@ -1,0 +1,109 @@
+import { CloudOff, Download, FileEdit, Wallet2 } from 'lucide-react'
+import TopBar from '../components/TopBar'
+import StatusPill from '../components/StatusPill'
+import WorkflowTracker from '../components/WorkflowTracker'
+import { useAppData } from '../lib/appData'
+import { useNav } from '../lib/nav'
+import { SERVICES } from '../data/mockData'
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+export default function ApplicationDetail({ id }: { id: string }) {
+  const { applications } = useAppData()
+  const { push, replace } = useNav()
+  const app = applications.find((a) => a.id === id)
+
+  if (!app) {
+    return (
+      <div className="p-6 text-center text-slate-400">
+        <TopBar title="Request not found" />
+        <p className="mt-4 text-[13px]">This request may have been removed.</p>
+      </div>
+    )
+  }
+
+  const service = SERVICES.find((s) => s.id === app.serviceId)
+
+  return (
+    <div className="animate-tap-in pb-28">
+      <TopBar title={app.serviceName} subtitle={app.isOfflineDraft ? 'Pending sync' : `Ref. ${app.referenceNo}`} />
+
+      <div className="space-y-4 px-4 pt-4">
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4">
+          <div>
+            <p className="text-[11.5px] text-slate-400">
+              {app.status === 'draft' ? 'Last edited' : 'Submitted'} {formatDate(app.dateSubmitted)}
+            </p>
+            <p className="mt-0.5 text-[12px] font-medium text-slate-500">
+              {service?.processingTime ?? ''}
+            </p>
+          </div>
+          <StatusPill status={app.status} />
+        </div>
+
+        {app.isOfflineDraft && (
+          <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-amber-800">
+            <CloudOff size={16} className="shrink-0" />
+            <p className="text-[12.5px] leading-snug">
+              Saved on this device while offline. It will sync to the LGU office automatically once you're connected.
+            </p>
+          </div>
+        )}
+
+        {app.status === 'draft' ? (
+          <button
+            onClick={() => replace({ name: 'service-form', serviceId: app.serviceId, draftId: app.id })}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[14px] font-semibold text-white active:bg-navy-900"
+          >
+            <FileEdit size={16} /> Continue application
+          </button>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="mb-1 text-[13px] font-bold text-navy-950">Application progress</p>
+            <div className="mt-3">
+              <WorkflowTracker currentStepIndex={app.currentStepIndex} rejected={app.status === 'rejected'} />
+            </div>
+          </div>
+        )}
+
+        {app.status === 'for-payment' && (
+          <div className="rounded-2xl border border-gold-500/40 bg-gold-100/60 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-bold text-navy-950">Assessed fee</p>
+              <p className="font-display text-[17px] font-extrabold text-navy-950">₱{app.fee.toLocaleString()}</p>
+            </div>
+            <p className="mt-1 text-[12px] text-navy-900/70">City Treasury has finalized your assessment. Pay to proceed to document release.</p>
+            <button
+              onClick={() => push({ name: 'payment', id: app.id })}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3 text-[13.5px] font-semibold text-white active:bg-navy-900"
+            >
+              <Wallet2 size={15} /> Pay Now
+            </button>
+          </div>
+        )}
+
+        {app.status === 'completed' && (
+          <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-[14px] font-semibold text-white active:bg-emerald-700">
+            <Download size={16} /> Download e-Document
+          </button>
+        )}
+
+        {app.status !== 'draft' && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="mb-2.5 text-[13px] font-bold text-navy-950">Submitted details</p>
+            <dl className="space-y-2">
+              {Object.entries(app.formValues).map(([key, val]) => (
+                <div key={key} className="flex justify-between gap-3 text-[12.5px]">
+                  <dt className="capitalize text-slate-400">{key.replace(/([A-Z])/g, ' $1')}</dt>
+                  <dd className="text-right font-medium text-navy-950">{val || '—'}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

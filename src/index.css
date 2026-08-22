@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-navy-950: #0f1d4d;
+  --color-navy-900: #172554;
+  --color-navy-800: #1e3a8a;
+  --color-navy-700: #24479e;
+  --color-navy-600: #2f57b8;
+  --color-navy-100: #e3e9fb;
+  --color-navy-50: #f2f5fd;
+
+  --color-gold-600: #d69e0a;
+  --color-gold-500: #fbbf24;
+  --color-gold-400: #fcd34d;
+  --color-gold-100: #fef3c7;
+
+  --color-slate-canvas: #f1f4f9;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-slate-canvas);
+  color: var(--color-navy-950);
+  overscroll-behavior-y: none;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Signature: guilloche seal ring pattern used behind the Digital ID card */
+.seal-ring {
+  background-image:
+    repeating-conic-gradient(from 0deg, rgba(251, 191, 36, 0.14) 0deg 2deg, transparent 2deg 8deg);
+  border-radius: 9999px;
+}
+
+/* Subtle woven security-paper texture for the ID card face */
+.id-texture {
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.07) 0, transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(255, 255, 255, 0.06) 0, transparent 40%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1px, transparent 1px, transparent 7px);
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+}
+
+@keyframes tap-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-tap-in {
+  animation: tap-in 0.22s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
