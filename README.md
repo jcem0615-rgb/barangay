@@ -1,18 +1,19 @@
 # eLGU Citizen Portal
 
 A mobile-first Progressive Web App for residents of a Philippine Local Government Unit (LGU)
-to transact with Barangay, Business Permits & Licensing (BOSS), Social Welfare (CSWDO), and the
-Local Civil Registrar — from one pocket app, with offline draft support.
+to transact with its city/municipal offices — from one pocket app, with offline draft support.
 
 ## Features
 
 - **Citizen Digital ID** — PhilSys sync status, barangay/city, and a QR verification card
-- **Barangay services** — Clearance, Certificate of Indigency, Residency Verification
-- **Business Permits (BOSS)** — one-stop-shop application with tax assessment and payment
-- **Social Welfare** — AICS financial assistance, Senior Citizen / PWD ID issuance
-- **Civil Registrar** — Birth, Marriage, and Death certificate requests
-- **Multi-step workflow tracker** — Submitted → Barangay Verification → City Treasury
-  Assessment → Payment → e-Document Release
+- **Business Permits (BOSS)** — one-stop-shop application, occupational permit
+- **Social Welfare** — AICS financial assistance, Senior Citizen / PWD ID, Solo Parent ID
+- **Civil Registrar** — Birth, Marriage, and Death certificates, marriage license application
+- **Treasurer's Office** — Cedula, real property tax assessment and tax clearance
+- **Building & Zoning** — zoning clearance, building permit, certificate of occupancy
+- **Health Office** — health certificate, sanitary permit
+- **Multi-step workflow tracker** — Submitted → City Treasury Assessment → Payment →
+  e-Document Release
 - **Payment simulation** — GCash, Maya, Landbank Online
 - **Offline drafts** — forms submitted without a connection are saved to IndexedDB on-device
   and sync automatically once you're back online

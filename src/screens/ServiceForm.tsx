@@ -18,6 +18,9 @@ const CATEGORY_PREFIX: Record<string, string> = {
   bpls: 'BOSS',
   cswdo: 'CSWDO',
   lcr: 'LCR',
+  treasury: 'CTO',
+  obo: 'OBO',
+  health: 'CHO',
 }
 
 export default function ServiceForm({ serviceId, draftId }: { serviceId: string; draftId?: string }) {

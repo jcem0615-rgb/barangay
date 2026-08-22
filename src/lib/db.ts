@@ -30,18 +30,18 @@ export async function getAllApplications(): Promise<Application[]> {
   )
 }
 
-export async function seedIfEmpty(seed: Application[]): Promise<void> {
-  const existing = await getAllApplications()
-  if (existing.length === 0) {
-    await Promise.all(seed.map((app) => saveApplication(app)))
-  }
-}
+const DATA_VERSION_KEY = 'schema-version'
 
-// Drops persisted applications whose service no longer exists (e.g. an office was
-// removed from SERVICES). Without this, an existing on-device store would keep
-// showing records that can no longer be opened.
-export async function pruneRemovedServices(validServiceIds: string[]): Promise<void> {
-  const valid = new Set(validServiceIds)
-  const stale = (await getAllApplications()).filter((a) => !valid.has(a.serviceId))
-  await Promise.all(stale.map((a) => deleteApplication(a.id)))
+// The service catalogue and workflow steps are demo data, so records saved by an
+// older build can reference a service or a step index that no longer exists.
+// When the version changes, start the on-device store clean instead of trying to
+// migrate those records field by field. Anything the viewer drafted is cleared too.
+export async function resetIfStale(version: string, seed: Application[]): Promise<void> {
+  const storedVersion = await get<string>(DATA_VERSION_KEY, applicationsStore)
+  if (storedVersion === version) return
+
+  const allKeys = await keys(applicationsStore)
+  await Promise.all(allKeys.map((k) => del(k as string, applicationsStore)))
+  await Promise.all(seed.map((app) => saveApplication(app)))
+  await set(DATA_VERSION_KEY, version, applicationsStore)
 }

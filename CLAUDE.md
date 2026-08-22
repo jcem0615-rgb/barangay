@@ -4,10 +4,12 @@ Handoff notes for continuing this project in Claude Code.
 
 ## What this is
 
-A mobile-first PWA for residents of a Philippine LGU (modeled on a city/municipality +
-barangay structure) to transact with local government offices: Barangay, Business Permits
-& Licensing (BOSS), Social Welfare (CSWDO), and the Local Civil Registrar. Built as a
-functional prototype — realistic UX and data flow, no real backend or PhilSys integration.
+A mobile-first PWA for residents of a Philippine city/municipality to transact with the
+LGU's own offices: Business Permits & Licensing (BOSS), Social Welfare (CSWDO), the Local
+Civil Registrar, the Treasurer's Office, the Office of the Building Official, and the City
+Health Office. Barangay-level services are deliberately out of scope — this is the
+municipal tier. Built as a functional prototype — realistic UX and data flow, no real
+backend or PhilSys integration.
 
 ## Stack
 
@@ -27,7 +29,8 @@ functional prototype — realistic UX and data flow, no real backend or PhilSys 
 ```
 src/
   types.ts              Domain model: ServiceDefinition, Application, ResidentProfile, etc.
-  data/mockData.ts       Resident profile, 4 service categories, 8 services, 3 seed applications
+  data/mockData.ts       Resident profile, 6 service categories, 17 services, 2 seed applications,
+                         and DATA_VERSION (bump to rebuild existing on-device stores)
   lib/
     nav.tsx               Screen stack + useNav()
     appData.tsx            React context wrapping useApplications()
@@ -81,10 +84,12 @@ automatically, no new screen needed. If a category needs an icon not already in
   processing delay — no PCI-relevant code, no real redirect/webhook handling. Real integration
   means server-side webhook verification; do not attempt to "complete" payment purely
   client-side in production.
-- **Workflow progression** (Submitted → Barangay Verification → City Treasury Assessment →
-  Payment → e-Document Release) is only advanced automatically at seed time and after a
-  simulated payment. There's no backend actor moving barangay/treasury steps forward — that
-  would come from real staff-facing tooling on the LGU side.
+- **Workflow progression** (Submitted → City Treasury Assessment → Payment → e-Document
+  Release) is only advanced automatically at seed time and after a simulated payment.
+  There's no backend actor moving the treasury step forward — that would come from real
+  staff-facing tooling on the LGU side. `currentStepIndex` is an index into
+  `WORKFLOW_STEPS`, so changing that array invalidates stored records; bump `DATA_VERSION`
+  when you do.
 - Navigation stack resets on reload (in-memory, not URL-based) — acceptable for a kiosk-style
   PWA session but worth revisiting if citizens expect to share/bookmark a specific application's
   URL.

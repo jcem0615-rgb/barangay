@@ -1,4 +1,4 @@
-export type ServiceCategoryId = 'bpls' | 'cswdo' | 'lcr'
+export type ServiceCategoryId = 'bpls' | 'cswdo' | 'lcr' | 'treasury' | 'obo' | 'health'
 
 export interface ServiceCategory {
   id: ServiceCategoryId
@@ -34,7 +34,6 @@ export interface ServiceDefinition {
 
 export const WORKFLOW_STEPS = [
   'Submitted',
-  'Barangay Verification',
   'City Treasury Assessment',
   'Payment',
   'e-Document Release',

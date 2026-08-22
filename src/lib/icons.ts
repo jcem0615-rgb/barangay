@@ -1,4 +1,7 @@
 import {
+  Coins,
+  HardHat,
+  Stethoscope,
   Store,
   HeartHandshake,
   ScrollText,
@@ -16,6 +19,9 @@ import {
 
 export const ICONS: Record<string, LucideIcon> = {
   store: Store,
+  coins: Coins,
+  'hard-hat': HardHat,
+  stethoscope: Stethoscope,
   'hand-heart': HeartHandshake,
   'scroll-text': ScrollText,
   'file-text': FileText,

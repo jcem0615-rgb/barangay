@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Application } from '../types'
-import { getAllApplications, pruneRemovedServices, saveApplication, seedIfEmpty } from './db'
-import { SERVICES, seedApplications } from '../data/mockData'
+import { getAllApplications, resetIfStale, saveApplication } from './db'
+import { DATA_VERSION, seedApplications } from '../data/mockData'
 import { useOnlineStatus } from './useOnlineStatus'
 
 export function useApplications() {
@@ -16,8 +16,7 @@ export function useApplications() {
   }, [])
 
   useEffect(() => {
-    seedIfEmpty(seedApplications())
-      .then(() => pruneRemovedServices(SERVICES.map((s) => s.id)))
+    resetIfStale(DATA_VERSION, seedApplications())
       .then(() => refresh())
       .then(() => setLoaded(true))
   }, [refresh])

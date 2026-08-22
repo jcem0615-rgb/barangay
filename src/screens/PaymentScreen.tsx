@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronRight, Loader2, ShieldCheck } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
+import { WORKFLOW_STEPS } from '../types'
 import type { Application } from '../types'
 
 type Method = 'GCash' | 'Maya' | 'Landbank Online'
@@ -32,7 +33,7 @@ export default function PaymentScreen({ id }: { id: string }) {
       paid: true,
       paymentMethod: selected,
       status: 'in-progress',
-      currentStepIndex: 4,
+      currentStepIndex: WORKFLOW_STEPS.length - 1,
     }
     await upsert(updated)
     setStep('done')

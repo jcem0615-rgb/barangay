@@ -8,7 +8,6 @@ interface WorkflowTrackerProps {
 
 const STEP_DETAIL: Record<string, string> = {
   Submitted: 'Your application was received and queued for review.',
-  'Barangay Verification': 'Barangay staff are verifying your details and documents.',
   'City Treasury Assessment': 'City Treasury is computing your applicable fees.',
   Payment: 'Settle your assessed fee to proceed to document release.',
   'e-Document Release': 'Your document is being prepared for release or pickup.',
