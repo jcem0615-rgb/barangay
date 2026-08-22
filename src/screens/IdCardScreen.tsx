@@ -26,7 +26,7 @@ export default function IdCardScreen() {
 
           <div className="relative mt-5 text-center">
             <p className="font-display text-[20px] font-bold">{RESIDENT.fullName}</p>
-            <p className="mt-1 text-[13px] text-navy-100">{RESIDENT.barangay}, {RESIDENT.city}</p>
+            <p className="mt-1 text-[13px] text-navy-100">{RESIDENT.barangay}, {RESIDENT.municipality}</p>
             <p className="text-[12px] text-navy-100/70">{RESIDENT.province}</p>
           </div>
 
@@ -59,7 +59,7 @@ export default function IdCardScreen() {
         <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
           <p className="text-[13px] font-bold text-navy-950">Registered address</p>
           <p className="mt-1.5 text-[13px] leading-relaxed text-slate-600">{RESIDENT.address}</p>
-          <p className="text-[13px] text-slate-600">{RESIDENT.barangay}, {RESIDENT.city}, {RESIDENT.province}</p>
+          <p className="text-[13px] text-slate-600">{RESIDENT.barangay}, {RESIDENT.municipality}, {RESIDENT.province}</p>
         </div>
       </div>
     </div>

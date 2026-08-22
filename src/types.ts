@@ -34,7 +34,7 @@ export interface ServiceDefinition {
 
 export const WORKFLOW_STEPS = [
   'Submitted',
-  'City Treasury Assessment',
+  'Municipal Treasury Assessment',
   'Payment',
   'e-Document Release',
 ] as const
@@ -66,7 +66,7 @@ export interface ResidentProfile {
   philSysId: string
   philSysSynced: boolean
   barangay: string
-  city: string
+  municipality: string
   province: string
   birthDate: string
   address: string

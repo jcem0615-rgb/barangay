@@ -4,10 +4,10 @@ Handoff notes for continuing this project in Claude Code.
 
 ## What this is
 
-A mobile-first PWA for residents of a Philippine city/municipality to transact with the
+A mobile-first PWA for residents of a Philippine municipality to transact with the
 LGU's own offices: Business Permits & Licensing (BOSS), Social Welfare (CSWDO), the Local
-Civil Registrar, the Treasurer's Office, the Office of the Building Official, and the City
-Health Office. Barangay-level services are deliberately out of scope — this is the
+Civil Registrar, the Treasurer's Office, the Office of the Building Official, and the
+Municipal Health Office. Barangay-level services are deliberately out of scope — this is the
 municipal tier. Built as a functional prototype — realistic UX and data flow, no real
 backend or PhilSys integration.
 
@@ -84,7 +84,7 @@ automatically, no new screen needed. If a category needs an icon not already in
   processing delay — no PCI-relevant code, no real redirect/webhook handling. Real integration
   means server-side webhook verification; do not attempt to "complete" payment purely
   client-side in production.
-- **Workflow progression** (Submitted → City Treasury Assessment → Payment → e-Document
+- **Workflow progression** (Submitted → Municipal Treasury Assessment → Payment → e-Document
   Release) is only advanced automatically at seed time and after a simulated payment.
   There's no backend actor moving the treasury step forward — that would come from real
   staff-facing tooling on the LGU side. `currentStepIndex` is an index into

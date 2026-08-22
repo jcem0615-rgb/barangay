@@ -2,12 +2,15 @@ import { ChevronRight, FileEdit } from 'lucide-react'
 import type { Application } from '../types'
 import StatusPill from './StatusPill'
 import { WORKFLOW_STEPS } from '../types'
+import { findCategory } from '../data/mockData'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default function ApplicationCard({ app, onTap }: { app: Application; onTap: () => void }) {
+  const category = findCategory(app.categoryId)
+
   return (
     <button
       onClick={onTap}
@@ -15,7 +18,12 @@ export default function ApplicationCard({ app, onTap }: { app: Application; onTa
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate font-display text-[14px] font-bold text-navy-950">{app.serviceName}</p>
+          {category && (
+            <p className="truncate text-[10.5px] font-semibold uppercase tracking-[0.06em] text-navy-700">
+              {category.name}
+            </p>
+          )}
+          <p className="mt-0.5 truncate font-display text-[14px] font-bold text-navy-950">{app.serviceName}</p>
           <p className="mt-0.5 text-[11.5px] text-slate-400">
             {app.isOfflineDraft ? 'Saved offline' : `Ref. ${app.referenceNo}`} &middot; {formatDate(app.dateSubmitted)}
           </p>

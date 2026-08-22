@@ -1,4 +1,4 @@
-import type { Application, ResidentProfile, ServiceCategory, ServiceDefinition } from '../types'
+import type { Application, ResidentProfile, ServiceCategory, ServiceCategoryId, ServiceDefinition } from '../types'
 
 export const RESIDENT: ResidentProfile = {
   fullName: 'Maria Clara D. Santos',
@@ -6,11 +6,11 @@ export const RESIDENT: ResidentProfile = {
   philSysId: '6392-8841-0027-3311',
   philSysSynced: true,
   barangay: 'Barangay San Isidro',
-  city: 'City of San Fernando',
-  province: 'Pampanga',
+  municipality: 'Municipality of San Fernando',
+  province: 'Cebu',
   birthDate: '1994-03-18',
   address: 'Blk 4 Lot 12, Purok 3, Brgy. San Isidro',
-  qrSeed: 'PSN-6392884100273311-SFP',
+  qrSeed: 'PSN-6392884100273311-SFC',
 }
 
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
@@ -24,7 +24,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'cswdo',
     name: 'Social Welfare',
-    officeName: 'City Social Welfare & Development Office',
+    officeName: 'Municipal Social Welfare & Development Office',
     description: 'Financial aid, Senior Citizen and PWD ID',
     icon: 'hand-heart',
   },
@@ -38,7 +38,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'treasury',
     name: "Treasurer's Office",
-    officeName: "City Treasurer's Office",
+    officeName: "Municipal Treasurer's Office",
     description: 'Cedula, real property tax, and tax clearance',
     icon: 'coins',
   },
@@ -52,11 +52,17 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'health',
     name: 'Health Office',
-    officeName: 'City Health Office',
+    officeName: 'Municipal Health Office',
     description: 'Health certificates and sanitary permits',
     icon: 'stethoscope',
   },
 ]
+
+// Resolves the office that handles a request, so residents can see which
+// department is working on it.
+export function findCategory(id: ServiceCategoryId): ServiceCategory | undefined {
+  return SERVICE_CATEGORIES.find((c) => c.id === id)
+}
 
 export const SERVICES: ServiceDefinition[] = [
   {
@@ -204,7 +210,7 @@ export const SERVICES: ServiceDefinition[] = [
     id: 'zoning-clearance',
     categoryId: 'obo',
     name: 'Zoning / Locational Clearance',
-    shortDescription: 'Confirms your intended use of a property matches the city zoning plan.',
+    shortDescription: 'Confirms your intended use of a property matches the municipal zoning plan.',
     processingTime: '3\u20135 working days',
     fee: 500,
     requiresPayment: true,
@@ -288,7 +294,7 @@ export const SERVICES: ServiceDefinition[] = [
     id: 'occupational-permit',
     categoryId: 'bpls',
     name: 'Occupational Permit',
-    shortDescription: "Working permit for people employed within the city's jurisdiction.",
+    shortDescription: "Working permit for people employed within the municipality's jurisdiction.",
     processingTime: '1\u20132 working days',
     fee: 150,
     requiresPayment: true,

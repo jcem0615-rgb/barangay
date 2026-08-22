@@ -18,7 +18,7 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
             eLGU Citizen Digital ID
           </p>
           <p className="font-display mt-1 text-[19px] font-bold leading-tight text-white">{profile.fullName}</p>
-          <p className="mt-0.5 text-[12.5px] text-navy-100">{profile.barangay}, {profile.city}</p>
+          <p className="mt-0.5 text-[12.5px] text-navy-100">{profile.barangay}, {profile.municipality}</p>
         </div>
         <QrPattern seed={profile.qrSeed} size={9} dim={54} dark />
       </div>

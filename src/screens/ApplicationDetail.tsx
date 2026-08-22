@@ -4,7 +4,8 @@ import StatusPill from '../components/StatusPill'
 import WorkflowTracker from '../components/WorkflowTracker'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
-import { SERVICES } from '../data/mockData'
+import { SERVICES, findCategory } from '../data/mockData'
+import { resolveIcon } from '../lib/icons'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -25,6 +26,8 @@ export default function ApplicationDetail({ id }: { id: string }) {
   }
 
   const service = SERVICES.find((s) => s.id === app.serviceId)
+  const category = findCategory(app.categoryId)
+  const OfficeIcon = resolveIcon(category?.icon ?? '')
 
   return (
     <div className="animate-tap-in pb-28">
@@ -42,6 +45,20 @@ export default function ApplicationDetail({ id }: { id: string }) {
           </div>
           <StatusPill status={app.status} />
         </div>
+
+        {category && (
+          <div className="flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-navy-50 text-navy-800">
+              <OfficeIcon size={19} strokeWidth={1.9} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                Handling office
+              </p>
+              <p className="mt-0.5 text-[13.5px] font-semibold text-navy-950">{category.officeName}</p>
+            </div>
+          </div>
+        )}
 
         {app.isOfflineDraft && (
           <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-amber-800">
@@ -74,7 +91,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
               <p className="text-[13px] font-bold text-navy-950">Assessed fee</p>
               <p className="font-display text-[17px] font-extrabold text-navy-950">₱{app.fee.toLocaleString()}</p>
             </div>
-            <p className="mt-1 text-[12px] text-navy-900/70">City Treasury has finalized your assessment. Pay to proceed to document release.</p>
+            <p className="mt-1 text-[12px] text-navy-900/70">Municipal Treasury has finalized your assessment. Pay to proceed to document release.</p>
             <button
               onClick={() => push({ name: 'payment', id: app.id })}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3 text-[13.5px] font-semibold text-white active:bg-navy-900"

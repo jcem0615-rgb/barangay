@@ -27,7 +27,7 @@ export default function Profile() {
           </span>
           <div className="min-w-0">
             <p className="truncate font-display text-[15px] font-bold text-navy-950">{RESIDENT.fullName}</p>
-            <p className="truncate text-[12px] text-slate-500">{RESIDENT.barangay}, {RESIDENT.city}</p>
+            <p className="truncate text-[12px] text-slate-500">{RESIDENT.barangay}, {RESIDENT.municipality}</p>
             <div className="mt-1 flex items-center gap-1">
               <ShieldCheck size={12} className="text-emerald-600" />
               <span className="text-[11px] font-semibold text-emerald-700">PhilSys Verified</span>
