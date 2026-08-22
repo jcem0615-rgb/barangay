@@ -45,7 +45,7 @@ export default function Dashboard() {
           View all
         </button>
       </div>
-      <div className="mt-3 grid grid-cols-4 gap-2.5">
+      <div className="mt-3 grid grid-cols-3 gap-2.5">
         {SERVICE_CATEGORIES.map((cat) => {
           const Icon = resolveIcon(cat.icon)
           return (

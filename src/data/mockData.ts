@@ -15,13 +15,6 @@ export const RESIDENT: ResidentProfile = {
 
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
-    id: 'barangay',
-    name: 'Barangay Services',
-    officeName: 'Barangay San Isidro',
-    description: 'Clearances, indigency, and residency documents',
-    icon: 'landmark',
-  },
-  {
     id: 'bpls',
     name: 'Business Permits (BOSS)',
     officeName: 'Business One-Stop Shop',
@@ -45,50 +38,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
 ]
 
 export const SERVICES: ServiceDefinition[] = [
-  {
-    id: 'brgy-clearance',
-    categoryId: 'barangay',
-    name: 'Barangay Clearance',
-    shortDescription: 'General-purpose clearance for employment, business, or personal transactions.',
-    processingTime: '1–2 working days',
-    fee: 50,
-    requiresPayment: true,
-    requirements: ['Valid government ID', 'Proof of billing or residency', 'Community Tax Certificate (Cedula)'],
-    fields: [
-      { id: 'purpose', label: 'Purpose', type: 'select', options: ['Employment', 'Business Permit Requirement', 'Bank Transaction', 'School Requirement', 'Other'], required: true },
-      { id: 'yearsResiding', label: 'Years residing in barangay', type: 'number', placeholder: 'e.g. 8', required: true },
-      { id: 'notes', label: 'Additional notes', type: 'textarea', placeholder: 'Optional — anything the barangay office should know', required: false },
-    ],
-  },
-  {
-    id: 'cert-indigency',
-    categoryId: 'barangay',
-    name: 'Certificate of Indigency',
-    shortDescription: 'Certifies low-income status for medical, legal, or scholarship assistance.',
-    processingTime: '1–2 working days',
-    fee: 0,
-    requiresPayment: false,
-    requirements: ['Valid government ID', 'Proof of residency', 'Barangay social case study (if available)'],
-    fields: [
-      { id: 'purpose', label: 'Purpose', type: 'select', options: ['Medical Assistance', 'Legal Assistance (PAO)', 'Scholarship / Educational Assistance', 'Burial Assistance', 'Other'], required: true },
-      { id: 'householdIncome', label: 'Estimated monthly household income (₱)', type: 'number', placeholder: 'e.g. 8000', required: true },
-      { id: 'dependents', label: 'Number of dependents', type: 'number', placeholder: 'e.g. 3', required: false },
-    ],
-  },
-  {
-    id: 'residency-verification',
-    categoryId: 'barangay',
-    name: 'Residency Verification',
-    shortDescription: 'Confirms your address for school enrollment, voter, or relocation purposes.',
-    processingTime: 'Same day – 1 working day',
-    fee: 30,
-    requiresPayment: true,
-    requirements: ['Valid government ID', 'Proof of billing (utility bill or lease)'],
-    fields: [
-      { id: 'purpose', label: 'Purpose', type: 'select', options: ['School Enrollment', 'Voter Registration', 'Relocation / Transfer', 'Other'], required: true },
-      { id: 'currentAddress', label: 'Current complete address', type: 'textarea', placeholder: 'House no., street, purok', required: true },
-    ],
-  },
   {
     id: 'boss-application',
     categoryId: 'bpls',
@@ -187,20 +136,6 @@ export const SERVICES: ServiceDefinition[] = [
 ]
 
 export const seedApplications = (): Application[] => [
-  {
-    id: 'seed-1',
-    referenceNo: 'BSI-2026-08421',
-    serviceId: 'brgy-clearance',
-    serviceName: 'Barangay Clearance',
-    categoryId: 'barangay',
-    dateSubmitted: '2026-08-18T09:12:00+08:00',
-    currentStepIndex: 2,
-    status: 'in-progress',
-    fee: 50,
-    paid: false,
-    formValues: { purpose: 'Employment', yearsResiding: '8' },
-    isOfflineDraft: false,
-  },
   {
     id: 'seed-2',
     referenceNo: 'BOSS-2026-01188',

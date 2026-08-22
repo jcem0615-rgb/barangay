@@ -1,5 +1,4 @@
 import {
-  Landmark,
   Store,
   HeartHandshake,
   ScrollText,
@@ -16,7 +15,6 @@ import {
 } from 'lucide-react'
 
 export const ICONS: Record<string, LucideIcon> = {
-  landmark: Landmark,
   store: Store,
   'hand-heart': HeartHandshake,
   'scroll-text': ScrollText,

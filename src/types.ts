@@ -1,4 +1,4 @@
-export type ServiceCategoryId = 'barangay' | 'bpls' | 'cswdo' | 'lcr'
+export type ServiceCategoryId = 'bpls' | 'cswdo' | 'lcr'
 
 export interface ServiceCategory {
   id: ServiceCategoryId

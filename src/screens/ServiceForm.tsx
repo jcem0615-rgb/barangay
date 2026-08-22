@@ -15,7 +15,6 @@ function makeReferenceNo(prefix: string) {
 }
 
 const CATEGORY_PREFIX: Record<string, string> = {
-  barangay: 'BSI',
   bpls: 'BOSS',
   cswdo: 'CSWDO',
   lcr: 'LCR',

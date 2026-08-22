@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Application } from '../types'
-import { getAllApplications, saveApplication, seedIfEmpty } from './db'
-import { seedApplications } from '../data/mockData'
+import { getAllApplications, pruneRemovedServices, saveApplication, seedIfEmpty } from './db'
+import { SERVICES, seedApplications } from '../data/mockData'
 import { useOnlineStatus } from './useOnlineStatus'
 
 export function useApplications() {
@@ -16,7 +16,10 @@ export function useApplications() {
   }, [])
 
   useEffect(() => {
-    seedIfEmpty(seedApplications()).then(() => refresh().then(() => setLoaded(true)))
+    seedIfEmpty(seedApplications())
+      .then(() => pruneRemovedServices(SERVICES.map((s) => s.id)))
+      .then(() => refresh())
+      .then(() => setLoaded(true))
   }, [refresh])
 
   const upsert = useCallback(

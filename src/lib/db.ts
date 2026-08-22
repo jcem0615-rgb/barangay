@@ -36,3 +36,12 @@ export async function seedIfEmpty(seed: Application[]): Promise<void> {
     await Promise.all(seed.map((app) => saveApplication(app)))
   }
 }
+
+// Drops persisted applications whose service no longer exists (e.g. an office was
+// removed from SERVICES). Without this, an existing on-device store would keep
+// showing records that can no longer be opened.
+export async function pruneRemovedServices(validServiceIds: string[]): Promise<void> {
+  const valid = new Set(validServiceIds)
+  const stale = (await getAllApplications()).filter((a) => !valid.has(a.serviceId))
+  await Promise.all(stale.map((a) => deleteApplication(a.id)))
+}
