@@ -7,8 +7,8 @@ import { Inbox } from 'lucide-react'
 
 const TABS = [
   { key: 'all', label: 'All' },
-  { key: 'in-progress', label: 'Active' },
-  { key: 'for-payment', label: 'For Payment' },
+  { key: 'in_progress', label: 'Active' },
+  { key: 'for_payment', label: 'For Payment' },
   { key: 'completed', label: 'Completed' },
   { key: 'draft', label: 'Drafts' },
 ] as const
@@ -18,7 +18,12 @@ export default function ApplicationsList() {
   const { push } = useNav()
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('all')
 
-  const filtered = tab === 'all' ? applications : applications.filter((a) => a.status === tab)
+  const filtered =
+    tab === 'all'
+      ? applications
+      : tab === 'in_progress'
+        ? applications.filter((a) => a.status === 'in_progress' || a.status === 'submitted')
+        : applications.filter((a) => a.status === tab)
 
   return (
     <div className="animate-tap-in pb-24">

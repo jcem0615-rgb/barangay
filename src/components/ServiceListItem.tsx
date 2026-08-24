@@ -1,5 +1,6 @@
 import { ChevronRight, Clock3, Wallet } from 'lucide-react'
 import type { ServiceDefinition } from '../types'
+import { formatPeso } from '../lib/money'
 
 export default function ServiceListItem({ service, onTap }: { service: ServiceDefinition; onTap: () => void }) {
   return (
@@ -17,7 +18,7 @@ export default function ServiceListItem({ service, onTap }: { service: ServiceDe
           <Clock3 size={13} /> {service.processingTime}
         </span>
         <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-slate-500">
-          <Wallet size={13} /> {service.requiresPayment ? `₱${service.fee.toLocaleString()}` : 'Free'}
+          <Wallet size={13} /> {service.requiresPayment ? formatPeso(service.fee) : 'Free'}
         </span>
       </div>
     </button>

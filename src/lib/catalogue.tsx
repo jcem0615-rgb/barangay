@@ -1,0 +1,51 @@
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { api } from './api'
+import type { ServiceCategory, ServiceDefinition } from '../types'
+
+interface CatalogueValue {
+  departments: ServiceCategory[]
+  services: ServiceDefinition[]
+  loaded: boolean
+  findCategory: (id: string) => ServiceCategory | undefined
+  findService: (id: string) => ServiceDefinition | undefined
+}
+
+const CatalogueContext = createContext<CatalogueValue | null>(null)
+
+/** The office and service catalogue comes from the server, not a local file. */
+export function CatalogueProvider({ children }: { children: ReactNode }) {
+  const [departments, setDepartments] = useState<ServiceCategory[]>([])
+  const [services, setServices] = useState<ServiceDefinition[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    api
+      .catalogue()
+      .then((c) => {
+        setDepartments(c.departments)
+        setServices(c.services)
+      })
+      .catch(() => undefined)
+      .finally(() => setLoaded(true))
+  }, [])
+
+  return (
+    <CatalogueContext.Provider
+      value={{
+        departments,
+        services,
+        loaded,
+        findCategory: (id) => departments.find((d) => d.id === id),
+        findService: (id) => services.find((s) => s.id === id),
+      }}
+    >
+      {children}
+    </CatalogueContext.Provider>
+  )
+}
+
+export function useCatalogue() {
+  const ctx = useContext(CatalogueContext)
+  if (!ctx) throw new Error('useCatalogue must be used within CatalogueProvider')
+  return ctx
+}

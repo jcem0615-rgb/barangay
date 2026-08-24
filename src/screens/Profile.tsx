@@ -1,6 +1,7 @@
 import { Bell, ChevronRight, CircleHelp, FileText, IdCard, LogOut, ShieldCheck, Wifi } from 'lucide-react'
 import TopBar from '../components/TopBar'
-import { RESIDENT } from '../data/mockData'
+import { useResidentProfile } from '../lib/resident'
+import { useAuth } from '../lib/auth'
 import { useNav } from '../lib/nav'
 import { useOnlineStatus } from '../lib/useOnlineStatus'
 
@@ -12,6 +13,10 @@ const SETTINGS = [
 ]
 
 export default function Profile() {
+  const resident = useResidentProfile()
+  const { logout } = useAuth()
+  if (!resident) return null
+
   const { push } = useNav()
   const isOnline = useOnlineStatus()
 
@@ -22,12 +27,12 @@ export default function Profile() {
       <div className="px-4 pt-4">
         <div className="flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-navy-800 font-display text-[18px] font-bold text-white">
-            {RESIDENT.firstName[0]}
-            {RESIDENT.fullName.split(' ').at(-1)?.[0]}
+            {resident.firstName[0]}
+            {resident.fullName.split(' ').at(-1)?.[0]}
           </span>
           <div className="min-w-0">
-            <p className="truncate font-display text-[15px] font-bold text-navy-950">{RESIDENT.fullName}</p>
-            <p className="truncate text-[12px] text-slate-500">{RESIDENT.barangay}, {RESIDENT.municipality}</p>
+            <p className="truncate font-display text-[15px] font-bold text-navy-950">{resident.fullName}</p>
+            <p className="truncate text-[12px] text-slate-500">{resident.barangay}, {resident.municipality}</p>
             <div className="mt-1 flex items-center gap-1">
               <ShieldCheck size={12} className="text-emerald-600" />
               <span className="text-[11px] font-semibold text-emerald-700">PhilSys Verified</span>
@@ -59,7 +64,10 @@ export default function Profile() {
           ))}
         </div>
 
-        <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 py-3.5 text-[13.5px] font-semibold text-rose-600 active:bg-rose-100">
+        <button
+          onClick={logout}
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 py-3.5 text-[13.5px] font-semibold text-rose-600 active:bg-rose-100"
+        >
           <LogOut size={16} /> Sign out
         </button>
 

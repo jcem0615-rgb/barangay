@@ -26,3 +26,4 @@ dist-ssr
 # Server secrets and deps
 server/.env
 server/node_modules
+.env.local

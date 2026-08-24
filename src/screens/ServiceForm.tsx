@@ -1,39 +1,38 @@
 import { useState } from 'react'
-import { CheckCircle2, ClipboardList, Loader2, Send, FileDown } from 'lucide-react'
+import { CheckCircle2, ClipboardList, Loader2, Send } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import FormField from '../components/FormField'
 import OfflineBanner from '../components/OfflineBanner'
-import { SERVICES } from '../data/mockData'
+import { useCatalogue } from '../lib/catalogue'
 import { useNav } from '../lib/nav'
 import { useAppData } from '../lib/appData'
 import { useOnlineStatus } from '../lib/useOnlineStatus'
+import { ApiError } from '../lib/api'
 import type { Application } from '../types'
-
-function makeReferenceNo(prefix: string) {
-  const n = Math.floor(1000 + Math.random() * 8999)
-  return `${prefix}-2026-${n.toString().padStart(5, '0')}`
-}
-
-const CATEGORY_PREFIX: Record<string, string> = {
-  bpls: 'BOSS',
-  cswdo: 'CSWDO',
-  lcr: 'LCR',
-  treasury: 'CTO',
-  obo: 'OBO',
-  health: 'CHO',
-}
+import { formatPeso } from '../lib/money'
 
 export default function ServiceForm({ serviceId, draftId }: { serviceId: string; draftId?: string }) {
   const { replace } = useNav()
-  const { upsert, applications } = useAppData()
+  const { submit, applications } = useAppData()
+  const { findService } = useCatalogue()
   const isOnline = useOnlineStatus()
-  const service = SERVICES.find((s) => s.id === serviceId)!
+  const service = findService(serviceId)
   const draft = draftId ? applications.find((a) => a.id === draftId) : undefined
 
   const [values, setValues] = useState<Record<string, string>>(draft?.formValues ?? {})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState<Application | null>(null)
+
+  if (!service) {
+    return (
+      <div className="p-6 text-center text-slate-400">
+        <TopBar title="Service unavailable" />
+        <p className="mt-4 text-[13px]">This service is no longer offered.</p>
+      </div>
+    )
+  }
 
   const setValue = (id: string, v: string) => {
     setValues((prev) => ({ ...prev, [id]: v }))
@@ -54,46 +53,20 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
   const handleSubmit = async () => {
     if (!validate()) return
     setSubmitting(true)
-
-    const app: Application = {
-      id: draft?.id ?? `app-${Date.now()}`,
-      referenceNo: draft?.referenceNo && draft.referenceNo !== '—' ? draft.referenceNo : makeReferenceNo(CATEGORY_PREFIX[service.categoryId] ?? 'LGU'),
-      serviceId: service.id,
-      serviceName: service.name,
-      categoryId: service.categoryId,
-      dateSubmitted: new Date().toISOString(),
-      currentStepIndex: 0,
-      status: 'in-progress',
-      fee: service.fee,
-      paid: false,
-      formValues: values,
-      isOfflineDraft: !isOnline,
+    setSubmitError(null)
+    try {
+      // The server issues the reference number and decides the starting step;
+      // offline, this lands in the outbox and syncs on reconnect.
+      const created = await submit(
+        { id: service.id, name: service.name, categoryId: service.categoryId, fee: service.fee },
+        values
+      )
+      setSubmitted(created)
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : 'Could not submit. Please try again.')
+    } finally {
+      setSubmitting(false)
     }
-
-    // Simulate network round-trip
-    await new Promise((r) => setTimeout(r, 700))
-    await upsert(app)
-    setSubmitting(false)
-    setSubmitted(app)
-  }
-
-  const handleSaveDraft = async () => {
-    const app: Application = {
-      id: draft?.id ?? `draft-${Date.now()}`,
-      referenceNo: '—',
-      serviceId: service.id,
-      serviceName: service.name,
-      categoryId: service.categoryId,
-      dateSubmitted: new Date().toISOString(),
-      currentStepIndex: 0,
-      status: 'draft',
-      fee: service.fee,
-      paid: false,
-      formValues: values,
-      isOfflineDraft: !isOnline,
-    }
-    await upsert(app)
-    replace({ name: 'applications' })
   }
 
   if (submitted) {
@@ -151,7 +124,7 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
           <div className="mt-3 flex items-center justify-between border-t border-dashed border-slate-200 pt-3">
             <span className="text-[12px] font-medium text-slate-500">Applicable fee</span>
             <span className="text-[13.5px] font-bold text-navy-950">
-              {service.requiresPayment ? `₱${service.fee.toLocaleString()}` : 'Free of charge'}
+              {service.requiresPayment ? formatPeso(service.fee) : 'Free of charge'}
             </span>
           </div>
         </div>
@@ -171,13 +144,12 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
       </div>
 
       <div className="fixed inset-x-0 bottom-[64px] mx-auto max-w-[430px] border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+        {submitError && (
+          <p role="alert" className="mb-2.5 rounded-lg bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700">
+            {submitError}
+          </p>
+        )}
         <div className="flex gap-2.5">
-          <button
-            onClick={handleSaveDraft}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-4 py-3 text-[13px] font-semibold text-navy-900 active:bg-slate-50"
-          >
-            <FileDown size={15} /> Save Draft
-          </button>
           <button
             onClick={handleSubmit}
             disabled={submitting}

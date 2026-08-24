@@ -46,7 +46,7 @@ const submit = await call('/requests', { method: 'POST', token: resident,
 check('submit returns 201', submit.status === 201, JSON.stringify(submit.json))
 const reqId = submit.json?.id
 check('reference number is OBO-prefixed', /^OBO-\d{4}-\d{5}$/.test(submit.json?.referenceNo ?? ''), submit.json?.referenceNo)
-check('routed to the obo department', submit.json?.departmentId === 'obo')
+check('routed to the obo department', submit.json?.categoryId === 'obo', submit.json?.categoryId)
 check('starts at step 0', submit.json?.currentStepIndex === 0)
 check('fee copied from catalogue (1500)', submit.json?.fee === 1500, submit.json?.fee)
 check('anonymous cannot submit', (await call('/requests', { method: 'POST', body: { serviceId: 'cedula' } })).status === 401)

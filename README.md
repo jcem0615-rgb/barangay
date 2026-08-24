@@ -1,7 +1,8 @@
 # eLGU Citizen Portal
 
 A mobile-first Progressive Web App for residents of a Philippine Local Government Unit (LGU)
-to transact with its municipal offices — from one pocket app, with offline draft support.
+to transact with its municipal offices, and for municipal staff to work the requests those
+residents send them.
 
 ## Features
 
@@ -19,11 +20,23 @@ to transact with its municipal offices — from one pocket app, with offline dra
 - **Offline drafts** — forms submitted without a connection are saved to IndexedDB on-device
   and sync automatically once you're back online
 - **Installable PWA** — web manifest + service worker (Workbox) for offline app-shell caching
+- **Department console** — staff sign in and see only their own office's queue, set the
+  assessed fee, advance a request, or reject it with a reason
+- **Accounts and roles** — residents register themselves; staff accounts are issued per office
+- **Audit trail** — every status change records who made it and when
 
 ## Getting started
 
+The app needs the API running. See `server/README.md`, then:
+
 ```bash
+# API
+cd server && cp .env.example .env && npm install
+npm run migrate && npm run seed && npm start
+
+# Web app (another terminal)
 npm install
+echo "VITE_API_URL=http://localhost:4000/api" > .env.local
 npm run dev
 ```
 
@@ -39,7 +52,7 @@ npm run preview # serve the production build locally
 
 ## Tech stack
 
-React 19 · TypeScript · Vite · Tailwind CSS v4 · lucide-react · idb-keyval (IndexedDB) ·
-vite-plugin-pwa
+**Web** React 19 · TypeScript · Vite · Tailwind CSS v4 · lucide-react · idb-keyval · vite-plugin-pwa
+**API** Node · Express 5 · PostgreSQL · JWT · bcrypt · zod
 
 See `CLAUDE.md` for architecture notes, data flow, and where to extend this.

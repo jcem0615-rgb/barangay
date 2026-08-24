@@ -2,13 +2,14 @@ import { ChevronRight, FileEdit } from 'lucide-react'
 import type { Application } from '../types'
 import StatusPill from './StatusPill'
 import { WORKFLOW_STEPS } from '../types'
-import { findCategory } from '../data/mockData'
+import { useCatalogue } from '../lib/catalogue'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default function ApplicationCard({ app, onTap }: { app: Application; onTap: () => void }) {
+  const { findCategory } = useCatalogue()
   const category = findCategory(app.categoryId)
 
   return (

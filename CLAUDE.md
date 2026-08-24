@@ -8,8 +8,11 @@ A mobile-first PWA for residents of a Philippine municipality to transact with t
 LGU's own offices: Business Permits & Licensing (BOSS), Social Welfare (CSWDO), the Local
 Civil Registrar, the Treasurer's Office, the Office of the Building Official, and the
 Municipal Health Office. Barangay-level services are deliberately out of scope — this is the
-municipal tier. Built as a functional prototype — realistic UX and data flow, no real
-backend or PhilSys integration.
+municipal tier.
+
+Both sides of the system live here: the resident PWA and the staff-facing department
+console, backed by a real Node + Postgres API with accounts and roles (`server/`).
+PhilSys verification and payment settlement are still simulated.
 
 ## Stack
 
@@ -17,12 +20,14 @@ backend or PhilSys integration.
 - **Tailwind CSS v4** via `@tailwindcss/vite` — no `tailwind.config.js`; all design tokens
   (colors, fonts) live in `src/index.css` under `@theme`.
 - **lucide-react** for icons
-- **idb-keyval** for IndexedDB-backed offline storage (`src/lib/db.ts`)
+- **idb-keyval** for the offline submission outbox (`src/lib/db.ts`)
 - **vite-plugin-pwa** for the web manifest + generated service worker (Workbox, `NetworkFirst`
   for documents, precache for the app shell)
 - No router library — navigation is a simple in-memory stack (`src/lib/nav.tsx`) since this
   is a single-session app shell, not a multi-URL site. Swap in `react-router` if deep-linking
   to individual screens becomes a requirement.
+- **Backend**: Node + Express + Postgres in `server/` (see `server/README.md`). The app will
+  not function without it — there is no offline demo mode.
 
 ## Project structure
 
@@ -55,17 +60,35 @@ src/
   `.id-texture` classes behind the Digital ID card — this is the one deliberate flourish; keep
   everything else restrained if you extend the UI.
 
+## Two shells, one bundle
+
+`App.tsx` renders by the role the server reports on `/auth/me`:
+
+- no session → `SignIn` (residents can self-register; staff use issued accounts)
+- `resident` → the mobile PWA shell
+- `staff` / `admin` → `StaffConsole`, the desk-width department queue
+
+Roles are a server-side fact. The shell is a rendering convenience, never a control —
+the API refuses cross-role and cross-department access on its own.
+
 ## Data flow / how offline works
 
-`Application` records are the single source of truth for anything a citizen has submitted or
-drafted. They live in IndexedDB via `db.ts`, loaded into a React context on boot
-(`useApplications`). Submitting a form while `navigator.onLine` is `false` sets
-`isOfflineDraft: true` on the record; when the `online` event fires, `useApplications` sweeps
-IndexedDB and flips any pending offline records to synced. This is a **client-side simulation**
-— there is no real backend, so "sync" just clears the flag. Wiring a real API: replace the
-`upsert`/`getAllApplications` calls in `useApplications.ts` with fetch calls, keep IndexedDB as
-the offline queue, and reconcile on reconnect (e.g. POST anything still flagged
-`isOfflineDraft`).
+The **API is the source of truth**. `useApplications` loads a resident's requests from
+`GET /api/requests`; the office catalogue comes from `GET /api/catalogue` via
+`CatalogueProvider`. `src/data/mockData.ts` is now only the *authoring* source for that
+catalogue — `server/src/seed.ts` imports it to seed the database, and the app reads it back
+from the server at runtime.
+
+IndexedDB (`src/lib/db.ts`) is now an **outbox**, not a store: submitting while offline
+queues a `PendingSubmission` on-device and shows it in the list immediately. When the
+`online` event fires, `flushOutbox` POSTs each queued item oldest-first, passing its original
+timestamp so the server records when the resident actually filled it in. A submission the
+server rejects with a 4xx is dropped rather than retried forever.
+
+Workflow progression belongs to the server. Staff call assess / advance / reject; the
+resident calls pay. The client never sets `currentStepIndex` itself.
+
+## Adding a new service
 
 ## Adding a new service
 
@@ -77,28 +100,42 @@ automatically, no new screen needed. If a category needs an icon not already in
 
 ## Known simplifications (intentional, flag if scope grows)
 
-- **PhilSys sync** and the **QR code** are visual only — `qrPattern.ts` renders a deterministic
-  but non-scannable pattern seeded from a string. A production build would call an actual
-  PhilSys verification API and render a real QR (e.g. via `qrcode` npm package).
-- **Payment gateways** (GCash / Maya / Landbank Online) are a UI simulation with a fake
-  processing delay — no PCI-relevant code, no real redirect/webhook handling. Real integration
-  means server-side webhook verification; do not attempt to "complete" payment purely
-  client-side in production.
-- **Workflow progression** (Submitted → Municipal Treasury Assessment → Payment → e-Document
-  Release) is only advanced automatically at seed time and after a simulated payment.
-  There's no backend actor moving the treasury step forward — that would come from real
-  staff-facing tooling on the LGU side. `currentStepIndex` is an index into
-  `WORKFLOW_STEPS`, so changing that array invalidates stored records; bump `DATA_VERSION`
-  when you do.
-- Navigation stack resets on reload (in-memory, not URL-based) — acceptable for a kiosk-style
-  PWA session but worth revisiting if citizens expect to share/bookmark a specific application's
-  URL.
+- **PhilSys sync** and the **QR code** are visual only — `qrPattern.ts` renders a
+  deterministic but non-scannable pattern. A production build would call a real PhilSys
+  verification API and render a scannable QR.
+- **Payment** records that a resident chose a method and marks the request paid. There is no
+  gateway integration: no redirect, no webhook, no settlement. Wiring a real one means
+  server-side webhook verification — never mark a request paid from the client.
+- **Drafts** have no API endpoint yet. `ApplicationStatus` still includes `draft` and the
+  request list still has a Drafts tab, but nothing writes one; the Save Draft button was
+  removed rather than left lying about what it did.
+- **Sessions** are 12-hour JWTs with no refresh or revocation list. Signing out clears the
+  token client-side; the token itself stays valid until it expires.
+- **No rate limiting** on login. Add it before this faces the internet.
+- Navigation stack resets on reload (in-memory, not URL-based).
 
 ## Commands
 
+Two processes: the API and the web app.
+
 ```bash
+# 1. API (needs Postgres running)
+cd server
+cp .env.example .env          # set DATABASE_URL and JWT_SECRET
 npm install
-npm run dev       # http://localhost:5173
+npm run migrate && npm run seed
+npm start                     # http://localhost:4000
+
+# 2. Web app, in another terminal
+npm install
+echo "VITE_API_URL=http://localhost:4000/api" > .env.local
+npm run dev                   # http://localhost:5173
+```
+
+Seeded staff logins are `<office>@sanfernando.gov.ph` (treasury, bpls, obo, lcr, cswdo,
+health) with the password printed by `npm run seed`. Residents register in the app.
+
+```bash
 npm run build     # tsc -b && vite build -> dist/
 npm run preview   # serve the production build locally
 ```

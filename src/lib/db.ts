@@ -1,47 +1,38 @@
-import { createStore, get, set, del, keys } from 'idb-keyval'
-import type { Application } from '../types'
+import { createStore, del, get, keys, set } from 'idb-keyval'
 
-// Dedicated IndexedDB store for this app (separate DB from idb-keyval's default)
-const applicationsStore = createStore('elgu-citizen-portal', 'applications')
+// IndexedDB is no longer the source of truth — the API is. What lives here is
+// the outbox: requests the resident submitted while offline, held on-device
+// until the connection comes back and they can be POSTed for real.
+const outboxStore = createStore('elgu-citizen-portal', 'outbox')
 
-const STORE_KEY_PREFIX = 'application:'
+const OUTBOX_PREFIX = 'pending:'
 
-export async function saveApplication(app: Application): Promise<void> {
-  await set(`${STORE_KEY_PREFIX}${app.id}`, app, applicationsStore)
+export interface PendingSubmission {
+  localId: string
+  serviceId: string
+  serviceName: string
+  categoryId: string
+  fee: number
+  formValues: Record<string, string>
+  createdAt: string
 }
 
-export async function deleteApplication(id: string): Promise<void> {
-  await del(`${STORE_KEY_PREFIX}${id}`, applicationsStore)
+export async function queueSubmission(item: PendingSubmission): Promise<void> {
+  await set(`${OUTBOX_PREFIX}${item.localId}`, item, outboxStore)
 }
 
-export async function getApplication(id: string): Promise<Application | undefined> {
-  return get(`${STORE_KEY_PREFIX}${id}`, applicationsStore)
-}
-
-export async function getAllApplications(): Promise<Application[]> {
-  const allKeys = await keys(applicationsStore)
-  const apps = await Promise.all(
+export async function getOutbox(): Promise<PendingSubmission[]> {
+  const allKeys = await keys(outboxStore)
+  const items = await Promise.all(
     allKeys
-      .filter((k) => typeof k === 'string' && k.startsWith(STORE_KEY_PREFIX))
-      .map((k) => get<Application>(k as string, applicationsStore))
+      .filter((k): k is string => typeof k === 'string' && k.startsWith(OUTBOX_PREFIX))
+      .map((k) => get<PendingSubmission>(k, outboxStore))
   )
-  return apps.filter((a): a is Application => Boolean(a)).sort(
-    (a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime()
-  )
+  return items
+    .filter((i): i is PendingSubmission => Boolean(i))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
-const DATA_VERSION_KEY = 'schema-version'
-
-// The service catalogue and workflow steps are demo data, so records saved by an
-// older build can reference a service or a step index that no longer exists.
-// When the version changes, start the on-device store clean instead of trying to
-// migrate those records field by field. Anything the viewer drafted is cleared too.
-export async function resetIfStale(version: string, seed: Application[]): Promise<void> {
-  const storedVersion = await get<string>(DATA_VERSION_KEY, applicationsStore)
-  if (storedVersion === version) return
-
-  const allKeys = await keys(applicationsStore)
-  await Promise.all(allKeys.map((k) => del(k as string, applicationsStore)))
-  await Promise.all(seed.map((app) => saveApplication(app)))
-  await set(DATA_VERSION_KEY, version, applicationsStore)
+export async function removeFromOutbox(localId: string): Promise<void> {
+  await del(`${OUTBOX_PREFIX}${localId}`, outboxStore)
 }

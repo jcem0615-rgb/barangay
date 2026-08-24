@@ -4,8 +4,9 @@ import StatusPill from '../components/StatusPill'
 import WorkflowTracker from '../components/WorkflowTracker'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
-import { SERVICES, findCategory } from '../data/mockData'
+import { useCatalogue } from '../lib/catalogue'
 import { resolveIcon } from '../lib/icons'
+import { formatPeso } from '../lib/money'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -13,6 +14,7 @@ function formatDate(iso: string) {
 
 export default function ApplicationDetail({ id }: { id: string }) {
   const { applications } = useAppData()
+  const { findCategory, findService } = useCatalogue()
   const { push, replace } = useNav()
   const app = applications.find((a) => a.id === id)
 
@@ -25,7 +27,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
     )
   }
 
-  const service = SERVICES.find((s) => s.id === app.serviceId)
+  const service = findService(app.serviceId)
   const category = findCategory(app.categoryId)
   const OfficeIcon = resolveIcon(category?.icon ?? '')
 
@@ -85,11 +87,11 @@ export default function ApplicationDetail({ id }: { id: string }) {
           </div>
         )}
 
-        {app.status === 'for-payment' && (
+        {app.status === 'for_payment' && (
           <div className="rounded-2xl border border-gold-500/40 bg-gold-100/60 p-4">
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-bold text-navy-950">Assessed fee</p>
-              <p className="font-display text-[17px] font-extrabold text-navy-950">₱{app.fee.toLocaleString()}</p>
+              <p className="font-display text-[17px] font-extrabold text-navy-950">{formatPeso(app.fee)}</p>
             </div>
             <p className="mt-1 text-[12px] text-navy-900/70">Municipal Treasury has finalized your assessment. Pay to proceed to document release.</p>
             <button

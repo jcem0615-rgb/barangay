@@ -15,7 +15,9 @@ export const env = {
   // No fallback on purpose: a default signing secret would let anyone mint a
   // valid staff token against a deployed server.
   jwtSecret: required('JWT_SECRET'),
-  corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
+  // localhost and 127.0.0.1 are different origins to a browser, so allow both
+  // by default — otherwise dev hits a CORS wall depending on which URL is used.
+  corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://127.0.0.1:5173')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean),

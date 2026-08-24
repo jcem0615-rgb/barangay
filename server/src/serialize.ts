@@ -27,7 +27,7 @@ export function serializeRequest(row: RequestRow) {
     referenceNo: row.reference_no,
     serviceId: row.service_id,
     serviceName: row.service_name ?? '',
-    departmentId: row.department_id,
+    categoryId: row.department_id,
     status: row.status,
     currentStepIndex: row.current_step_index,
     fee: toPesos(row.fee_centavos),

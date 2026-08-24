@@ -1,14 +1,17 @@
 import TopBar from '../components/TopBar'
 import ServiceListItem from '../components/ServiceListItem'
-import { SERVICE_CATEGORIES, SERVICES } from '../data/mockData'
+import { useCatalogue } from '../lib/catalogue'
 import { useNav, type Screen } from '../lib/nav'
 import { resolveIcon } from '../lib/icons'
 
 export default function CategoryDetail({ categoryId }: { categoryId: Extract<Screen, { name: 'category' }>['categoryId'] }) {
   const { push } = useNav()
-  const category = SERVICE_CATEGORIES.find((c) => c.id === categoryId)!
-  const services = SERVICES.filter((s) => s.categoryId === categoryId)
-  const Icon = resolveIcon(category.icon)
+  const { departments, services: allServices } = useCatalogue()
+  const category = departments.find((c) => c.id === categoryId)
+  const services = allServices.filter((s) => s.categoryId === categoryId)
+  const Icon = resolveIcon(category?.icon ?? '')
+
+  if (!category) return null
 
   return (
     <div className="animate-tap-in pb-6">

@@ -1,17 +1,7 @@
-import type { Application, ResidentProfile, ServiceCategory, ServiceCategoryId, ServiceDefinition } from '../types'
-
-export const RESIDENT: ResidentProfile = {
-  fullName: 'Maria Clara D. Santos',
-  firstName: 'Maria',
-  philSysId: '6392-8841-0027-3311',
-  philSysSynced: true,
-  barangay: 'Barangay San Isidro',
-  municipality: 'Municipality of San Fernando',
-  province: 'Cebu',
-  birthDate: '1994-03-18',
-  address: 'Blk 4 Lot 12, Purok 3, Brgy. San Isidro',
-  qrSeed: 'PSN-6392884100273311-SFC',
-}
+// Catalogue of municipal offices and the services they provide.
+// The API seeds from this file (server/src/seed.ts), and the app reads the
+// catalogue back from the server at runtime — this is the authoring source.
+import type { ServiceCategory, ServiceCategoryId, ServiceDefinition } from '../types'
 
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
@@ -342,41 +332,5 @@ export const SERVICES: ServiceDefinition[] = [
       { id: 'childrenCount', label: 'Number of dependent children', type: 'number', placeholder: 'e.g. 2', required: true },
       { id: 'monthlyIncome', label: 'Monthly income (\u20b1)', type: 'number', placeholder: 'e.g. 12000', required: true },
     ],
-  },
-]
-
-// Bump whenever SERVICES, SERVICE_CATEGORIES, or WORKFLOW_STEPS change shape, so
-// existing on-device stores are rebuilt instead of holding stale references.
-export const DATA_VERSION = '2026-08-22-municipal-offices'
-
-export const seedApplications = (): Application[] => [
-  {
-    id: 'seed-2',
-    referenceNo: 'BOSS-2026-01188',
-    serviceId: 'boss-application',
-    serviceName: 'BOSS Business Permit Application',
-    categoryId: 'bpls',
-    dateSubmitted: '2026-08-10T14:30:00+08:00',
-    currentStepIndex: 2,
-    status: 'for-payment',
-    fee: 2850,
-    paid: false,
-    formValues: { businessName: 'Santos Sari-Sari Store', businessType: 'Renewal', lineOfBusiness: 'Retail / Sari-Sari Store' },
-    isOfflineDraft: false,
-  },
-  {
-    id: 'seed-3',
-    referenceNo: 'LCR-2026-00937',
-    serviceId: 'birth-certificate',
-    serviceName: 'Birth Certificate (PSA)',
-    categoryId: 'lcr',
-    dateSubmitted: '2026-07-29T08:05:00+08:00',
-    currentStepIndex: 3,
-    status: 'completed',
-    fee: 155,
-    paid: true,
-    paymentMethod: 'GCash',
-    formValues: { registrantName: 'Maria Clara D. Santos', copies: '2' },
-    isOfflineDraft: false,
   },
 ]

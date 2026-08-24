@@ -1,5 +1,6 @@
 import { Bell } from 'lucide-react'
-import { RESIDENT, SERVICE_CATEGORIES } from '../data/mockData'
+import { useCatalogue } from '../lib/catalogue'
+import { useResidentProfile } from '../lib/resident'
 import IDCard from '../components/IDCard'
 import { useNav } from '../lib/nav'
 import { useAppData } from '../lib/appData'
@@ -10,6 +11,8 @@ import { resolveIcon } from '../lib/icons'
 
 export default function Dashboard() {
   const { push } = useNav()
+  const { departments } = useCatalogue()
+  const resident = useResidentProfile()
   const { applications } = useAppData()
   const isOnline = useOnlineStatus()
   const recent = applications.slice(0, 2)
@@ -19,7 +22,7 @@ export default function Dashboard() {
       <div className="mb-5 flex items-start justify-between">
         <div>
           <p className="text-[13px] text-slate-500">Magandang araw,</p>
-          <h1 className="font-display text-[21px] font-extrabold text-navy-950">{RESIDENT.firstName} 👋</h1>
+          <h1 className="font-display text-[21px] font-extrabold text-navy-950">{resident?.firstName ?? ''} 👋</h1>
         </div>
         <button
           onClick={() => push({ name: 'applications' })}
@@ -37,7 +40,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <IDCard profile={RESIDENT} onTap={() => push({ name: 'id-card' })} />
+      {resident && <IDCard profile={resident} onTap={() => push({ name: 'id-card' })} />}
 
       <div className="mt-6 flex items-center justify-between">
         <h2 className="font-display text-[15px] font-bold text-navy-950">Quick Services</h2>
@@ -46,7 +49,7 @@ export default function Dashboard() {
         </button>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2.5">
-        {SERVICE_CATEGORIES.map((cat) => {
+        {departments.map((cat) => {
           const Icon = resolveIcon(cat.icon)
           return (
             <button

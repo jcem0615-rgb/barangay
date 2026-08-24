@@ -41,7 +41,8 @@ export const WORKFLOW_STEPS = [
 
 export type WorkflowStepLabel = (typeof WORKFLOW_STEPS)[number]
 
-export type ApplicationStatus = 'draft' | 'in-progress' | 'for-payment' | 'completed' | 'rejected'
+export type ApplicationStatus =
+  | 'draft' | 'submitted' | 'in_progress' | 'for_payment' | 'completed' | 'rejected'
 
 export interface Application {
   id: string
@@ -56,7 +57,7 @@ export interface Application {
   paid: boolean
   paymentMethod?: 'GCash' | 'Maya' | 'Landbank Online'
   formValues: Record<string, string>
-  isOfflineDraft: boolean
+  isOfflineDraft?: boolean
   rejectionReason?: string
 }
 

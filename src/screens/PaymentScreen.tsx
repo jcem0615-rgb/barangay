@@ -3,8 +3,8 @@ import { CheckCircle2, ChevronRight, Loader2, ShieldCheck } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
-import { WORKFLOW_STEPS } from '../types'
-import type { Application } from '../types'
+import { ApiError } from '../lib/api'
+import { formatPeso } from '../lib/money'
 
 type Method = 'GCash' | 'Maya' | 'Landbank Online'
 
@@ -15,28 +15,28 @@ const METHODS: { id: Method; label: string; blurb: string; bg: string; fg: strin
 ]
 
 export default function PaymentScreen({ id }: { id: string }) {
-  const { applications, upsert } = useAppData()
+  const { applications, pay } = useAppData()
   const { replace } = useNav()
   const app = applications.find((a) => a.id === id)
 
   const [selected, setSelected] = useState<Method | null>(null)
   const [step, setStep] = useState<'select' | 'confirm' | 'processing' | 'done'>('select')
+  const [error, setError] = useState<string | null>(null)
 
   if (!app) return null
 
   const handlePay = async () => {
     if (!selected) return
     setStep('processing')
-    await new Promise((r) => setTimeout(r, 1400))
-    const updated: Application = {
-      ...app,
-      paid: true,
-      paymentMethod: selected,
-      status: 'in-progress',
-      currentStepIndex: WORKFLOW_STEPS.length - 1,
+    setError(null)
+    try {
+      // The server records the payment and moves the request forward.
+      await pay(app.id, selected)
+      setStep('done')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Payment did not go through.')
+      setStep('confirm')
     }
-    await upsert(updated)
-    setStep('done')
   }
 
   if (step === 'done') {
@@ -47,7 +47,7 @@ export default function PaymentScreen({ id }: { id: string }) {
         </div>
         <h1 className="font-display mt-5 text-[19px] font-extrabold text-navy-950">Payment successful</h1>
         <p className="mt-2 max-w-xs text-[13.5px] leading-relaxed text-slate-500">
-          ₱{app.fee.toLocaleString()} paid via {selected}. Your document is now being prepared for release.
+          {formatPeso(app.fee)} paid via {selected}. Your document is now being prepared for release.
         </p>
         <button
           onClick={() => replace({ name: 'application-detail', id: app.id })}
@@ -66,7 +66,7 @@ export default function PaymentScreen({ id }: { id: string }) {
       <div className="px-4 pt-4">
         <div className="rounded-2xl bg-navy-800 p-5 text-white">
           <p className="text-[11px] uppercase tracking-wide text-navy-100/80">Amount due</p>
-          <p className="font-display mt-1 text-[26px] font-extrabold">₱{app.fee.toLocaleString()}</p>
+          <p className="font-display mt-1 text-[26px] font-extrabold">{formatPeso(app.fee)}</p>
           <p className="mt-1 text-[12px] text-navy-100/70">Ref. {app.referenceNo}</p>
         </div>
 
@@ -102,6 +102,12 @@ export default function PaymentScreen({ id }: { id: string }) {
             <p className="text-center text-[13px] font-semibold text-slate-500">Confirm payment with</p>
             <p className="font-display mt-1 text-center text-[18px] font-extrabold text-navy-950">{selected}</p>
 
+            {error && (
+              <p role="alert" className="mt-4 rounded-lg bg-rose-50 px-3 py-2.5 text-center text-[12.5px] text-rose-700">
+                {error}
+              </p>
+            )}
+
             <div className="mt-5 space-y-2.5 border-y border-dashed border-slate-200 py-4">
               <div className="flex justify-between text-[12.5px]">
                 <span className="text-slate-500">Service</span>
@@ -113,7 +119,7 @@ export default function PaymentScreen({ id }: { id: string }) {
               </div>
               <div className="flex justify-between text-[13.5px] font-bold">
                 <span className="text-navy-950">Total</span>
-                <span className="text-navy-950">₱{app.fee.toLocaleString()}</span>
+                <span className="text-navy-950">{formatPeso(app.fee)}</span>
               </div>
             </div>
 
@@ -131,7 +137,7 @@ export default function PaymentScreen({ id }: { id: string }) {
                   <Loader2 size={16} className="animate-spin" /> Processing payment…
                 </>
               ) : (
-                `Confirm & Pay ₱${app.fee.toLocaleString()}`
+                `Confirm & Pay ${formatPeso(app.fee)}`
               )}
             </button>
             {step === 'confirm' && (

@@ -1,5 +1,8 @@
+import { Loader2 } from 'lucide-react'
 import { NavProvider, useNav } from './lib/nav'
 import { AppDataProvider } from './lib/appData'
+import { AuthProvider, useAuth } from './lib/auth'
+import { CatalogueProvider } from './lib/catalogue'
 import BottomNav from './components/BottomNav'
 import Dashboard from './screens/Dashboard'
 import Services from './screens/Services'
@@ -10,6 +13,8 @@ import ApplicationDetail from './screens/ApplicationDetail'
 import PaymentScreen from './screens/PaymentScreen'
 import Profile from './screens/Profile'
 import IdCardScreen from './screens/IdCardScreen'
+import SignIn from './screens/SignIn'
+import StaffConsole from './screens/staff/StaffConsole'
 
 function ScreenRouter() {
   const { screen } = useNav()
@@ -38,7 +43,7 @@ function ScreenRouter() {
   }
 }
 
-function AppShell() {
+function ResidentShell() {
   const { screen } = useNav()
   const showBottomNav = !['payment', 'id-card'].includes(screen.name)
 
@@ -52,12 +57,36 @@ function AppShell() {
   )
 }
 
-export default function App() {
+/** Which shell you get is decided by the role the server reports, not the URL. */
+function RoleShell() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-slate-canvas">
+        <Loader2 size={22} className="animate-spin text-navy-800" />
+      </div>
+    )
+  }
+
+  if (!user) return <SignIn />
+  if (user.role === 'staff' || user.role === 'admin') return <StaffConsole />
+
   return (
     <NavProvider>
-      <AppDataProvider>
-        <AppShell />
-      </AppDataProvider>
+      <ResidentShell />
     </NavProvider>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <CatalogueProvider>
+        <AppDataProvider>
+          <RoleShell />
+        </AppDataProvider>
+      </CatalogueProvider>
+    </AuthProvider>
   )
 }

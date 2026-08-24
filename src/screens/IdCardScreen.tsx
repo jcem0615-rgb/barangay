@@ -1,9 +1,12 @@
 import { ShieldCheck, Fingerprint } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import QrPattern from '../components/QrPattern'
-import { RESIDENT } from '../data/mockData'
+import { useResidentProfile } from '../lib/resident'
 
 export default function IdCardScreen() {
+  const resident = useResidentProfile()
+  if (!resident) return null
+
   return (
     <div className="animate-tap-in pb-10">
       <TopBar title="Digital ID" subtitle="Present this for verification" />
@@ -21,24 +24,26 @@ export default function IdCardScreen() {
           </div>
 
           <div className="relative mt-5 flex justify-center">
-            <QrPattern seed={RESIDENT.qrSeed} size={11} dim={190} dark />
+            <QrPattern seed={resident.qrSeed} size={11} dim={190} dark />
           </div>
 
           <div className="relative mt-5 text-center">
-            <p className="font-display text-[20px] font-bold">{RESIDENT.fullName}</p>
-            <p className="mt-1 text-[13px] text-navy-100">{RESIDENT.barangay}, {RESIDENT.municipality}</p>
-            <p className="text-[12px] text-navy-100/70">{RESIDENT.province}</p>
+            <p className="font-display text-[20px] font-bold">{resident.fullName}</p>
+            <p className="mt-1 text-[13px] text-navy-100">{resident.barangay}, {resident.municipality}</p>
+            <p className="text-[12px] text-navy-100/70">{resident.province}</p>
           </div>
 
           <div className="relative mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-navy-100/60">PhilSys ID No.</p>
-              <p className="mt-0.5 text-[12.5px] font-semibold tracking-wide">{RESIDENT.philSysId}</p>
+              <p className="mt-0.5 text-[12.5px] font-semibold tracking-wide">{resident.philSysId}</p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-navy-100/60">Date of Birth</p>
               <p className="mt-0.5 text-[12.5px] font-semibold">
-                {new Date(RESIDENT.birthDate).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}
+                {resident.birthDate
+                  ? new Date(resident.birthDate).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })
+                  : '—'}
               </p>
             </div>
           </div>
@@ -58,8 +63,8 @@ export default function IdCardScreen() {
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
           <p className="text-[13px] font-bold text-navy-950">Registered address</p>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-slate-600">{RESIDENT.address}</p>
-          <p className="text-[13px] text-slate-600">{RESIDENT.barangay}, {RESIDENT.municipality}, {RESIDENT.province}</p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-slate-600">{resident.address}</p>
+          <p className="text-[13px] text-slate-600">{resident.barangay}, {resident.municipality}, {resident.province}</p>
         </div>
       </div>
     </div>
