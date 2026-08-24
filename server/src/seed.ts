@@ -1,0 +1,90 @@
+/**
+ * Seeds the office and service catalogue from the app's own mockData, so the
+ * database and the frontend never drift apart on what the LGU offers.
+ * Safe to re-run: catalogue rows are upserted, demo accounts are skipped if present.
+ */
+import { SERVICES, SERVICE_CATEGORIES } from '../../src/data/mockData.ts'
+import { hashPassword } from './auth.ts'
+import { one, pool, query, transaction } from './db.ts'
+import { toCentavos } from './serialize.ts'
+
+const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? 'elgu-demo-2026'
+
+const STAFF: Array<{ email: string; name: string; department: string; position: string }> = [
+  { email: 'treasury@sanfernando.gov.ph', name: 'Ana R. Lim', department: 'treasury', position: 'Revenue Officer II' },
+  { email: 'bpls@sanfernando.gov.ph', name: 'Rico M. Dela Cruz', department: 'bpls', position: 'Licensing Officer' },
+  { email: 'obo@sanfernando.gov.ph', name: 'Eng. Jose P. Vega', department: 'obo', position: 'Building Inspector' },
+  { email: 'lcr@sanfernando.gov.ph', name: 'Carmen S. Reyes', department: 'lcr', position: 'Registration Officer' },
+  { email: 'cswdo@sanfernando.gov.ph', name: 'Grace T. Bautista', department: 'cswdo', position: 'Social Welfare Officer' },
+  { email: 'health@sanfernando.gov.ph', name: 'Dr. Elena V. Cruz', department: 'health', position: 'Sanitation Inspector' },
+]
+
+async function main() {
+  await transaction(async (client) => {
+    for (const [index, dept] of SERVICE_CATEGORIES.entries()) {
+      await client.query(
+        `insert into departments (id, name, office_name, description, icon, sort_order)
+         values ($1, $2, $3, $4, $5, $6)
+         on conflict (id) do update set
+           name = excluded.name, office_name = excluded.office_name,
+           description = excluded.description, icon = excluded.icon,
+           sort_order = excluded.sort_order`,
+        [dept.id, dept.name, dept.officeName, dept.description, dept.icon, index]
+      )
+    }
+
+    for (const service of SERVICES) {
+      await client.query(
+        `insert into services (id, department_id, name, short_description, processing_time,
+                               fee_centavos, requires_payment, requirements, fields, active)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+         on conflict (id) do update set
+           department_id = excluded.department_id, name = excluded.name,
+           short_description = excluded.short_description,
+           processing_time = excluded.processing_time,
+           fee_centavos = excluded.fee_centavos,
+           requires_payment = excluded.requires_payment,
+           requirements = excluded.requirements, fields = excluded.fields, active = true`,
+        [
+          service.id, service.categoryId, service.name, service.shortDescription,
+          service.processingTime, toCentavos(service.fee), service.requiresPayment,
+          JSON.stringify(service.requirements), JSON.stringify(service.fields),
+        ]
+      )
+    }
+  })
+  console.log(`catalogue: ${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services`)
+
+  const passwordHash = await hashPassword(DEMO_PASSWORD)
+  for (const staff of STAFF) {
+    const existing = await one<{ id: string }>(
+      `select id from users where lower(email) = lower($1)`, [staff.email]
+    )
+    if (existing) {
+      await query(
+        `insert into staff_assignments (user_id, department_id, position) values ($1, $2, $3)
+         on conflict (user_id, department_id) do update set position = excluded.position`,
+        [existing.id, staff.department, staff.position]
+      )
+      continue
+    }
+    await transaction(async (client) => {
+      const inserted = await client.query<{ id: string }>(
+        `insert into users (email, password_hash, role, full_name)
+         values ($1, $2, 'staff', $3) returning id`,
+        [staff.email, passwordHash, staff.name]
+      )
+      await client.query(
+        `insert into staff_assignments (user_id, department_id, position) values ($1, $2, $3)`,
+        [inserted.rows[0]!.id, staff.department, staff.position]
+      )
+    })
+  }
+  console.log(`staff: ${STAFF.length} accounts (password: ${DEMO_PASSWORD})`)
+  await pool.end()
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

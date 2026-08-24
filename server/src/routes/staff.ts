@@ -1,0 +1,199 @@
+import { Router } from 'express'
+import { z } from 'zod'
+import { one, query, transaction } from '../db.ts'
+import { authenticate, canActOnDepartment, requireRole } from '../auth.ts'
+import { REQUEST_SELECT, serializeRequest, toCentavos, type RequestRow } from '../serialize.ts'
+import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
+
+export const staffRouter = Router()
+staffRouter.use(authenticate, requireRole('staff', 'admin'))
+
+/**
+ * Every staff route resolves the request through the caller's departments, so
+ * a Treasury clerk asking for a Building & Zoning request gets a 404 rather
+ * than someone else's queue.
+ */
+async function loadForStaff(id: string, departments: string[], isAdmin: boolean) {
+  return one<RequestRow>(
+    `select ${REQUEST_SELECT}, u.full_name as resident_name
+       from requests r
+       join services s on s.id = r.service_id
+       join users u on u.id = r.resident_id
+      where r.id = $1
+        and ($2::boolean or r.department_id = any($3::text[]))`,
+    [id, isAdmin, departments]
+  )
+}
+
+/** The department queue: what this office has been asked to act on. */
+staffRouter.get('/queue', async (req, res) => {
+  const user = req.user!
+  const isAdmin = user.role === 'admin'
+
+  const departmentId = typeof req.query.departmentId === 'string' ? req.query.departmentId : undefined
+  if (departmentId && !canActOnDepartment(user, departmentId)) {
+    return res.status(403).json({ error: 'You are not assigned to that office.' })
+  }
+  if (!isAdmin && user.departments.length === 0) {
+    return res.status(403).json({ error: 'Your account is not assigned to an office yet.' })
+  }
+
+  const status = typeof req.query.status === 'string' ? req.query.status : undefined
+  const scope = departmentId ? [departmentId] : user.departments
+
+  const rows = await query<RequestRow>(
+    `select ${REQUEST_SELECT}, u.full_name as resident_name
+       from requests r
+       join services s on s.id = r.service_id
+       join users u on u.id = r.resident_id
+      where ($1::boolean or r.department_id = any($2::text[]))
+        and ($3::text is null or r.status = $3::request_status)
+      order by r.submitted_at asc`,
+    [isAdmin && !departmentId, scope, status ?? null]
+  )
+  res.json(rows.map(serializeRequest))
+})
+
+/** Counts per status, for the queue's summary tiles. */
+staffRouter.get('/summary', async (req, res) => {
+  const user = req.user!
+  const isAdmin = user.role === 'admin'
+  const rows = await query<{ department_id: string; status: string; count: number }>(
+    `select r.department_id, r.status, count(*)::int as count
+       from requests r
+      where ($1::boolean or r.department_id = any($2::text[]))
+      group by r.department_id, r.status`,
+    [isAdmin, user.departments]
+  )
+  res.json(rows.map((r) => ({ departmentId: r.department_id, status: r.status, count: r.count })))
+})
+
+staffRouter.get('/requests/:id', async (req, res) => {
+  const user = req.user!
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+
+  const events = await query(
+    `select e.event_type as "eventType", e.from_step as "fromStep", e.to_step as "toStep",
+            e.note, e.created_at as "createdAt", u.full_name as "actorName"
+       from request_events e
+       left join users u on u.id = e.actor_id
+      where e.request_id = $1 order by e.created_at`,
+    [row.id]
+  )
+  res.json({ ...serializeRequest(row), events })
+})
+
+/** Treasury sets the amount due and moves the request to For Payment. */
+const assessSchema = z.object({
+  fee: z.number().min(0).max(10_000_000),
+  note: z.string().max(500).optional(),
+})
+
+staffRouter.post('/requests/:id/assess', async (req, res) => {
+  const parsed = assessSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  const user = req.user!
+
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+  if (row.status === 'completed' || row.status === 'rejected') {
+    return res.status(409).json({ error: 'This request is already closed.' })
+  }
+
+  const updated = await transaction(async (client) => {
+    const result = await client.query<RequestRow>(
+      `update requests
+          set fee_centavos = $2, status = 'for_payment',
+              current_step_index = $3, updated_at = now()
+        where id = $1 returning *`,
+      [row.id, toCentavos(parsed.data.fee), STEP_PAYMENT]
+    )
+    await client.query(
+      `insert into request_events (request_id, actor_id, event_type, from_step, to_step, note)
+       values ($1, $2, 'assessed', $3, $4, $5)`,
+      [row.id, user.id, row.current_step_index, STEP_PAYMENT, parsed.data.note ?? null]
+    )
+    return result.rows[0]!
+  })
+
+  const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
+  res.json(serializeRequest(withName!))
+})
+
+/** Moves the request one step forward; the last step completes it. */
+const advanceSchema = z.object({ note: z.string().max(500).optional() })
+
+staffRouter.post('/requests/:id/advance', async (req, res) => {
+  const parsed = advanceSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'Note is too long.' })
+  const user = req.user!
+
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+  if (row.status === 'completed' || row.status === 'rejected') {
+    return res.status(409).json({ error: 'This request is already closed.' })
+  }
+  if (row.current_step_index >= WORKFLOW_STEPS.length - 1) {
+    return res.status(409).json({ error: 'This request is already at the final step.' })
+  }
+  // Payment is the resident's move, not the office's.
+  if (row.current_step_index === STEP_PAYMENT && !row.paid) {
+    return res.status(409).json({ error: 'Waiting for the resident to pay the assessed fee.' })
+  }
+
+  const nextStep = row.current_step_index + 1
+  const isFinal = nextStep >= WORKFLOW_STEPS.length - 1
+
+  const updated = await transaction(async (client) => {
+    const result = await client.query<RequestRow>(
+      `update requests
+          set current_step_index = $2, status = $3, updated_at = now()
+        where id = $1 returning *`,
+      [row.id, nextStep, isFinal ? 'completed' : 'in_progress']
+    )
+    await client.query(
+      `insert into request_events (request_id, actor_id, event_type, from_step, to_step, note)
+       values ($1, $2, $3, $4, $5, $6)`,
+      [
+        row.id, user.id, isFinal ? 'completed' : 'advanced',
+        row.current_step_index, nextStep, parsed.data.note ?? null,
+      ]
+    )
+    return result.rows[0]!
+  })
+
+  const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
+  res.json(serializeRequest(withName!))
+})
+
+const rejectSchema = z.object({ reason: z.string().min(3, 'Tell the resident why.').max(500) })
+
+staffRouter.post('/requests/:id/reject', async (req, res) => {
+  const parsed = rejectSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  const user = req.user!
+
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+  if (row.status === 'completed') {
+    return res.status(409).json({ error: 'This request is already completed.' })
+  }
+
+  const updated = await transaction(async (client) => {
+    const result = await client.query<RequestRow>(
+      `update requests set status = 'rejected', rejection_reason = $2, updated_at = now()
+        where id = $1 returning *`,
+      [row.id, parsed.data.reason]
+    )
+    await client.query(
+      `insert into request_events (request_id, actor_id, event_type, from_step, to_step, note)
+       values ($1, $2, 'rejected', $3, $3, $4)`,
+      [row.id, user.id, row.current_step_index, parsed.data.reason]
+    )
+    return result.rows[0]!
+  })
+
+  const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
+  res.json(serializeRequest(withName!))
+})
