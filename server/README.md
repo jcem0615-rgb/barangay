@@ -60,10 +60,49 @@ is the resident's to complete, and `advance` refuses to step over an unpaid fee.
 Every transition is appended to `request_events` with the actor who made it, so
 a request's history is auditable rather than inferred.
 
+## Login throttling
+
+| Axis | Limit | Window |
+|---|---|---|
+| Per account | 5 failed attempts | 15 minutes |
+| Per IP | 20 failed attempts | 15 minutes |
+
+Both are needed. The account limit alone lets one client try a common password
+against thousands of accounts; the IP limit alone lets a botnet grind a single
+account from many addresses. Attempts are recorded in Postgres, not in process
+memory, so the limit holds across restarts and across instances behind a load
+balancer.
+
+Details worth knowing:
+
+- The throttle is checked **before** the password comparison, so a locked-out
+  attacker cannot keep forcing expensive bcrypt work.
+- Failures are recorded for addresses that have **no account**, so a `429`
+  cannot be used to discover which emails are registered.
+- A correct password clears that address's failures, so someone who mistyped
+  twice in the morning isn't closer to a lockout in the afternoon.
+- A blocked response carries `Retry-After` and tells the person when to retry.
+- Registration shares the same budget, so sign-up can't be used to spray.
+
+**`TRUST_PROXY` must match your deployment.** It is the number of reverse
+proxies in front of this server (0 = directly exposed). Express only reads
+`X-Forwarded-For` when it is set — leave it at 0 behind a load balancer and
+every attempt is attributed to the balancer, so one resident's mistyping locks
+out the whole municipality; set it too high on a directly-exposed server and a
+client can forge the address the limit counts.
+
+**Known trade-off:** because a locked account refuses the correct password too,
+someone who knows a staff address can deliberately keep that account locked in
+15-minute stretches. The alternative — letting a known-good password through —
+would defeat the lockout entirely. If this becomes a problem in practice, the
+usual answer is to add a second factor for staff rather than to loosen this.
+
 ## Tests
 
 ```bash
-npm run test:e2e   # needs the server running against a migrated, seeded database
+npm run test:e2e          # needs the server running against a migrated, seeded database
+npm run test:rate-limit   # login throttling; run the server with TRUST_PROXY=1 to
+                          # also exercise the per-IP axis
 ```
 
 Covers registration and login, request submission, the full assess → pay →
@@ -77,3 +116,5 @@ on another's requests, and one resident cannot read another's.
   is unknown, so responses don't reveal which accounts exist.
 - Tokens carry only a user id; the user, role, and department assignments are
   re-read from the database on every request, so revoking access takes effect at once.
+- `login_attempts` rows are purged opportunistically after a successful sign-in;
+  the table is not expected to grow unbounded.

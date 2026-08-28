@@ -2,6 +2,10 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { authenticate, hashPassword, signToken, verifyPassword } from '../auth.ts'
+import {
+  checkLoginThrottle, clearLoginFailures, clientIp, LOGIN_LIMITS,
+  purgeOldAttempts, recordLoginAttempt,
+} from '../rateLimit.ts'
 
 export const authRouter = Router()
 
@@ -26,8 +30,19 @@ authRouter.post('/register', async (req, res) => {
   }
   const body = parsed.data
 
+  const ip = clientIp(req)
+  const throttle = await checkLoginThrottle(body.email, ip)
+  if (!throttle.allowed) {
+    const minutes = Math.ceil(throttle.retryAfter / 60)
+    res.setHeader('Retry-After', String(throttle.retryAfter))
+    return res.status(429).json({
+      error: `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+    })
+  }
+
   const existing = await one(`select 1 from users where lower(email) = lower($1)`, [body.email])
   if (existing) {
+    await recordLoginAttempt(body.email, ip, false)
     return res.status(409).json({ error: 'That email is already registered. Try signing in.' })
   }
 
@@ -68,6 +83,18 @@ authRouter.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Enter your email and password.' })
   }
   const { email, password } = parsed.data
+  const ip = clientIp(req)
+
+  // Checked before the password comparison, so a locked-out attacker cannot
+  // keep forcing expensive bcrypt work.
+  const throttle = await checkLoginThrottle(email, ip)
+  if (!throttle.allowed) {
+    const minutes = Math.ceil(throttle.retryAfter / 60)
+    res.setHeader('Retry-After', String(throttle.retryAfter))
+    return res.status(429).json({
+      error: `Too many sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+    })
+  }
 
   const user = await one<{ id: string; email: string; password_hash: string; role: 'resident' | 'staff' | 'admin'; full_name: string }>(
     `select id, email, password_hash, role, full_name from users where lower(email) = lower($1)`,
@@ -79,8 +106,16 @@ authRouter.post('/login', async (req, res) => {
   const hash = user?.password_hash ?? '$2b$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinv'
   const ok = await verifyPassword(password, hash)
   if (!user || !ok) {
+    // Recorded for unknown addresses too, so lockout behaviour is identical
+    // whether or not the account exists.
+    await recordLoginAttempt(email, ip, false)
     return res.status(401).json({ error: 'Email or password is incorrect.' })
   }
+
+  // A correct password clears the address's failures, so an honest user who
+  // mistyped twice this morning isn't closer to a lockout this afternoon.
+  await clearLoginFailures(email)
+  void purgeOldAttempts().catch(() => undefined)
 
   const departments = await query<{ department_id: string }>(
     `select department_id from staff_assignments where user_id = $1`,

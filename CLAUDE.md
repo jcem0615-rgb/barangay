@@ -111,7 +111,12 @@ automatically, no new screen needed. If a category needs an icon not already in
   removed rather than left lying about what it did.
 - **Sessions** are 12-hour JWTs with no refresh or revocation list. Signing out clears the
   token client-side; the token itself stays valid until it expires.
-- **No rate limiting** on login. Add it before this faces the internet.
+- **Login throttling** is per-account (5 failures / 15 min) and per-IP (20 / 15 min),
+  recorded in Postgres so it survives restarts and spans instances. Set `TRUST_PROXY` to
+  the real number of proxies in front of the API, or the per-IP limit counts the load
+  balancer instead of the client. A locked account rejects the correct password too, which
+  means an attacker who knows an address can keep that resident out for 15 minutes at a
+  time — the accepted trade for not leaving accounts guessable.
 - Navigation stack resets on reload (in-memory, not URL-based).
 
 ## Commands

@@ -22,4 +22,11 @@ export const env = {
     .map((o) => o.trim())
     .filter(Boolean),
   port: Number(process.env.PORT ?? 4000),
+  /**
+   * How many reverse proxies sit in front of this server. Left at 0, express
+   * ignores X-Forwarded-For and attributes attempts to the socket address.
+   * Set it to the real hop count when deploying behind a load balancer —
+   * setting it too high lets a client forge the address the IP limit counts.
+   */
+  trustProxy: Number(process.env.TRUST_PROXY ?? 0),
 }

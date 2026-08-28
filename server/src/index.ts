@@ -8,6 +8,10 @@ import { staffRouter } from './routes/staff.ts'
 
 const app = express()
 
+// Only trust as many forwarding hops as are actually deployed, so the client
+// address used for rate limiting can't be spoofed by a header.
+app.set('trust proxy', env.trustProxy)
+
 app.use(cors({ origin: env.corsOrigins, credentials: true }))
 app.use(express.json({ limit: '256kb' }))
 
