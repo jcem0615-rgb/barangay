@@ -1,0 +1,49 @@
+# Local production-shaped stack: Postgres plus the app image.
+#   docker compose up --build
+#   docker compose run --rm app npm run migrate
+#   docker compose run --rm app npm run seed
+# Then open http://localhost:4000
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: elgu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+      POSTGRES_DB: elgu
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # The app waits for this, so it never starts against a database that is
+      # still initialising.
+      test: ["CMD-SHELL", "pg_isready -U elgu -d elgu"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      args:
+        VITE_API_URL: /api
+    environment:
+      DATABASE_URL: postgres://elgu:${POSTGRES_PASSWORD:-change-me-locally}@db:5432/elgu
+      # Required. Generate with:
+      #   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in a .env file next to this compose file}
+      # The app is served same-origin here, so CORS is not in play. Set it only
+      # if you serve the web app from a different host.
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      # 0 = this container is directly exposed. Behind a reverse proxy or load
+      # balancer, set it to the number of hops or rate limiting counts the proxy.
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      NODE_ENV: production
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:

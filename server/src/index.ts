@@ -1,6 +1,12 @@
-import express from 'express'
+import { existsSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import compression from 'compression'
 import cors from 'cors'
+import express from 'express'
+import helmet from 'helmet'
 import { env } from './env.ts'
+import { isDatabaseReachable, pool } from './db.ts'
 import { authRouter } from './routes/auth.ts'
 import { catalogueRouter } from './routes/catalogue.ts'
 import { requestsRouter } from './routes/requests.ts'
@@ -11,17 +17,80 @@ const app = express()
 // Only trust as many forwarding hops as are actually deployed, so the client
 // address used for rate limiting can't be spoofed by a header.
 app.set('trust proxy', env.trustProxy)
+app.disable('x-powered-by')
 
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // Tailwind ships as a stylesheet, but the SPA still injects some
+        // inline style; fonts come from Google Fonts.
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+      },
+    },
+    // The app is same-origin in production; this header would otherwise block
+    // the fonts it loads.
+    crossOriginEmbedderPolicy: false,
+  })
+)
+app.use(compression())
+
+// CORS only matters when the web app is served from somewhere else (dev, or a
+// split deployment). Same-origin production traffic never reaches this.
 app.use(cors({ origin: env.corsOrigins, credentials: true }))
 app.use(express.json({ limit: '256kb' }))
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }))
+/**
+ * Liveness *and* readiness: a process that is up but cannot reach Postgres
+ * cannot serve anything, and reporting it healthy would keep a broken instance
+ * in the load balancer's rotation.
+ */
+app.get('/api/health', async (_req, res) => {
+  const dbOk = await isDatabaseReachable()
+  res.status(dbOk ? 200 : 503).json({ ok: dbOk, database: dbOk ? 'up' : 'unreachable' })
+})
+
 app.use('/api/auth', authRouter)
 app.use('/api/catalogue', catalogueRouter)
 app.use('/api/requests', requestsRouter)
 app.use('/api/staff', staffRouter)
 
-app.use((_req, res) => res.status(404).json({ error: 'Not found.' }))
+// Unknown API routes are an error, never the SPA's index.html — returning HTML
+// to a fetch() would surface as a confusing parse error in the client.
+app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }))
+
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'dist')
+if (env.serveWeb && existsSync(webRoot)) {
+  // Hashed assets are immutable; index.html must not be cached or clients keep
+  // booting an old bundle after a deploy.
+  app.use(
+    express.static(webRoot, {
+      index: false,
+      setHeaders: (res, path) => {
+        if (path.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache')
+        else if (path.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+      },
+    })
+  )
+  app.get(/.*/, (_req, res) => {
+    // Must go through sendFile's options: it writes its own Cache-Control from
+    // maxAge and would overwrite a header set beforehand.
+    res.sendFile(join(webRoot, 'index.html'), {
+      cacheControl: false,
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+  })
+} else {
+  app.use((_req, res) => res.status(404).json({ error: 'Not found.' }))
+}
 
 // Log the real error server-side; hand the client something it can act on.
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -29,6 +98,39 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: 'Something went wrong on our end. Please try again.' })
 })
 
-app.listen(env.port, () => {
+const server = app.listen(env.port, () => {
   console.log(`eLGU API listening on http://localhost:${env.port}`)
+  if (env.serveWeb && existsSync(webRoot)) console.log(`serving web app from ${webRoot}`)
 })
+
+/**
+ * Stop accepting connections, let in-flight requests finish, then close the
+ * pool. Without this a deploy can cut off a request mid-transaction.
+ */
+let shuttingDown = false
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(signal, () => {
+    if (shuttingDown) return
+    shuttingDown = true
+    console.log(`${signal} received, shutting down`)
+
+    const forced = setTimeout(() => {
+      // A client holding a keep-alive socket open would otherwise stall the
+      // deploy indefinitely; cut the remaining sockets and go.
+      console.error('shutdown timed out, closing remaining connections')
+      server.closeAllConnections()
+      pool.end().catch(() => undefined).finally(() => process.exit(1))
+    }, 10_000)
+    forced.unref()
+
+    server.close(async () => {
+      await pool.end().catch(() => undefined)
+      clearTimeout(forced)
+      process.exit(0)
+    })
+
+    // close() alone waits for idle keep-alive sockets to time out on their own.
+    // Requests already in flight are untouched and still finish.
+    server.closeIdleConnections()
+  })
+}

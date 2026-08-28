@@ -56,3 +56,13 @@ npm run preview # serve the production build locally
 **API** Node · Express 5 · PostgreSQL · JWT · bcrypt · zod
 
 See `CLAUDE.md` for architecture notes, data flow, and where to extend this.
+
+## Deployment
+
+```bash
+docker compose up --build -d
+docker compose run --rm app npm run migrate
+docker compose run --rm app npm run seed
+```
+
+See [DEPLOY.md](DEPLOY.md) for hosting, configuration, and the pre-launch checklist.

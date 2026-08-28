@@ -119,6 +119,18 @@ automatically, no new screen needed. If a category needs an icon not already in
   time — the accepted trade for not leaving accounts guessable.
 - Navigation stack resets on reload (in-memory, not URL-based).
 
+## Deployment
+
+One container: the API serves the built SPA same-origin, so there is no CORS in
+production. `Dockerfile` builds the web app and runs the API; `docker-compose.yml`
+brings up Postgres alongside it. See `DEPLOY.md` for configuration and the
+pre-launch checklist.
+
+Node 22 strips TypeScript natively, so the server has no build step and `tsx` is
+only a dev dependency. The container runs `node src/index.ts` directly rather
+than through a wrapper — a wrapper process swallows SIGTERM, which would defeat
+the graceful shutdown in `src/index.ts`.
+
 ## Commands
 
 Two processes: the API and the web app.

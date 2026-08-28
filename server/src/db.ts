@@ -4,7 +4,30 @@ import { env } from './env.ts'
 // Fees are integers in the DB; make sure pg hands back numbers, not strings.
 pg.types.setTypeParser(pg.types.builtins.INT8, (v) => Number(v))
 
-export const pool = new pg.Pool({ connectionString: env.databaseUrl })
+export const pool = new pg.Pool({
+  connectionString: env.databaseUrl,
+  // Sized for a municipal deployment: enough for concurrent counter staff,
+  // low enough that several API instances together stay under Postgres's
+  // default 100-connection ceiling.
+  max: Number(process.env.PGPOOL_MAX ?? 10),
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+})
+
+// A pool error (a dropped backend, a failover) must not take the process down.
+pool.on('error', (err) => {
+  console.error('unexpected idle client error', err)
+})
+
+/** True when the database answers. Used by the health check. */
+export async function isDatabaseReachable(): Promise<boolean> {
+  try {
+    await pool.query('select 1')
+    return true
+  } catch {
+    return false
+  }
+}
 
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
   text: string,

@@ -29,4 +29,10 @@ export const env = {
    * setting it too high lets a client forge the address the IP limit counts.
    */
   trustProxy: Number(process.env.TRUST_PROXY ?? 0),
+  isProduction: process.env.NODE_ENV === 'production',
+  /**
+   * Serve the built web app from this server. Same-origin means no CORS to get
+   * wrong in production, and one thing to deploy instead of two.
+   */
+  serveWeb: process.env.SERVE_WEB !== 'false',
 }
