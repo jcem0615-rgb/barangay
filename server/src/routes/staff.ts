@@ -5,6 +5,7 @@ import { authenticate, canActOnDepartment, requireRole } from '../auth.ts'
 import { REQUEST_SELECT, serializeRequest, toCentavos, type RequestRow } from '../serialize.ts'
 import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
 import { documentFileName, makeVerificationCode, renderDocument } from '../documents.ts'
+import { sendAttachment } from '../attachments.ts'
 
 export const staffRouter = Router()
 staffRouter.use(authenticate, requireRole('staff', 'admin'))
@@ -266,4 +267,35 @@ staffRouter.get('/requests/:id/document', async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `attachment; filename="${doc.file_name}"`)
   res.send(doc.content)
+})
+
+/** What the resident attached, for the office that has to verify it. */
+staffRouter.get('/requests/:id/attachments', async (req, res) => {
+  const user = req.user!
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+
+  const rows = await query(
+    `select id, requirement, file_name as "fileName", content_type as "contentType",
+            byte_size as "byteSize", created_at as "createdAt"
+       from attachments where request_id = $1 order by created_at`,
+    [row.id]
+  )
+  res.json(rows)
+})
+
+staffRouter.get('/requests/:id/attachments/:attachmentId', async (req, res) => {
+  const user = req.user!
+  // Resolved through the caller's departments first, so another office's
+  // attachment is simply not found.
+  const request = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!request) return res.status(404).json({ error: 'Request not found.' })
+
+  const row = await one<{ storage_key: string; file_name: string; content_type: string }>(
+    `select storage_key, file_name, content_type
+       from attachments where id = $1 and request_id = $2`,
+    [req.params.attachmentId, request.id]
+  )
+  if (!row) return res.status(404).json({ error: 'Attachment not found.' })
+  await sendAttachment(res, row)
 })

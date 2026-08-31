@@ -82,8 +82,8 @@ export interface RequestEvent {
 }
 
 /**
- * Documents need the Authorization header, so they can't be fetched with a
- * plain link — download them as a blob and save that instead.
+ * Files need the Authorization header, so they can't be fetched with a plain
+ * link — download them as a blob and save that instead.
  */
 async function downloadPdf(path: string): Promise<{ blob: Blob; fileName: string }> {
   const token = getToken()
@@ -97,6 +97,31 @@ async function downloadPdf(path: string): Promise<{ blob: Blob; fileName: string
   const disposition = res.headers.get('content-disposition') ?? ''
   const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'document.pdf'
   return { blob: await res.blob(), fileName }
+}
+
+export interface Attachment {
+  id: string
+  requirement: string | null
+  fileName: string
+  contentType: string
+  byteSize: number
+  createdAt: string
+}
+
+/** Uploads go as multipart; the browser sets its own Content-Type boundary. */
+async function uploadFile(path: string, file: File, requirement?: string) {
+  const form = new FormData()
+  form.append('file', file)
+  if (requirement) form.append('requirement', requirement)
+  const token = getToken()
+  const res = await fetch(BASE + path, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(body?.error ?? 'Could not attach that file.', res.status)
+  return body as Attachment
 }
 
 export const api = {
@@ -132,6 +157,22 @@ export const api = {
     }),
 
   document: (id: string) => downloadPdf(`/requests/${id}/document`),
+
+  attachments: (id: string) => request<Attachment[]>(`/requests/${id}/attachments`),
+
+  attach: (id: string, file: File, requirement?: string) =>
+    uploadFile(`/requests/${id}/attachments`, file, requirement),
+
+  removeAttachment: (id: string, attachmentId: string) =>
+    request<void>(`/requests/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
+
+  attachmentFile: (id: string, attachmentId: string) =>
+    downloadPdf(`/requests/${id}/attachments/${attachmentId}`),
+
+  staffAttachments: (id: string) => request<Attachment[]>(`/staff/requests/${id}/attachments`),
+
+  staffAttachmentFile: (id: string, attachmentId: string) =>
+    downloadPdf(`/staff/requests/${id}/attachments/${attachmentId}`),
 
   staffDocument: (id: string) => downloadPdf(`/staff/requests/${id}/document`),
 

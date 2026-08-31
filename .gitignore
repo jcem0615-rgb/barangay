@@ -27,3 +27,6 @@ dist-ssr
 server/.env
 server/node_modules
 .env.local
+
+# Resident-uploaded attachments (storage backend, not source)
+server/uploads

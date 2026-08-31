@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Download, Loader2, X } from 'lucide-react'
-import { api, ApiError, type RequestEvent } from '../../lib/api'
+import { Check, Download, Loader2, Paperclip, X } from 'lucide-react'
+import { api, ApiError, type Attachment, type RequestEvent } from '../../lib/api'
 import { saveBlob } from '../../lib/download'
 import type { Application } from '../../types'
 import { WORKFLOW_STEPS } from '../../types'
@@ -17,6 +17,7 @@ export default function StaffRequestPanel({
   const [detail, setDetail] = useState<Detail | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
   const [feeInput, setFeeInput] = useState('')
   const [note, setNote] = useState('')
 
@@ -26,6 +27,7 @@ export default function StaffRequestPanel({
       const data = (await api.staffRequest(id)) as Detail
       setDetail(data)
       setFeeInput(data.fee ? String(data.fee) : '')
+      setAttachments(await api.staffAttachments(id).catch(() => []))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load this request.')
     }
@@ -116,6 +118,41 @@ export default function StaffRequestPanel({
             <Download size={15} /> Released document
           </button>
         )}
+
+        <div>
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+            Submitted files
+          </p>
+          {attachments.length === 0 ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+              The resident has not attached any requirements.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {attachments.map((file) => (
+                <li key={file.id} className="flex items-center gap-2">
+                  <Paperclip size={13} className="shrink-0 text-slate-400" />
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { blob, fileName } = await api.staffAttachmentFile(detail.id, file.id)
+                        saveBlob(blob, fileName)
+                      } catch (err) {
+                        setError(err instanceof ApiError ? err.message : 'Could not open that file.')
+                      }
+                    }}
+                    className="min-w-0 flex-1 truncate text-left text-[12.5px] text-navy-800 underline-offset-2 hover:underline"
+                  >
+                    {file.fileName}
+                  </button>
+                  {file.requirement && (
+                    <span className="shrink-0 text-[11px] text-slate-400">{file.requirement}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {Object.keys(detail.formValues).length > 0 && (
           <div>

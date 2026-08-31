@@ -38,6 +38,10 @@ COPY src/data ./src/data
 COPY src/types.ts ./src/types.ts
 COPY --from=web /app/dist ./dist
 
+# The upload directory is a mount point at runtime; create it owned by the
+# unprivileged user so the container can write there.
+RUN mkdir -p /app/uploads && chown -R node:node /app/uploads
+
 # Never run as root.
 USER node
 

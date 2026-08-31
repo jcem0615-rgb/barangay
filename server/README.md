@@ -53,6 +53,12 @@ by seeding or by an administrator — there is no self-service path to a staff r
 | `GET` | `/api/requests/:id/document` | resident — the released PDF for their own request |
 | `GET` | `/api/staff/requests/:id/document` | staff — the released PDF, own departments only |
 | `GET` | `/api/verify/:code` | public — confirm a document is genuine |
+| `GET` | `/api/requests/:id/attachments` | resident — files on their own request |
+| `POST` | `/api/requests/:id/attachments` | resident — attach a requirement (multipart) |
+| `GET` | `/api/requests/:id/attachments/:aid` | resident — download their own file |
+| `DELETE` | `/api/requests/:id/attachments/:aid` | resident — remove, while the request is open |
+| `GET` | `/api/staff/requests/:id/attachments` | staff — what the resident supplied |
+| `GET` | `/api/staff/requests/:id/attachments/:aid` | staff — download it |
 
 ## Workflow
 
@@ -82,6 +88,29 @@ verification code.
 
 Note that **paying carries a request to the final step but does not close it**.
 The office still advances it, and that release step is what issues the document.
+
+## Attachments
+
+Residents attach a file against each requirement the service states, so the
+office can verify what was submitted instead of approving blind.
+
+- **The bytes decide the type**, not the declared Content-Type or the filename:
+  PDF, JPEG, PNG and HEIC are detected by magic number, and anything else is
+  refused. HEIC matters — it is what an iPhone camera produces.
+- **Files are never served inline.** A resident-supplied PDF can carry script,
+  so serving one on our own origin would turn an upload into stored XSS.
+  Everything goes out as `Content-Disposition: attachment` with `nosniff`.
+- **Storage keys are server-generated**, never derived from the uploaded name,
+  so a filename cannot shape a path. Names are also stripped of directory
+  parts, control characters and quotes before being echoed back.
+- 10 MB per file, 10 files per request. Closed requests accept no more.
+- Metadata is in Postgres; bytes go to `UPLOAD_DIR` via `src/storage.ts`, whose
+  interface (put/get/remove by opaque key) is deliberately narrow so S3 can
+  replace it without touching the routes.
+
+**`UPLOAD_DIR` must be a mounted volume in a container**, or every uploaded
+requirement is lost on the next deploy. There is no virus scanning — worth
+adding before this handles real submissions at scale.
 
 ## Login throttling
 
@@ -128,6 +157,7 @@ npm run test:rate-limit   # login throttling; run the server with TRUST_PROXY=1 
                           # also exercise the per-IP axis
 npm run test:hardening    # regressions for the issues found in the security pass
 npm run test:documents    # release, download, access rules, and verification
+npm run test:attachments  # upload validation, access rules, and lifecycle
 ```
 
 Covers registration and login, request submission, the full assess → pay →

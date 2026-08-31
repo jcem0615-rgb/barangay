@@ -1,9 +1,15 @@
 import { Router } from 'express'
+import multer from 'multer'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { authenticate, requireRole } from '../auth.ts'
 import { REQUEST_SELECT, serializeRequest, type RequestRow } from '../serialize.ts'
 import { DEPARTMENT_PREFIX, STEP_ASSESSMENT, STEP_RELEASE, makeReferenceNo } from '../workflow.ts'
+import { putFile, removeFile } from '../storage.ts'
+import { sendAttachment } from '../attachments.ts'
+import {
+  ACCEPTED_DESCRIPTION, detectType, MAX_FILE_BYTES, MAX_FILES_PER_REQUEST, safeFileName,
+} from '../uploads.ts'
 
 export const requestsRouter = Router()
 requestsRouter.use(authenticate, requireRole('resident'))
@@ -177,4 +183,124 @@ requestsRouter.get('/:id/document', async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `attachment; filename="${doc.file_name}"`)
   res.send(doc.content)
+})
+
+// Held in memory so the bytes can be type-checked before anything is written to
+// disk — multer's own diskStorage would persist the file first.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_BYTES, files: 1 },
+})
+
+/**
+ * Requests still being worked on accept attachments; closed ones do not.
+ * The id comes off the URL, so it is only trusted once it is actually a string.
+ */
+async function openRequestOwnedBy(id: unknown, residentId: string) {
+  if (typeof id !== 'string') return undefined
+  return one<{ id: string; status: string }>(
+    `select id, status from requests where id = $1 and resident_id = $2`,
+    [id, residentId]
+  )
+}
+
+requestsRouter.get('/:id/attachments', async (req, res) => {
+  const owned = await openRequestOwnedBy(req.params.id, req.user!.id)
+  if (!owned) return res.status(404).json({ error: 'Request not found.' })
+
+  const rows = await query(
+    `select id, requirement, file_name as "fileName", content_type as "contentType",
+            byte_size as "byteSize", created_at as "createdAt"
+       from attachments where request_id = $1 order by created_at`,
+    [owned.id]
+  )
+  res.json(rows)
+})
+
+requestsRouter.post('/:id/attachments', upload.single('file'), async (req, res) => {
+  const owned = await openRequestOwnedBy(req.params.id, req.user!.id)
+  if (!owned) return res.status(404).json({ error: 'Request not found.' })
+  if (owned.status === 'completed' || owned.status === 'rejected') {
+    return res.status(409).json({ error: 'This request is closed and no longer accepts files.' })
+  }
+
+  const file = req.file
+  if (!file) return res.status(400).json({ error: 'Choose a file to attach.' })
+
+  const count = await one<{ count: number }>(
+    `select count(*)::int as count from attachments where request_id = $1`,
+    [owned.id]
+  )
+  if ((count?.count ?? 0) >= MAX_FILES_PER_REQUEST) {
+    return res.status(409).json({
+      error: `You can attach up to ${MAX_FILES_PER_REQUEST} files to a request.`,
+    })
+  }
+
+  // The declared type and the filename are both caller-controlled; the bytes decide.
+  const detected = detectType(file.buffer)
+  if (!detected) {
+    return res.status(415).json({ error: `That file type isn't accepted. Attach a ${ACCEPTED_DESCRIPTION} file.` })
+  }
+
+  const requirement = typeof req.body?.requirement === 'string'
+    ? req.body.requirement.slice(0, 200)
+    : null
+
+  const stored = await putFile(file.buffer)
+  const fileName = safeFileName(file.originalname ?? 'file', detected.extension)
+
+  try {
+    const row = await one(
+      `insert into attachments
+         (request_id, uploaded_by, requirement, file_name, content_type, byte_size, storage_key, checksum)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)
+       returning id, requirement, file_name as "fileName", content_type as "contentType",
+                 byte_size as "byteSize", created_at as "createdAt"`,
+      [
+        owned.id, req.user!.id, requirement, fileName,
+        detected.contentType, stored.byteSize, stored.storageKey, stored.checksum,
+      ]
+    )
+    await query(
+      `insert into request_events (request_id, actor_id, event_type, note)
+       values ($1, $2, 'attached', $3)`,
+      [owned.id, req.user!.id, requirement ? `${fileName} (${requirement})` : fileName]
+    )
+    res.status(201).json(row)
+  } catch (err) {
+    // Don't leave an orphaned file on disk if the row could not be written.
+    await removeFile(stored.storageKey)
+    throw err
+  }
+})
+
+requestsRouter.get('/:id/attachments/:attachmentId', async (req, res) => {
+  const row = await one<{ storage_key: string; file_name: string; content_type: string }>(
+    `select a.storage_key, a.file_name, a.content_type
+       from attachments a
+       join requests r on r.id = a.request_id
+      where a.id = $1 and a.request_id = $2 and r.resident_id = $3`,
+    [req.params.attachmentId, req.params.id, req.user!.id]
+  )
+  if (!row) return res.status(404).json({ error: 'Attachment not found.' })
+  await sendAttachment(res, row)
+})
+
+requestsRouter.delete('/:id/attachments/:attachmentId', async (req, res) => {
+  const row = await one<{ id: string; storage_key: string; status: string }>(
+    `select a.id, a.storage_key, r.status
+       from attachments a
+       join requests r on r.id = a.request_id
+      where a.id = $1 and a.request_id = $2 and r.resident_id = $3`,
+    [req.params.attachmentId, req.params.id, req.user!.id]
+  )
+  if (!row) return res.status(404).json({ error: 'Attachment not found.' })
+  if (row.status === 'completed' || row.status === 'rejected') {
+    return res.status(409).json({ error: 'This request is closed and its files cannot be changed.' })
+  }
+
+  await query(`delete from attachments where id = $1`, [row.id])
+  await removeFile(row.storage_key)
+  res.status(204).end()
 })

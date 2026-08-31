@@ -12,6 +12,7 @@ import { catalogueRouter } from './routes/catalogue.ts'
 import { requestsRouter } from './routes/requests.ts'
 import { staffRouter } from './routes/staff.ts'
 import { verifyRouter } from './routes/verify.ts'
+import { MAX_FILE_BYTES } from './uploads.ts'
 
 const app = express()
 
@@ -104,6 +105,10 @@ if (env.serveWeb && existsSync(webRoot)) {
 
 // Log the real error server-side; hand the client something it can act on.
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // An upload over the size limit is the caller's problem, not a server fault.
+  if (err && typeof err === 'object' && (err as { code?: string }).code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: `That file is too large. The limit is ${MAX_FILE_BYTES / (1024 * 1024)} MB.` })
+  }
   console.error(err)
   res.status(500).json({ error: 'Something went wrong on our end. Please try again.' })
 })

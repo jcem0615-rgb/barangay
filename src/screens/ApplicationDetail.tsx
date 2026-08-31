@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { useCatalogue } from '../lib/catalogue'
 import { api, ApiError } from '../lib/api'
 import { saveBlob } from '../lib/download'
+import Attachments from '../components/Attachments'
 import { resolveIcon } from '../lib/icons'
 import { formatPeso } from '../lib/money'
 
@@ -136,6 +137,14 @@ export default function ApplicationDetail({ id }: { id: string }) {
               </p>
             )}
           </div>
+        )}
+
+        {app.status !== 'draft' && service && (
+          <Attachments
+            requestId={app.id}
+            requirements={service.requirements}
+            editable={app.status !== 'completed' && app.status !== 'rejected'}
+          />
         )}
 
         {app.status !== 'draft' && (

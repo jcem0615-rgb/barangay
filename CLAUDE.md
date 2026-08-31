@@ -111,6 +111,8 @@ automatically, no new screen needed. If a category needs an icon not already in
 - **Document release** produces a real PDF with a verification code, but it is not
   digitally signed. A production system would sign it so tampering is detectable
   rather than relying on the code lookup alone.
+- **Attachments** are type-checked by magic number and served only as downloads,
+  but there is **no virus scanning**. Add it before this handles real volume.
 - **Drafts** have no API endpoint yet. `ApplicationStatus` still includes `draft` and the
   request list still has a Drafts tab, but nothing writes one; the Save Draft button was
   removed rather than left lying about what it did.

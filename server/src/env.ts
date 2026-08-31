@@ -35,4 +35,9 @@ export const env = {
    * wrong in production, and one thing to deploy instead of two.
    */
   serveWeb: process.env.SERVE_WEB !== 'false',
+  /**
+   * Directory for resident-uploaded attachments. In a container this must be a
+   * mounted volume, or uploads are lost on the next deploy.
+   */
+  uploadDir: process.env.UPLOAD_DIR ?? './uploads',
 }
