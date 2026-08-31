@@ -8,6 +8,9 @@ import { DEPARTMENT_PREFIX, STEP_ASSESSMENT, STEP_RELEASE, makeReferenceNo } fro
 export const requestsRouter = Router()
 requestsRouter.use(authenticate, requireRole('resident'))
 
+/** Generous enough for a long address or narrative, short of an abuse vector. */
+const MAX_FIELD_LENGTH = 2000
+
 const createSchema = z.object({
   serviceId: z.string().min(1),
   formValues: z.record(z.string(), z.string()).default({}),
@@ -20,22 +23,46 @@ requestsRouter.post('/', async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
   const { serviceId, formValues, submittedOfflineAt } = parsed.data
 
-  const service = await one<{ id: string; department_id: string; fee_centavos: number }>(
-    `select id, department_id, fee_centavos from services where id = $1 and active = true`,
+  const service = await one<{
+    id: string; department_id: string; fee_centavos: number
+    fields: Array<{ id: string }>
+  }>(
+    `select id, department_id, fee_centavos, fields
+       from services where id = $1 and active = true`,
     [serviceId]
   )
   if (!service) return res.status(404).json({ error: 'That service is no longer offered.' })
 
+  // Only the fields this service actually declares are stored. Without this a
+  // caller could attach arbitrary keys, which staff would then be shown as if
+  // the resident had filled them in.
+  const declared = new Set(service.fields.map((f) => f.id))
+  const unknown = Object.keys(formValues).filter((k) => !declared.has(k))
+  if (unknown.length > 0) {
+    return res.status(400).json({ error: `Unexpected field: ${unknown[0]}` })
+  }
+  const tooLong = Object.entries(formValues).find(([, v]) => v.length > MAX_FIELD_LENGTH)
+  if (tooLong) {
+    return res.status(400).json({ error: `${tooLong[0]} is too long (max ${MAX_FIELD_LENGTH} characters).` })
+  }
+
   const created = await transaction(async (client) => {
-    // Per-department sequence, taken inside the transaction so two concurrent
-    // submissions can't be handed the same reference number.
-    const seq = await client.query<{ next: number }>(
-      `select coalesce(count(*), 0) + 1 as next from requests where department_id = $1`,
-      [service.department_id]
+    // Atomic increment: the upsert takes a row lock, so simultaneous
+    // submissions to the same office queue up and each gets its own number.
+    // Counting existing rows instead would hand them all the same one.
+    const year = new Date().getFullYear()
+    const seq = await client.query<{ last_number: number }>(
+      `insert into request_counters (department_id, year, last_number)
+       values ($1, $2, 1)
+       on conflict (department_id, year)
+       do update set last_number = request_counters.last_number + 1
+       returning last_number`,
+      [service.department_id, year]
     )
     const referenceNo = makeReferenceNo(
       DEPARTMENT_PREFIX[service.department_id] ?? 'LGU',
-      seq.rows[0]!.next
+      year,
+      seq.rows[0]!.last_number
     )
 
     const inserted = await client.query<RequestRow>(

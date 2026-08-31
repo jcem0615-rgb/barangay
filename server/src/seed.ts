@@ -8,6 +8,16 @@ import { hashPassword } from './auth.ts'
 import { one, pool, query, transaction } from './db.ts'
 import { toCentavos } from './serialize.ts'
 
+// A published default password on real staff accounts is an open door, so in
+// production one has to be supplied deliberately.
+if (process.env.NODE_ENV === 'production' && !process.env.SEED_PASSWORD) {
+  console.error(
+    'Refusing to seed staff accounts with the default password in production.\n' +
+      'Set SEED_PASSWORD to a value from your secret store, or create staff accounts yourself.'
+  )
+  process.exit(1)
+}
+
 const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? 'elgu-demo-2026'
 
 const STAFF: Array<{ email: string; name: string; department: string; position: string }> = [
@@ -56,11 +66,14 @@ async function main() {
   console.log(`catalogue: ${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services`)
 
   const passwordHash = await hashPassword(DEMO_PASSWORD)
+  let created = 0
+  let kept = 0
   for (const staff of STAFF) {
     const existing = await one<{ id: string }>(
       `select id from users where lower(email) = lower($1)`, [staff.email]
     )
     if (existing) {
+      kept++
       await query(
         `insert into staff_assignments (user_id, department_id, position) values ($1, $2, $3)
          on conflict (user_id, department_id) do update set position = excluded.position`,
@@ -79,8 +92,21 @@ async function main() {
         [inserted.rows[0]!.id, staff.department, staff.position]
       )
     })
+    created++
   }
-  console.log(`staff: ${STAFF.length} accounts (password: ${DEMO_PASSWORD})`)
+
+  // Existing accounts keep their own password — saying otherwise would send
+  // someone hunting for a login that does not work.
+  console.log(`staff: ${created} created, ${kept} already existed`)
+  if (created > 0) {
+    // Only the development default is safe to print. A supplied SEED_PASSWORD
+    // is a real secret and must not end up in deploy logs.
+    console.log(
+      process.env.SEED_PASSWORD
+        ? 'new accounts use the password from SEED_PASSWORD'
+        : `new accounts use the development password: ${DEMO_PASSWORD}`
+    )
+  }
   await pool.end()
 }
 

@@ -35,8 +35,13 @@ export function verifyPassword(plain: string, hash: string): Promise<boolean> {
   return bcrypt.compare(plain, hash)
 }
 
+const JWT_ALGORITHM = 'HS256' as const
+
 export function signToken(user: { id: string; role: Role }): string {
-  return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, { expiresIn: TOKEN_TTL })
+  return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, {
+    expiresIn: TOKEN_TTL,
+    algorithm: JWT_ALGORITHM,
+  })
 }
 
 /**
@@ -52,7 +57,11 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
   let userId: string
   try {
-    const payload = jwt.verify(header.slice(7), env.jwtSecret) as jwt.JwtPayload
+    // Pinning the algorithm keeps verification from being steered by the
+    // token's own header, which is the shape of the classic JWT confusion bugs.
+    const payload = jwt.verify(header.slice(7), env.jwtSecret, {
+      algorithms: [JWT_ALGORITHM],
+    }) as jwt.JwtPayload
     if (typeof payload.sub !== 'string') throw new Error('bad subject')
     userId = payload.sub
   } catch {

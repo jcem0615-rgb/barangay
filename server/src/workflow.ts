@@ -18,8 +18,7 @@ export type RequestStatus =
   | 'draft' | 'submitted' | 'in_progress' | 'for_payment' | 'completed' | 'rejected'
 
 /** Reference numbers are issued server-side so they can't collide or be forged. */
-export function makeReferenceNo(prefix: string, seq: number): string {
-  const year = new Date().getFullYear()
+export function makeReferenceNo(prefix: string, year: number, seq: number): string {
   return `${prefix}-${year}-${seq.toString().padStart(5, '0')}`
 }
 

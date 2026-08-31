@@ -103,11 +103,28 @@ usual answer is to add a second factor for staff rather than to loosen this.
 npm run test:e2e          # needs the server running against a migrated, seeded database
 npm run test:rate-limit   # login throttling; run the server with TRUST_PROXY=1 to
                           # also exercise the per-IP axis
+npm run test:hardening    # regressions for the issues found in the security pass
 ```
 
 Covers registration and login, request submission, the full assess → pay →
 release path, rejection, and the access rules: one department cannot read or act
 on another's requests, and one resident cannot read another's.
+
+## Security notes
+
+- **Reference numbers** come from `request_counters`, incremented atomically per
+  department and year. They were previously derived from `count(*)`, which does
+  not serialize: 6 of 8 simultaneous submissions failed on the unique index.
+  Re-check `test:hardening` before changing how they are issued.
+- **Submitted form values** are checked against the fields the service actually
+  declares, and capped at 2000 characters each. Without that, a caller could
+  attach arbitrary keys that staff would be shown as if the resident had filled
+  them in.
+- **JWTs** are signed and verified with a pinned algorithm (`HS256`), so
+  verification cannot be steered by the token's own header.
+- **Seeding refuses the built-in password when `NODE_ENV=production`** — supply
+  `SEED_PASSWORD` from a secret store. The seed never prints a supplied
+  password, only the development default.
 
 ## Notes
 
@@ -118,3 +135,6 @@ on another's requests, and one resident cannot read another's.
   re-read from the database on every request, so revoking access takes effect at once.
 - `login_attempts` rows are purged opportunistically after a successful sign-in;
   the table is not expected to grow unbounded.
+- Required-field enforcement is still client-side: the API rejects fields a
+  service does not declare, but does not yet reject a submission that omits a
+  required one. Staff can receive an incomplete application.
