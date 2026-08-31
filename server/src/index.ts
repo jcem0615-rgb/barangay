@@ -13,6 +13,7 @@ import { requestsRouter } from './routes/requests.ts'
 import { staffRouter } from './routes/staff.ts'
 import { verifyRouter } from './routes/verify.ts'
 import { MAX_FILE_BYTES } from './uploads.ts'
+import { scanningEnabled } from './antivirus.ts'
 
 const app = express()
 
@@ -65,7 +66,12 @@ app.use(express.json({ limit: '256kb' }))
  */
 app.get('/api/health', async (_req, res) => {
   const dbOk = await isDatabaseReachable()
-  res.status(dbOk ? 200 : 503).json({ ok: dbOk, database: dbOk ? 'up' : 'unreachable' })
+  res.status(dbOk ? 200 : 503).json({
+    ok: dbOk,
+    database: dbOk ? 'up' : 'unreachable',
+    // Visible so a deployment that meant to scan uploads but isn't can be spotted.
+    virusScanning: scanningEnabled() ? 'enabled' : 'disabled',
+  })
 })
 
 app.use('/api/auth', authRouter)

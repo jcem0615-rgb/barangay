@@ -13,7 +13,8 @@
     "test:rate-limit": "node test/rate-limit.mjs",
     "test:hardening": "node test/hardening.mjs",
     "test:documents": "node test/documents.mjs",
-    "test:attachments": "node test/attachments.mjs"
+    "test:attachments": "node test/attachments.mjs",
+    "test:antivirus": "node test/antivirus.mjs"
   },
   "dependencies": {
     "@types/compression": "^1.8.1",

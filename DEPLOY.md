@@ -38,6 +38,8 @@ Everything is environment variables. Only the first two are required.
 | `CORS_ORIGIN` | only if split | Leave unset when the API serves the web app |
 | `PGPOOL_MAX` | no | Connections per instance, default 10 |
 | `SERVE_WEB` | no | `false` to run API-only |
+| `UPLOAD_DIR` | **in a container** | Must be a mounted volume, or uploads are lost on deploy |
+| `CLAMAV_HOST` | **for public traffic** | clamd for scanning uploads. Unset = no scanning |
 
 ### TRUST_PROXY is not optional guesswork
 
@@ -88,6 +90,8 @@ usually `1` behind a single load balancer or ingress.
 - [ ] Postgres has automated backups with a tested restore
 - [ ] TLS is enforced and HTTP redirects
 - [ ] You have somewhere to read `console.error` output
+- [ ] `UPLOAD_DIR` points at persistent storage, not the container filesystem
+- [ ] `CLAMAV_HOST` is set and `/api/health` reports `virusScanning: enabled`
 
 ## Scaling
 

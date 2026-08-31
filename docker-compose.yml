@@ -39,6 +39,9 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-0}
       NODE_ENV: production
       UPLOAD_DIR: /app/uploads
+      # Unset by default so the stack starts fast. Turn scanning on with:
+      #   docker compose --profile antivirus up -d
+      CLAMAV_HOST: ${CLAMAV_HOST:-}
     ports:
       - "4000:4000"
     volumes:
@@ -49,6 +52,23 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Opt-in: the image carries a virus database and takes a few minutes to become
+  # ready on first start, so it is kept out of the default stack.
+  #   docker compose --profile antivirus up -d
+  #   ...and set CLAMAV_HOST=clamav in your .env
+  clamav:
+    image: clamav/clamav:stable
+    profiles: [antivirus]
+    volumes:
+      - clamav-db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
 volumes:
   db-data:
   uploads:
+  clamav-db:

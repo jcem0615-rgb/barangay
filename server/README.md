@@ -109,8 +109,29 @@ office can verify what was submitted instead of approving blind.
   replace it without touching the routes.
 
 **`UPLOAD_DIR` must be a mounted volume in a container**, or every uploaded
-requirement is lost on the next deploy. There is no virus scanning — worth
-adding before this handles real submissions at scale.
+requirement is lost on the next deploy.
+
+### Virus scanning
+
+Set `CLAMAV_HOST` and uploads are streamed to clamd before anything reaches
+disk. Leave it unset and scanning is skipped, which is fine for development and
+not for anything facing the public.
+
+Two behaviours worth knowing:
+
+- **It fails closed.** When scanning is configured but the scanner is down,
+  times out, or answers with something unparseable, the upload is rejected with
+  a 503 rather than accepted unscanned. An unavailable scanner must not quietly
+  become no scanner.
+- **Files are scanned in memory**, before `putFile`, so an infected upload never
+  lands on disk at all. The rejection message doesn't name the signature.
+
+`GET /api/health` reports `virusScanning: enabled|disabled`, so a deployment
+that meant to scan but isn't is visible rather than silent.
+
+`docker compose --profile antivirus up -d` starts a clamd alongside the app; set
+`CLAMAV_HOST=clamav` to point at it. It is opt-in because the image downloads a
+virus database and takes a few minutes to become ready.
 
 ## Login throttling
 
@@ -158,6 +179,8 @@ npm run test:rate-limit   # login throttling; run the server with TRUST_PROXY=1 
 npm run test:hardening    # regressions for the issues found in the security pass
 npm run test:documents    # release, download, access rules, and verification
 npm run test:attachments  # upload validation, access rules, and lifecycle
+npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
+                          # (starts its own API on port 4100; no setup needed)
 ```
 
 Covers registration and login, request submission, the full assess → pay →

@@ -40,4 +40,11 @@ export const env = {
    * mounted volume, or uploads are lost on the next deploy.
    */
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
+  /**
+   * clamd for scanning uploads. Unset means no scanning — fine for
+   * development, not for a deployment that accepts files from the public.
+   */
+  clamavHost: process.env.CLAMAV_HOST || undefined,
+  clamavPort: Number(process.env.CLAMAV_PORT ?? 3310),
+  clamavTimeoutMs: Number(process.env.CLAMAV_TIMEOUT_MS ?? 15000),
 }

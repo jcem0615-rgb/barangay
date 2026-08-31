@@ -10,6 +10,7 @@ import { sendAttachment } from '../attachments.ts'
 import {
   ACCEPTED_DESCRIPTION, detectType, MAX_FILE_BYTES, MAX_FILES_PER_REQUEST, safeFileName,
 } from '../uploads.ts'
+import { scanBuffer } from '../antivirus.ts'
 
 export const requestsRouter = Router()
 requestsRouter.use(authenticate, requireRole('resident'))
@@ -241,6 +242,24 @@ requestsRouter.post('/:id/attachments', upload.single('file'), async (req, res) 
   const detected = detectType(file.buffer)
   if (!detected) {
     return res.status(415).json({ error: `That file type isn't accepted. Attach a ${ACCEPTED_DESCRIPTION} file.` })
+  }
+
+  // Scanned while still in memory, so an infected file never reaches disk.
+  const scan = await scanBuffer(file.buffer)
+  if (scan.status === 'infected') {
+    console.warn(
+      `rejected upload from user ${req.user!.id} on request ${owned.id}: ${scan.signature}`
+    )
+    return res.status(422).json({
+      error: 'That file was rejected by our virus scan. Try a different copy.',
+    })
+  }
+  if (scan.status === 'unavailable') {
+    // Fail closed: an unavailable scanner must not quietly become no scanner.
+    console.error(`virus scan unavailable: ${scan.reason}`)
+    return res.status(503).json({
+      error: "We can't check files for viruses right now. Please try again shortly.",
+    })
   }
 
   const requirement = typeof req.body?.requirement === 'string'
