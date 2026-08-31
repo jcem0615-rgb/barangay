@@ -4,7 +4,10 @@ import StatusPill from '../components/StatusPill'
 import WorkflowTracker from '../components/WorkflowTracker'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
+import { useState } from 'react'
 import { useCatalogue } from '../lib/catalogue'
+import { api, ApiError } from '../lib/api'
+import { saveBlob } from '../lib/download'
 import { resolveIcon } from '../lib/icons'
 import { formatPeso } from '../lib/money'
 
@@ -15,6 +18,8 @@ function formatDate(iso: string) {
 export default function ApplicationDetail({ id }: { id: string }) {
   const { applications } = useAppData()
   const { findCategory, findService } = useCatalogue()
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   const { push, replace } = useNav()
   const app = applications.find((a) => a.id === id)
 
@@ -104,9 +109,33 @@ export default function ApplicationDetail({ id }: { id: string }) {
         )}
 
         {app.status === 'completed' && (
-          <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-[14px] font-semibold text-white active:bg-emerald-700">
-            <Download size={16} /> Download e-Document
-          </button>
+          <div>
+            <button
+              disabled={downloading}
+              onClick={async () => {
+                setDownloading(true)
+                setDownloadError(null)
+                try {
+                  const { blob, fileName } = await api.document(app.id)
+                  saveBlob(blob, fileName)
+                } catch (err) {
+                  setDownloadError(
+                    err instanceof ApiError ? err.message : 'Could not download the document.'
+                  )
+                } finally {
+                  setDownloading(false)
+                }
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-[14px] font-semibold text-white transition active:bg-emerald-700 disabled:opacity-70"
+            >
+              <Download size={16} /> {downloading ? 'Preparing…' : 'Download e-Document'}
+            </button>
+            {downloadError && (
+              <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700">
+                {downloadError}
+              </p>
+            )}
+          </div>
         )}
 
         {app.status !== 'draft' && (

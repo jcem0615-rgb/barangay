@@ -162,3 +162,19 @@ requestsRouter.post('/:id/pay', async (req, res) => {
   )
   res.json(serializeRequest(withName!))
 })
+
+/** The released document, downloadable only by the resident who filed it. */
+requestsRouter.get('/:id/document', async (req, res) => {
+  const doc = await one<{ file_name: string; content: Buffer }>(
+    `select d.file_name, d.content
+       from documents d
+       join requests r on r.id = d.request_id
+      where d.request_id = $1 and r.resident_id = $2`,
+    [req.params.id, req.user!.id]
+  )
+  if (!doc) return res.status(404).json({ error: 'No document is available for this request.' })
+
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="${doc.file_name}"`)
+  res.send(doc.content)
+})

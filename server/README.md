@@ -50,6 +50,9 @@ by seeding or by an administrator — there is no self-service path to a staff r
 | `POST` | `/api/staff/requests/:id/assess` | staff — set the fee due |
 | `POST` | `/api/staff/requests/:id/advance` | staff — move one step forward |
 | `POST` | `/api/staff/requests/:id/reject` | staff — close with a reason |
+| `GET` | `/api/requests/:id/document` | resident — the released PDF for their own request |
+| `GET` | `/api/staff/requests/:id/document` | staff — the released PDF, own departments only |
+| `GET` | `/api/verify/:code` | public — confirm a document is genuine |
 
 ## Workflow
 
@@ -59,6 +62,26 @@ The server owns progression. Staff move a request forward; the **Payment** step
 is the resident's to complete, and `advance` refuses to step over an unpaid fee.
 Every transition is appended to `request_events` with the actor who made it, so
 a request's history is auditable rather than inferred.
+
+## Document release
+
+Completing a request renders a PDF and stores it against that request. It
+carries the office, the resident, the submitted fields, the fee, and a
+verification code.
+
+- The PDF **bytes are stored**, not regenerated on demand. A released clearance
+  is a record of what was issued at that moment; rebuilding it from the request
+  row would let a later edit silently change a document a resident already holds.
+- One document per request (`documents.request_id` is unique), so re-completing
+  cannot mint a second one with a different code.
+- Verification codes are 16 characters of Crockford-style base32 (no I/L/O/U),
+  long enough that `/api/verify/:code` cannot be walked.
+- `/api/verify/:code` is deliberately public — whoever is checking already holds
+  the document — and returns only what is needed to match the paper against the
+  record.
+
+Note that **paying carries a request to the final step but does not close it**.
+The office still advances it, and that release step is what issues the document.
 
 ## Login throttling
 
@@ -104,6 +127,7 @@ npm run test:e2e          # needs the server running against a migrated, seeded 
 npm run test:rate-limit   # login throttling; run the server with TRUST_PROXY=1 to
                           # also exercise the per-IP axis
 npm run test:hardening    # regressions for the issues found in the security pass
+npm run test:documents    # release, download, access rules, and verification
 ```
 
 Covers registration and login, request submission, the full assess → pay →

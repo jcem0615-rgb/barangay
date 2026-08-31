@@ -11,6 +11,7 @@ import { authRouter } from './routes/auth.ts'
 import { catalogueRouter } from './routes/catalogue.ts'
 import { requestsRouter } from './routes/requests.ts'
 import { staffRouter } from './routes/staff.ts'
+import { verifyRouter } from './routes/verify.ts'
 
 const app = express()
 
@@ -45,7 +46,15 @@ app.use(compression())
 
 // CORS only matters when the web app is served from somewhere else (dev, or a
 // split deployment). Same-origin production traffic never reaches this.
-app.use(cors({ origin: env.corsOrigins, credentials: true }))
+app.use(
+  cors({
+    origin: env.corsOrigins,
+    credentials: true,
+    // Without this the browser hides Content-Disposition from JavaScript, and
+    // a downloaded document is saved as a generic "document.pdf".
+    exposedHeaders: ['Content-Disposition'],
+  })
+)
 app.use(express.json({ limit: '256kb' }))
 
 /**
@@ -62,6 +71,7 @@ app.use('/api/auth', authRouter)
 app.use('/api/catalogue', catalogueRouter)
 app.use('/api/requests', requestsRouter)
 app.use('/api/staff', staffRouter)
+app.use('/api/verify', verifyRouter)
 
 // Unknown API routes are an error, never the SPA's index.html — returning HTML
 // to a fetch() would surface as a confusing parse error in the client.

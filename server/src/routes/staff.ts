@@ -4,6 +4,7 @@ import { one, query, transaction } from '../db.ts'
 import { authenticate, canActOnDepartment, requireRole } from '../auth.ts'
 import { REQUEST_SELECT, serializeRequest, toCentavos, type RequestRow } from '../serialize.ts'
 import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
+import { documentFileName, makeVerificationCode, renderDocument } from '../documents.ts'
 
 export const staffRouter = Router()
 staffRouter.use(authenticate, requireRole('staff', 'admin'))
@@ -134,16 +135,55 @@ staffRouter.post('/requests/:id/advance', async (req, res) => {
   if (row.status === 'completed' || row.status === 'rejected') {
     return res.status(409).json({ error: 'This request is already closed.' })
   }
-  if (row.current_step_index >= WORKFLOW_STEPS.length - 1) {
-    return res.status(409).json({ error: 'This request is already at the final step.' })
-  }
   // Payment is the resident's move, not the office's.
   if (row.current_step_index === STEP_PAYMENT && !row.paid) {
     return res.status(409).json({ error: 'Waiting for the resident to pay the assessed fee.' })
   }
 
-  const nextStep = row.current_step_index + 1
-  const isFinal = nextStep >= WORKFLOW_STEPS.length - 1
+  // Paying carries a request to the final step but does not close it — the
+  // office still has to release the document. So advancing from the final step
+  // completes the request rather than being refused, otherwise a paid request
+  // would sit at 'e-Document Release' forever with nothing to hand over.
+  const lastStep = WORKFLOW_STEPS.length - 1
+  const nextStep = Math.min(row.current_step_index + 1, lastStep)
+  const isFinal = nextStep >= lastStep
+
+  // Completing a request releases the document. Rendered before the
+  // transaction so a PDF failure cannot leave a request marked completed with
+  // nothing to hand the resident.
+  let released: { code: string; fileName: string; content: Buffer } | null = null
+  if (isFinal) {
+    const context = await one<{
+      office_name: string; municipality: string | null; address: string | null
+    }>(
+      `select d.office_name, rp.municipality, rp.address
+         from requests r
+         join departments d on d.id = r.department_id
+         left join resident_profiles rp on rp.user_id = r.resident_id
+        where r.id = $1`,
+      [row.id]
+    )
+    const code = makeVerificationCode()
+    const content = await renderDocument({
+      referenceNo: row.reference_no,
+      serviceName: row.service_name ?? 'Municipal Document',
+      officeName: context?.office_name ?? 'Municipal Office',
+      municipality: context?.municipality ?? 'Municipality of San Fernando',
+      residentName: row.resident_name ?? '',
+      residentAddress: context?.address ?? null,
+      formValues: row.form_values,
+      feePesos: row.fee_centavos / 100,
+      paid: row.paid,
+      submittedAt: row.submitted_at,
+      issuedAt: new Date(),
+      verificationCode: code,
+    })
+    released = {
+      code,
+      fileName: documentFileName(row.service_name ?? 'document', row.reference_no),
+      content,
+    }
+  }
 
   const updated = await transaction(async (client) => {
     const result = await client.query<RequestRow>(
@@ -160,6 +200,20 @@ staffRouter.post('/requests/:id/advance', async (req, res) => {
         row.current_step_index, nextStep, parsed.data.note ?? null,
       ]
     )
+    if (released) {
+      // One document per request: re-completing cannot mint a second one.
+      await client.query(
+        `insert into documents (request_id, verification_code, file_name, content, byte_size, issued_by)
+         values ($1, $2, $3, $4, $5, $6)
+         on conflict (request_id) do nothing`,
+        [row.id, released.code, released.fileName, released.content, released.content.length, user.id]
+      )
+      await client.query(
+        `insert into request_events (request_id, actor_id, event_type, from_step, to_step, note)
+         values ($1, $2, 'released', $3, $3, $4)`,
+        [row.id, user.id, nextStep, `Document released (code ${released.code})`]
+      )
+    }
     return result.rows[0]!
   })
 
@@ -196,4 +250,20 @@ staffRouter.post('/requests/:id/reject', async (req, res) => {
 
   const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
   res.json(serializeRequest(withName!))
+})
+
+staffRouter.get('/requests/:id/document', async (req, res) => {
+  const user = req.user!
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+
+  const doc = await one<{ file_name: string; content: Buffer }>(
+    `select file_name, content from documents where request_id = $1`,
+    [row.id]
+  )
+  if (!doc) return res.status(404).json({ error: 'No document has been released yet.' })
+
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="${doc.file_name}"`)
+  res.send(doc.content)
 })

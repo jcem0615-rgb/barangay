@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, Download, Loader2, X } from 'lucide-react'
 import { api, ApiError, type RequestEvent } from '../../lib/api'
+import { saveBlob } from '../../lib/download'
 import type { Application } from '../../types'
 import { WORKFLOW_STEPS } from '../../types'
 
@@ -99,6 +100,22 @@ export default function StaffRequestPanel({
             </p>
           )}
         </div>
+
+        {detail.status === 'completed' && (
+          <button
+            onClick={async () => {
+              try {
+                const { blob, fileName } = await api.staffDocument(detail.id)
+                saveBlob(blob, fileName)
+              } catch (err) {
+                setError(err instanceof ApiError ? err.message : 'Could not download the document.')
+              }
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 py-2.5 text-[13px] font-semibold text-emerald-800 transition hover:bg-emerald-100"
+          >
+            <Download size={15} /> Released document
+          </button>
+        )}
 
         {Object.keys(detail.formValues).length > 0 && (
           <div>

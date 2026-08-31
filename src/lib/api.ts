@@ -81,6 +81,24 @@ export interface RequestEvent {
   actorName?: string | null
 }
 
+/**
+ * Documents need the Authorization header, so they can't be fetched with a
+ * plain link — download them as a blob and save that instead.
+ */
+async function downloadPdf(path: string): Promise<{ blob: Blob; fileName: string }> {
+  const token = getToken()
+  const res = await fetch(BASE + path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new ApiError(body?.error ?? 'Could not download the document.', res.status)
+  }
+  const disposition = res.headers.get('content-disposition') ?? ''
+  const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'document.pdf'
+  return { blob: await res.blob(), fileName }
+}
+
 export const api = {
   catalogue: () =>
     request<{
@@ -112,6 +130,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ serviceId, formValues, submittedOfflineAt }),
     }),
+
+  document: (id: string) => downloadPdf(`/requests/${id}/document`),
+
+  staffDocument: (id: string) => downloadPdf(`/staff/requests/${id}/document`),
+
+  verify: (code: string) =>
+    request<{ valid: boolean; referenceNo?: string; documentType?: string; issuedBy?: string; issuedTo?: string; issuedAt?: string }>(
+      `/verify/${encodeURIComponent(code)}`
+    ),
 
   pay: (id: string, method: string) =>
     request<Application>(`/requests/${id}/pay`, {

@@ -86,7 +86,9 @@ timestamp so the server records when the resident actually filled it in. A submi
 server rejects with a 4xx is dropped rather than retried forever.
 
 Workflow progression belongs to the server. Staff call assess / advance / reject; the
-resident calls pay. The client never sets `currentStepIndex` itself.
+resident calls pay. The client never sets `currentStepIndex` itself. Paying moves a
+request to the final step but does not close it — the office advances it once more, and
+that release step renders and stores the PDF (`server/src/documents.ts`).
 
 ## Adding a new service
 
@@ -106,6 +108,9 @@ automatically, no new screen needed. If a category needs an icon not already in
 - **Payment** records that a resident chose a method and marks the request paid. There is no
   gateway integration: no redirect, no webhook, no settlement. Wiring a real one means
   server-side webhook verification — never mark a request paid from the client.
+- **Document release** produces a real PDF with a verification code, but it is not
+  digitally signed. A production system would sign it so tampering is detectable
+  rather than relying on the code lookup alone.
 - **Drafts** have no API endpoint yet. `ApplicationStatus` still includes `draft` and the
   request list still has a Drafts tab, but nothing writes one; the Save Draft button was
   removed rather than left lying about what it did.
