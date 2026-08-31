@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { NavProvider, useNav } from './lib/nav'
 import { AppDataProvider } from './lib/appData'
@@ -14,6 +15,7 @@ import PaymentScreen from './screens/PaymentScreen'
 import Profile from './screens/Profile'
 import IdCardScreen from './screens/IdCardScreen'
 import SignIn from './screens/SignIn'
+import ResetPassword from './screens/ResetPassword'
 import StaffConsole from './screens/staff/StaffConsole'
 
 function ScreenRouter() {
@@ -57,9 +59,28 @@ function ResidentShell() {
   )
 }
 
+/**
+ * Pulls a reset token out of the URL once, at boot, and clears it from the
+ * address bar so it isn't left in history or shoulder-read. There is no router,
+ * so this is the one place a URL means anything.
+ */
+function takeResetToken(): string | null {
+  if (typeof window === 'undefined') return null
+  const token = new URLSearchParams(window.location.search).get('reset')
+  if (token) {
+    window.history.replaceState({}, '', window.location.pathname)
+  }
+  return token
+}
+
 /** Which shell you get is decided by the role the server reports, not the URL. */
 function RoleShell() {
   const { user, loading } = useAuth()
+  const [resetToken, setResetToken] = useState<string | null>(takeResetToken)
+
+  if (resetToken) {
+    return <ResetPassword token={resetToken} onDone={() => setResetToken(null)} />
+  }
 
   if (loading) {
     return (

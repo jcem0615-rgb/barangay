@@ -146,6 +146,18 @@ export const api = {
 
   me: () => request<{ user: AuthUser; profile: ResidentProfileData | null }>('/auth/me'),
 
+  forgotPassword: (email: string) =>
+    request<{ message: string }>('/auth/forgot', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    request<void>('/auth/reset', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    }),
+
   myRequests: () => request<Application[]>('/requests'),
 
   myRequest: (id: string) => request<Application & { events: RequestEvent[] }>(`/requests/${id}`),

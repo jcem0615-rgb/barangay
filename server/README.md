@@ -40,6 +40,8 @@ by seeding or by an administrator — there is no self-service path to a staff r
 | `POST` | `/api/auth/register` | public — resident sign-up |
 | `POST` | `/api/auth/login` | public |
 | `GET` | `/api/auth/me` | signed in |
+| `POST` | `/api/auth/forgot` | public — request a reset link |
+| `POST` | `/api/auth/reset` | public — set a new password with a link's token |
 | `POST` | `/api/requests` | resident — submit |
 | `GET` | `/api/requests` | resident — own requests |
 | `GET` | `/api/requests/:id` | resident — own request + history |
@@ -88,6 +90,32 @@ verification code.
 
 Note that **paying carries a request to the final step but does not close it**.
 The office still advances it, and that release step is what issues the document.
+
+## Password reset
+
+`POST /auth/forgot` mails a single-use link; `POST /auth/reset` spends it.
+
+- **Only a hash of the token is stored**, so a leaked database yields no working
+  links. Tokens are single-use and expire in an hour, and a successful reset
+  spends every other outstanding link for that account.
+- **The response never reveals whether an account exists** — a known address, an
+  unknown one and a malformed one all get the same 202. A send failure is logged
+  rather than surfaced, for the same reason.
+- **It shares the login rate-limit budget**, so it can't be used to spray
+  addresses or flood an inbox.
+- **A reset signs out existing sessions.** Sessions are stateless JWTs, so
+  `users.password_changed_at` is checked on every request and anything issued
+  earlier is refused — otherwise resetting would leave the very person you are
+  locking out still signed in. Tokens carry `iatMs` because `iat`'s whole-second
+  resolution cannot separate a session issued moments before a reset from one
+  issued moments after.
+- A successful reset clears the account's failed-login count, so someone locked
+  out by an attacker can get straight back in.
+
+**`MAIL_TRANSPORT=smtp` and `SMTP_URL` are required for anything public**, along
+with `PUBLIC_URL` pointing at the address residents actually use. On the default
+`console` transport the link is only logged, which means no resident can
+actually recover their account.
 
 ## Attachments
 
@@ -179,6 +207,7 @@ npm run test:rate-limit   # login throttling; run the server with TRUST_PROXY=1 
 npm run test:hardening    # regressions for the issues found in the security pass
 npm run test:documents    # release, download, access rules, and verification
 npm run test:attachments  # upload validation, access rules, and lifecycle
+npm run test:password-reset  # token handling, enumeration, session invalidation
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```

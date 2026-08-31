@@ -117,8 +117,11 @@ automatically, no new screen needed. If a category needs an icon not already in
 - **Drafts** have no API endpoint yet. `ApplicationStatus` still includes `draft` and the
   request list still has a Drafts tab, but nothing writes one; the Save Draft button was
   removed rather than left lying about what it did.
-- **Sessions** are 12-hour JWTs with no refresh or revocation list. Signing out clears the
-  token client-side; the token itself stays valid until it expires.
+- **Sessions** are 12-hour JWTs with no refresh or general revocation list. Signing out
+  clears the token client-side; it stays valid until it expires. The one exception is a
+  password change, which `users.password_changed_at` enforces on every request.
+- **Reset links** need real mail (`SMTP_URL`). On the default console transport the link
+  is only logged, so no resident can actually recover an account.
 - **Login throttling** is per-account (5 failures / 15 min) and per-IP (20 / 15 min),
   recorded in Postgres so it survives restarts and spans instances. Set `TRUST_PROXY` to
   the real number of proxies in front of the API, or the per-IP limit counts the load

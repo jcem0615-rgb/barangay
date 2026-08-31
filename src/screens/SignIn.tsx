@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { Building2, Loader2 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
-import { ApiError } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 
-type Mode = 'login' | 'register'
+type Mode = 'login' | 'register' | 'forgot'
 
 export default function SignIn() {
   const { login, register } = useAuth()
+  const [notice, setNotice] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>('login')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,9 +23,13 @@ export default function SignIn() {
     e.preventDefault()
     setBusy(true)
     setError(null)
+    setNotice(null)
     try {
       if (mode === 'login') await login(form.email, form.password)
-      else await register(form)
+      else if (mode === 'forgot') {
+        const { message } = await api.forgotPassword(form.email)
+        setNotice(message)
+      } else await register(form)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
     } finally {
@@ -48,9 +53,11 @@ export default function SignIn() {
             <button
               key={m}
               type="button"
-              onClick={() => { setMode(m); setError(null) }}
+              onClick={() => { setMode(m); setError(null); setNotice(null) }}
               className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition ${
-                mode === m ? 'bg-navy-800 text-white' : 'text-slate-500'
+                mode === m || (m === 'login' && mode === 'forgot')
+                  ? 'bg-navy-800 text-white'
+                  : 'text-slate-500'
               }`}
             >
               {m === 'login' ? 'Sign in' : 'Create account'}
@@ -59,19 +66,26 @@ export default function SignIn() {
         </div>
 
         <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+          {mode === 'forgot' && (
+            <p className="text-[12.5px] leading-snug text-slate-500">
+              Enter the email you registered with and we&rsquo;ll send a link to choose a new password.
+            </p>
+          )}
           {mode === 'register' && (
             <Field label="Full name" value={form.fullName} onChange={set('fullName')} required autoComplete="name" />
           )}
           <Field label="Email" type="email" value={form.email} onChange={set('email')} required autoComplete="email" />
-          <Field
-            label="Password"
-            type="password"
-            value={form.password}
-            onChange={set('password')}
-            required
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            helper={mode === 'register' ? 'At least 10 characters.' : undefined}
-          />
+          {mode !== 'forgot' && (
+            <Field
+              label="Password"
+              type="password"
+              value={form.password}
+              onChange={set('password')}
+              required
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              helper={mode === 'register' ? 'At least 10 characters.' : undefined}
+            />
+          )}
           {mode === 'register' && (
             <Field label="Barangay" value={form.barangay} onChange={set('barangay')} autoComplete="address-level4" />
           )}
@@ -81,6 +95,11 @@ export default function SignIn() {
               {error}
             </p>
           )}
+          {notice && (
+            <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2.5 text-[12.5px] text-emerald-800">
+              {notice}
+            </p>
+          )}
 
           <button
             type="submit"
@@ -88,8 +107,27 @@ export default function SignIn() {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[14px] font-semibold text-white transition active:bg-navy-900 disabled:opacity-70"
           >
             {busy && <Loader2 size={16} className="animate-spin" />}
-            {mode === 'login' ? 'Sign in' : 'Create account'}
+            {mode === 'login' ? 'Sign in' : mode === 'forgot' ? 'Send reset link' : 'Create account'}
           </button>
+
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => { setMode('forgot'); setError(null); setNotice(null) }}
+              className="w-full py-1 text-[12.5px] font-medium text-navy-800"
+            >
+              Forgot your password?
+            </button>
+          )}
+          {mode === 'forgot' && (
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setError(null); setNotice(null) }}
+              className="w-full py-1 text-[12.5px] font-medium text-slate-500"
+            >
+              Back to sign in
+            </button>
+          )}
         </form>
 
         <p className="mt-4 text-center text-[11.5px] leading-relaxed text-slate-400">

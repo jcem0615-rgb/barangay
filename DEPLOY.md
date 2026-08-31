@@ -40,6 +40,8 @@ Everything is environment variables. Only the first two are required.
 | `SERVE_WEB` | no | `false` to run API-only |
 | `UPLOAD_DIR` | **in a container** | Must be a mounted volume, or uploads are lost on deploy |
 | `CLAMAV_HOST` | **for public traffic** | clamd for scanning uploads. Unset = no scanning |
+| `SMTP_URL` | **for public traffic** | Password reset links go nowhere without it |
+| `PUBLIC_URL` | **yes, if mailing** | Address residents reach; reset links are built from it |
 
 ### TRUST_PROXY is not optional guesswork
 
@@ -92,6 +94,7 @@ usually `1` behind a single load balancer or ingress.
 - [ ] You have somewhere to read `console.error` output
 - [ ] `UPLOAD_DIR` points at persistent storage, not the container filesystem
 - [ ] `CLAMAV_HOST` is set and `/api/health` reports `virusScanning: enabled`
+- [ ] `SMTP_URL` and `PUBLIC_URL` are set, and a test reset email actually arrives
 
 ## Scaling
 

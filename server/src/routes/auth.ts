@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
@@ -6,6 +7,8 @@ import {
   checkLoginThrottle, clearLoginFailures, clientIp, LOGIN_LIMITS,
   purgeOldAttempts, recordLoginAttempt,
 } from '../rateLimit.ts'
+import { resetEmail, sendMail } from '../mailer.ts'
+import { env } from '../env.ts'
 
 export const authRouter = Router()
 
@@ -139,4 +142,106 @@ authRouter.get('/me', authenticate, async (req, res) => {
     [req.user!.id]
   )
   res.json({ user: req.user, profile: profile ?? null })
+})
+
+// ---------------------------------------------------------------------------
+// Password reset
+// ---------------------------------------------------------------------------
+
+const RESET_TTL_MINUTES = 60
+
+/** Only the hash is stored, so a leaked table yields no usable links. */
+const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
+
+const forgotSchema = z.object({ email: z.email() })
+
+authRouter.post('/forgot', async (req, res) => {
+  const parsed = forgotSchema.safeParse(req.body)
+  // Even a malformed address gets the same answer: whether an account exists is
+  // not something this endpoint should reveal.
+  const acknowledge = () =>
+    res.status(202).json({
+      message: 'If that email has an account, we have sent a reset link.',
+    })
+
+  if (!parsed.success) return acknowledge()
+  const email = parsed.data.email
+  const ip = clientIp(req)
+
+  // Shares the login budget, so this cannot be used to spray addresses or to
+  // flood someone's inbox.
+  const throttle = await checkLoginThrottle(email, ip)
+  if (!throttle.allowed) {
+    const minutes = Math.ceil(throttle.retryAfter / 60)
+    res.setHeader('Retry-After', String(throttle.retryAfter))
+    return res.status(429).json({
+      error: `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+    })
+  }
+  await recordLoginAttempt(email, ip, false)
+
+  const user = await one<{ id: string }>(
+    `select id from users where lower(email) = lower($1)`, [email]
+  )
+  if (!user) return acknowledge()
+
+  const token = randomBytes(32).toString('base64url')
+  await query(
+    `insert into password_reset_tokens (user_id, token_hash, expires_at)
+     values ($1, $2, now() + ($3 || ' minutes')::interval)`,
+    [user.id, hashToken(token), RESET_TTL_MINUTES]
+  )
+
+  const link = `${env.publicUrl}/?reset=${token}`
+  try {
+    await sendMail({ to: email, ...resetEmail(link, RESET_TTL_MINUTES) })
+  } catch (err) {
+    // Don't tell the caller the send failed — that would leak that the account
+    // exists. Logged so an operator can see it.
+    console.error('failed to send reset email', err)
+  }
+  acknowledge()
+})
+
+const resetSchema = z.object({
+  token: z.string().min(10).max(200),
+  password: z.string().min(10, 'Use at least 10 characters.').max(200),
+})
+
+authRouter.post('/reset', async (req, res) => {
+  const parsed = resetSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+
+  const row = await one<{ id: string; user_id: string }>(
+    `select id, user_id from password_reset_tokens
+      where token_hash = $1 and used_at is null and expires_at > now()`,
+    [hashToken(parsed.data.token)]
+  )
+  if (!row) {
+    return res.status(400).json({ error: 'That reset link is invalid or has expired. Request a new one.' })
+  }
+
+  const passwordHash = await hashPassword(parsed.data.password)
+  await transaction(async (client) => {
+    // password_changed_at invalidates sessions issued before now, so a reset
+    // signs out whoever was already holding a token for this account.
+    await client.query(
+      `update users set password_hash = $2, password_changed_at = now() where id = $1`,
+      [row.user_id, passwordHash]
+    )
+    await client.query(`update password_reset_tokens set used_at = now() where id = $1`, [row.id])
+    // Any other outstanding link for this account is spent too.
+    await client.query(
+      `update password_reset_tokens set used_at = now()
+        where user_id = $1 and used_at is null`,
+      [row.user_id]
+    )
+  })
+
+  // A successful reset clears the account's failed-login count, so someone
+  // locked out by an attacker can get straight back in.
+  const account = await one<{ email: string }>(`select email from users where id = $1`, [row.user_id])
+  if (account) await clearLoginFailures(account.email)
+
+  res.status(204).end()
 })

@@ -38,7 +38,10 @@ export function verifyPassword(plain: string, hash: string): Promise<boolean> {
 const JWT_ALGORITHM = 'HS256' as const
 
 export function signToken(user: { id: string; role: Role }): string {
-  return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, {
+  // `iat` is whole seconds, too coarse to tell a session issued moments before
+  // a password change from one issued moments after. iatMs carries the
+  // millisecond so that comparison is exact.
+  return jwt.sign({ sub: user.id, role: user.role, iatMs: Date.now() }, env.jwtSecret, {
     expiresIn: TOKEN_TTL,
     algorithm: JWT_ALGORITHM,
   })
@@ -56,10 +59,11 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 
   let userId: string
+  let payload: jwt.JwtPayload
   try {
     // Pinning the algorithm keeps verification from being steered by the
     // token's own header, which is the shape of the classic JWT confusion bugs.
-    const payload = jwt.verify(header.slice(7), env.jwtSecret, {
+    payload = jwt.verify(header.slice(7), env.jwtSecret, {
       algorithms: [JWT_ALGORITHM],
     }) as jwt.JwtPayload
     if (typeof payload.sub !== 'string') throw new Error('bad subject')
@@ -69,9 +73,10 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 
   const rows = await query<{
-    id: string; email: string; role: Role; full_name: string; department_id: string | null
+    id: string; email: string; role: Role; full_name: string
+    department_id: string | null; password_changed_at: Date
   }>(
-    `select u.id, u.email, u.role, u.full_name, sa.department_id
+    `select u.id, u.email, u.role, u.full_name, u.password_changed_at, sa.department_id
        from users u
        left join staff_assignments sa on sa.user_id = u.id
       where u.id = $1`,
@@ -80,6 +85,23 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
   const first = rows[0]
   if (!first) return res.status(401).json({ error: 'Your account is no longer active.' })
+
+  // Sessions are stateless, so a password change is enforced here: anything
+  // issued before it is refused. Without this, resetting a password would not
+  // sign out whoever prompted the reset.
+  // Tokens issued before the password changed are refused, so a reset signs out
+  // whoever was already holding one. Falls back to `iat` for tokens predating
+  // iatMs, rounded up to the end of its second so a valid session is never
+  // rejected merely because of that coarser resolution.
+  const issuedAtMs =
+    typeof payload.iatMs === 'number'
+      ? payload.iatMs
+      : typeof payload.iat === 'number'
+        ? payload.iat * 1000 + 999
+        : 0
+  if (issuedAtMs < first.password_changed_at.getTime()) {
+    return res.status(401).json({ error: 'Your password was changed. Sign in again.' })
+  }
 
   req.user = {
     id: first.id,

@@ -47,4 +47,16 @@ export const env = {
   clamavHost: process.env.CLAMAV_HOST || undefined,
   clamavPort: Number(process.env.CLAMAV_PORT ?? 3310),
   clamavTimeoutMs: Number(process.env.CLAMAV_TIMEOUT_MS ?? 15000),
+
+  /** 'console' | 'file' | 'smtp'. Anything public needs 'smtp'. */
+  mailTransport: (process.env.MAIL_TRANSPORT ?? (process.env.SMTP_URL ? 'smtp' : 'console')) as
+    'console' | 'file' | 'smtp',
+  smtpUrl: process.env.SMTP_URL || undefined,
+  mailOutbox: process.env.MAIL_OUTBOX || undefined,
+  mailFrom: process.env.MAIL_FROM ?? 'eLGU Citizen Portal <no-reply@sanfernando.gov.ph>',
+  /**
+   * Public base URL of the web app, used to build the reset link. Must be the
+   * address residents actually reach, not the server's own hostname.
+   */
+  publicUrl: (process.env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
 }
