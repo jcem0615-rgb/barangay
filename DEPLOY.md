@@ -41,7 +41,8 @@ Everything is environment variables. Only the first two are required.
 | `UPLOAD_DIR` | **in a container** | Must be a mounted volume, or uploads are lost on deploy |
 | `CLAMAV_HOST` | **for public traffic** | clamd for scanning uploads. Unset = no scanning |
 | `SMTP_URL` | **for public traffic** | Password reset links go nowhere without it |
-| `PUBLIC_URL` | **yes, if mailing** | Address residents reach; reset links are built from it |
+| `PUBLIC_URL` | **yes, if mailing** | Address residents reach; reset and notification links use it |
+| `SMS_TRANSPORT` | optional | `http` plus `SMS_URL`/`SMS_API_KEY` to text residents |
 
 ### TRUST_PROXY is not optional guesswork
 

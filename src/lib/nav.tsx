@@ -11,6 +11,7 @@ export type Screen =
   | { name: 'payment'; id: string }
   | { name: 'profile' }
   | { name: 'id-card' }
+  | { name: 'notifications' }
 
 interface NavContextValue {
   screen: Screen

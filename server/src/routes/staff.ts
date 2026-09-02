@@ -6,6 +6,9 @@ import { REQUEST_SELECT, serializeRequest, toCentavos, type RequestRow } from '.
 import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
 import { documentFileName, makeVerificationCode, renderDocument } from '../documents.ts'
 import { sendAttachment } from '../attachments.ts'
+import {
+  deliverNotification, notificationFor, recordNotification, type NotificationInput,
+} from '../notifications.ts'
 
 export const staffRouter = Router()
 staffRouter.use(authenticate, requireRole('staff', 'admin'))
@@ -26,6 +29,11 @@ async function loadForStaff(id: string, departments: string[], isAdmin: boolean)
     [id, isAdmin, departments]
   )
 }
+
+const officeNameFor = async (departmentId: string) =>
+  (await one<{ office_name: string }>(
+    `select office_name from departments where id = $1`, [departmentId]
+  ))?.office_name ?? 'The municipal office'
 
 /** The department queue: what this office has been asked to act on. */
 staffRouter.get('/queue', async (req, res) => {
@@ -103,6 +111,19 @@ staffRouter.post('/requests/:id/assess', async (req, res) => {
     return res.status(409).json({ error: 'This request is already closed.' })
   }
 
+  const officeName = await officeNameFor(row.department_id)
+  const notice: NotificationInput = {
+    userId: row.resident_id,
+    requestId: row.id,
+    kind: 'assessed',
+    ...notificationFor('assessed', {
+      serviceName: row.service_name ?? 'request',
+      referenceNo: row.reference_no,
+      officeName,
+      fee: parsed.data.fee,
+    }),
+  }
+
   const updated = await transaction(async (client) => {
     const result = await client.query<RequestRow>(
       `update requests
@@ -116,8 +137,15 @@ staffRouter.post('/requests/:id/assess', async (req, res) => {
        values ($1, $2, 'assessed', $3, $4, $5)`,
       [row.id, user.id, row.current_step_index, STEP_PAYMENT, parsed.data.note ?? null]
     )
+    // Part of the same transaction: a request cannot be assessed without the
+    // resident being told what they owe.
+    await recordNotification(client, notice)
     return result.rows[0]!
   })
+
+  // Delivered after the change is committed and without blocking the response,
+  // so a slow mail server never makes this button hang.
+  void deliverNotification(notice)
 
   const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
   res.json(serializeRequest(withName!))
@@ -186,6 +214,18 @@ staffRouter.post('/requests/:id/advance', async (req, res) => {
     }
   }
 
+  const officeName = await officeNameFor(row.department_id)
+  const notice: NotificationInput = {
+    userId: row.resident_id,
+    requestId: row.id,
+    kind: isFinal ? 'released' : 'advanced',
+    ...notificationFor(isFinal ? 'released' : 'advanced', {
+      serviceName: row.service_name ?? 'request',
+      referenceNo: row.reference_no,
+      officeName,
+    }),
+  }
+
   const updated = await transaction(async (client) => {
     const result = await client.query<RequestRow>(
       `update requests
@@ -215,8 +255,11 @@ staffRouter.post('/requests/:id/advance', async (req, res) => {
         [row.id, user.id, nextStep, `Document released (code ${released.code})`]
       )
     }
+    await recordNotification(client, notice)
     return result.rows[0]!
   })
+
+  void deliverNotification(notice)
 
   const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
   res.json(serializeRequest(withName!))
@@ -235,6 +278,19 @@ staffRouter.post('/requests/:id/reject', async (req, res) => {
     return res.status(409).json({ error: 'This request is already completed.' })
   }
 
+  const officeName = await officeNameFor(row.department_id)
+  const notice: NotificationInput = {
+    userId: row.resident_id,
+    requestId: row.id,
+    kind: 'rejected',
+    ...notificationFor('rejected', {
+      serviceName: row.service_name ?? 'request',
+      referenceNo: row.reference_no,
+      officeName,
+      reason: parsed.data.reason,
+    }),
+  }
+
   const updated = await transaction(async (client) => {
     const result = await client.query<RequestRow>(
       `update requests set status = 'rejected', rejection_reason = $2, updated_at = now()
@@ -246,8 +302,11 @@ staffRouter.post('/requests/:id/reject', async (req, res) => {
        values ($1, $2, 'rejected', $3, $3, $4)`,
       [row.id, user.id, row.current_step_index, parsed.data.reason]
     )
+    await recordNotification(client, notice)
     return result.rows[0]!
   })
+
+  void deliverNotification(notice)
 
   const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
   res.json(serializeRequest(withName!))

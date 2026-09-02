@@ -16,7 +16,8 @@
     "test:attachments": "node test/attachments.mjs",
     "test:antivirus": "node test/antivirus.mjs",
     "test:password-reset": "node test/password-reset.mjs",
-    "test:admin": "node test/admin.mjs"
+    "test:admin": "node test/admin.mjs",
+    "test:notifications": "node test/notifications.mjs"
   },
   "dependencies": {
     "@types/compression": "^1.8.1",

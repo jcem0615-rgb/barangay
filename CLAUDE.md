@@ -86,6 +86,10 @@ queues a `PendingSubmission` on-device and shows it in the list immediately. Whe
 timestamp so the server records when the resident actually filled it in. A submission the
 server rejects with a 4xx is dropped rather than retried forever.
 
+Staff actions notify the resident: the notification row is written inside the same
+transaction as the change, and email/SMS are dispatched after it commits without
+blocking the response (`server/src/notifications.ts`).
+
 Workflow progression belongs to the server. Staff call assess / advance / reject; the
 resident calls pay. The client never sets `currentStepIndex` itself. Paying moves a
 request to the final step but does not close it — the office advances it once more, and

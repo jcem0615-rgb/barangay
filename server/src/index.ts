@@ -13,6 +13,7 @@ import { requestsRouter } from './routes/requests.ts'
 import { staffRouter } from './routes/staff.ts'
 import { verifyRouter } from './routes/verify.ts'
 import { adminRouter } from './routes/admin.ts'
+import { notificationsRouter } from './routes/notifications.ts'
 import { MAX_FILE_BYTES } from './uploads.ts'
 import { scanningEnabled } from './antivirus.ts'
 
@@ -81,6 +82,7 @@ app.use('/api/requests', requestsRouter)
 app.use('/api/staff', staffRouter)
 app.use('/api/verify', verifyRouter)
 app.use('/api/admin', adminRouter)
+app.use('/api/notifications', notificationsRouter)
 
 // Unknown API routes are an error, never the SPA's index.html — returning HTML
 // to a fetch() would surface as a confusing parse error in the client.

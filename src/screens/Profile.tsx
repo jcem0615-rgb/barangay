@@ -2,6 +2,7 @@ import { Bell, ChevronRight, CircleHelp, FileText, IdCard, LogOut, ShieldCheck, 
 import TopBar from '../components/TopBar'
 import { useResidentProfile } from '../lib/resident'
 import { useAuth } from '../lib/auth'
+import NotificationSettings from '../components/NotificationSettings'
 import { useNav } from '../lib/nav'
 import { useOnlineStatus } from '../lib/useOnlineStatus'
 
@@ -46,6 +47,9 @@ export default function Profile() {
             {isOnline ? 'Connected — requests sync in real time' : 'Offline — drafts save to this device'}
           </p>
         </div>
+
+        <p className="mb-2 mt-6 px-1 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Notifications</p>
+        <NotificationSettings />
 
         <p className="mb-2 mt-6 px-1 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Account</p>
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">

@@ -59,4 +59,10 @@ export const env = {
    * address residents actually reach, not the server's own hostname.
    */
   publicUrl: (process.env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
+
+  /** 'off' | 'log' | 'http'. SMS costs money per message, so it is opt-in. */
+  smsTransport: (process.env.SMS_TRANSPORT ?? 'off') as 'off' | 'log' | 'http',
+  smsUrl: process.env.SMS_URL || undefined,
+  smsApiKey: process.env.SMS_API_KEY || undefined,
+  smsSender: process.env.SMS_SENDER ?? 'eLGU',
 }

@@ -14,6 +14,7 @@ import ApplicationDetail from './screens/ApplicationDetail'
 import PaymentScreen from './screens/PaymentScreen'
 import Profile from './screens/Profile'
 import IdCardScreen from './screens/IdCardScreen'
+import NotificationsScreen from './screens/Notifications'
 import SignIn from './screens/SignIn'
 import ResetPassword from './screens/ResetPassword'
 import StaffConsole from './screens/staff/StaffConsole'
@@ -40,6 +41,8 @@ function ScreenRouter() {
       return <Profile />
     case 'id-card':
       return <IdCardScreen />
+    case 'notifications':
+      return <NotificationsScreen />
     default:
       return <Dashboard />
   }

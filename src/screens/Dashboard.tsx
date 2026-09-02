@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { Bell } from 'lucide-react'
+import { api } from '../lib/api'
 import { useCatalogue } from '../lib/catalogue'
 import { useResidentProfile } from '../lib/resident'
 import IDCard from '../components/IDCard'
@@ -13,6 +15,12 @@ export default function Dashboard() {
   const { push } = useNav()
   const { departments } = useCatalogue()
   const resident = useResidentProfile()
+  const [unread, setUnread] = useState(0)
+
+  // Refreshed on each visit to the dashboard; offices act while the app is closed.
+  useEffect(() => {
+    api.notifications().then((n) => setUnread(n.unread)).catch(() => undefined)
+  }, [])
   const { applications } = useAppData()
   const isOnline = useOnlineStatus()
   const recent = applications.slice(0, 2)
@@ -25,12 +33,17 @@ export default function Dashboard() {
           <h1 className="font-display text-[21px] font-extrabold text-navy-950">{resident?.firstName ?? ''} 👋</h1>
         </div>
         <button
-          onClick={() => push({ name: 'applications' })}
-          aria-label="Notifications"
+          onClick={() => push({ name: 'notifications' })}
+          aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
           className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm shadow-slate-900/[0.04] active:bg-slate-50"
         >
           <Bell size={18} className="text-navy-800" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-gold-500" />
+          {/* Only lit when something is actually waiting. */}
+          {unread > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gold-500 px-1 text-[10px] font-bold text-navy-950">
+              {unread > 9 ? '9+' : unread}
+            </span>
+          )}
         </button>
       </div>
 

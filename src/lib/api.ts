@@ -137,6 +137,22 @@ export interface StaffAccount {
   invited?: boolean
 }
 
+export interface Notification {
+  id: string
+  requestId: string | null
+  kind: 'assessed' | 'advanced' | 'released' | 'rejected'
+  title: string
+  body: string
+  createdAt: string
+  readAt: string | null
+}
+
+export interface NotificationPreferences {
+  notifyEmail: boolean
+  notifySms: boolean
+  phone: string | null
+}
+
 export const api = {
   catalogue: () =>
     request<{
@@ -182,6 +198,24 @@ export const api = {
     }),
 
   document: (id: string) => downloadPdf(`/requests/${id}/document`),
+
+  notifications: () =>
+    request<{ notifications: Notification[]; unread: number }>('/notifications'),
+
+  markNotificationRead: (id: string) =>
+    request<void>(`/notifications/${id}/read`, { method: 'POST' }),
+
+  markAllNotificationsRead: () =>
+    request<void>('/notifications/read-all', { method: 'POST' }),
+
+  notificationPreferences: () =>
+    request<NotificationPreferences>('/notifications/preferences'),
+
+  updateNotificationPreferences: (body: Partial<NotificationPreferences>) =>
+    request<NotificationPreferences>('/notifications/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
 
   attachments: (id: string) => request<Attachment[]>(`/requests/${id}/attachments`),
 

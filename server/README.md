@@ -61,6 +61,10 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `DELETE` | `/api/requests/:id/attachments/:aid` | resident — remove, while the request is open |
 | `GET` | `/api/staff/requests/:id/attachments` | staff — what the resident supplied |
 | `GET` | `/api/staff/requests/:id/attachments/:aid` | staff — download it |
+| `GET` | `/api/notifications` | resident — their own, with an unread count |
+| `POST` | `/api/notifications/:id/read` | resident — mark one read |
+| `POST` | `/api/notifications/read-all` | resident — mark all read |
+| `GET`/`PATCH` | `/api/notifications/preferences` | resident — channels and mobile number |
 | `GET` | `/api/admin/staff` | admin — every staff and admin account |
 | `POST` | `/api/admin/staff` | admin — create an account and mail an invitation |
 | `PATCH` | `/api/admin/staff/:id` | admin — name, offices, position |
@@ -96,6 +100,24 @@ verification code.
 
 Note that **paying carries a request to the final step but does not close it**.
 The office still advances it, and that release step is what issues the document.
+
+## Notifications
+
+A resident used to learn their fee had been assessed only by reopening the app.
+Assessing, advancing, releasing and rejecting now all tell them.
+
+- **The notification is written in the same transaction as the change it
+  describes**, so a request cannot move without the resident being told.
+- **Email and SMS are attempted afterwards**, outside the transaction and
+  without blocking the response: a slow mail server must not make an office's
+  Advance button hang, and a bounced message must never roll back the work. If
+  delivery fails the notice is still in the app.
+- Email is on by default (it is the address they registered with); SMS is off
+  until a mobile number is supplied.
+
+`SMS_TRANSPORT=http` posts to `SMS_URL`; the payload shape matches Semaphore,
+which most Philippine LGUs use. Texts are trimmed to one 160-character segment
+because they are billed per segment.
 
 ## Staff accounts
 
@@ -239,6 +261,7 @@ npm run test:documents    # release, download, access rules, and verification
 npm run test:attachments  # upload validation, access rules, and lifecycle
 npm run test:password-reset  # token handling, enumeration, session invalidation
 npm run test:admin        # staff account management and its access boundaries
+npm run test:notifications  # recording, delivery, preferences, and isolation
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```
