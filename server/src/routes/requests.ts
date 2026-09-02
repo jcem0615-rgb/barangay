@@ -100,12 +100,16 @@ requestsRouter.post('/', async (req, res) => {
 })
 
 requestsRouter.get('/', async (req, res) => {
+  // A resident has few requests, but the endpoint should still not be able to
+  // return an unbounded result set.
+  const limit = Math.min(Math.max(Number(req.query.limit ?? 100) || 100, 1), 200)
   const rows = await query<RequestRow>(
     `select ${REQUEST_SELECT}
        from requests r join services s on s.id = r.service_id
       where r.resident_id = $1
-      order by r.submitted_at desc`,
-    [req.user!.id]
+      order by r.submitted_at desc
+      limit $2`,
+    [req.user!.id, limit]
   )
   res.json(rows.map(serializeRequest))
 })

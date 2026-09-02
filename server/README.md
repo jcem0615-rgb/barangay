@@ -46,7 +46,7 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `GET` | `/api/requests` | resident — own requests |
 | `GET` | `/api/requests/:id` | resident — own request + history |
 | `POST` | `/api/requests/:id/pay` | resident — settle an assessed fee |
-| `GET` | `/api/staff/queue` | staff — their departments' requests |
+| `GET` | `/api/staff/queue` | staff — their departments' requests, paged (`limit`, `cursor`, `q`) |
 | `GET` | `/api/staff/summary` | staff — counts by status |
 | `GET` | `/api/staff/requests/:id` | staff — request + full audit trail |
 | `POST` | `/api/staff/requests/:id/assess` | staff — set the fee due |
@@ -100,6 +100,27 @@ verification code.
 
 Note that **paying carries a request to the final step but does not close it**.
 The office still advances it, and that release step is what issues the document.
+
+## Queue pagination
+
+`GET /api/staff/queue` returns `{ items, nextCursor, total }`, 25 per page by
+default and 100 at most. Pass `cursor` for the next page and `q` to search by
+reference number, resident name or service.
+
+**The cursor is keyset, not an offset.** A queue takes new requests constantly:
+with `OFFSET`, a request arriving while a clerk reads page 1 shifts everything
+down and page 2 repeats a row they have already seen. A cursor anchored to the
+last row read is stable regardless of what arrives in between, and stays fast at
+depth. `nextCursor` is null on the last page.
+
+The cursor carries the timestamp as **text straight from Postgres**. A JS `Date`
+keeps only milliseconds while `timestamptz` keeps microseconds, so round-tripping
+through `toISOString()` truncates `.123456` to `.123` — the next page then starts
+*before* the row it should start after and returns it twice. `test:pagination`
+covers this.
+
+The queue is oldest-first, which is what a queue should be, so a request just
+submitted is at the back. Search is how a clerk finds a specific one.
 
 ## Notifications
 
@@ -262,6 +283,7 @@ npm run test:attachments  # upload validation, access rules, and lifecycle
 npm run test:password-reset  # token handling, enumeration, session invalidation
 npm run test:admin        # staff account management and its access boundaries
 npm run test:notifications  # recording, delivery, preferences, and isolation
+npm run test:pagination   # paging boundaries, cursor stability, and search
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```

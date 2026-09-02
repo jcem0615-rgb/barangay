@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Building2, Inbox, LogOut, RefreshCw, Users } from 'lucide-react'
+import { Building2, Inbox, LogOut, RefreshCw, Search, Users } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { Application, ServiceCategory } from '../../types'
@@ -25,23 +25,65 @@ export default function StaffConsole() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [view, setView] = useState<'queue' | 'accounts'>('queue')
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
+
+  // Typing shouldn't fire a query per keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(id)
+  }, [search])
 
   useEffect(() => {
     api.catalogue().then((c) => setDepartments(c.departments)).catch(() => undefined)
   }, [])
 
+  /** Loads the first page. Any filter change starts over from the top. */
   const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      setQueue(await api.staffQueue(departmentId || undefined, status || undefined))
+      const page = await api.staffQueue({
+        departmentId: departmentId || undefined,
+        status: status || undefined,
+        q: debouncedSearch || undefined,
+      })
+      setQueue(page.items)
+      setCursor(page.nextCursor)
+      setTotal(page.total)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load the queue.')
     } finally {
       setLoading(false)
     }
-  }, [departmentId, status])
+  }, [departmentId, status, debouncedSearch])
+
+  const loadMore = useCallback(async () => {
+    if (!cursor) return
+    setLoadingMore(true)
+    setError(null)
+    try {
+      const page = await api.staffQueue({
+        departmentId: departmentId || undefined,
+        status: status || undefined,
+        q: debouncedSearch || undefined,
+        cursor,
+      })
+      // Appended, not replaced: the cursor guarantees no overlap with what is
+      // already on screen.
+      setQueue((prev) => [...prev, ...page.items])
+      setCursor(page.nextCursor)
+      setTotal(page.total)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not load more.')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [cursor, departmentId, status, debouncedSearch])
 
   useEffect(() => {
     if (view === 'queue') void refresh()
@@ -124,9 +166,19 @@ export default function StaffConsole() {
               {t.label}
             </button>
           ))}
+          <div className="relative ml-auto">
+            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Reference, resident, or service"
+              aria-label="Search the queue"
+              className="w-[260px] rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-3 text-[12.5px] outline-none focus:border-navy-600"
+            />
+          </div>
           <button
             onClick={() => void refresh()}
-            className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-medium text-slate-600 transition hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-medium text-slate-600 transition hover:bg-slate-50"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
@@ -137,7 +189,26 @@ export default function StaffConsole() {
         )}
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <QueueTable queue={queue} loading={loading} selectedId={selectedId} onSelect={setSelectedId} />
+          <div>
+            <QueueTable queue={queue} loading={loading} selectedId={selectedId} onSelect={setSelectedId} />
+            {queue.length > 0 && (
+              <div className="mt-3 flex items-center justify-between">
+                <p className="text-[12px] text-slate-500">
+                  Showing {queue.length} of {total}
+                  {debouncedSearch ? ` matching “${debouncedSearch}”` : ''}
+                </p>
+                {cursor && (
+                  <button
+                    onClick={() => void loadMore()}
+                    disabled={loadingMore}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[12.5px] font-semibold text-navy-800 transition hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {loadingMore ? 'Loading…' : 'Load more'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <StaffRequestPanel
             requestId={selectedId}
             onChanged={() => void refresh()}
@@ -164,6 +235,7 @@ function QueueTable({
       <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 py-16 text-center">
         <Inbox size={28} className="text-slate-300" />
         <p className="mt-3 text-[13.5px] font-medium text-slate-400">Nothing in this queue</p>
+        <p className="mt-1 text-[12px] text-slate-400">Try clearing the search or the status filter.</p>
       </div>
     )
   }

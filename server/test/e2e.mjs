@@ -54,11 +54,13 @@ check('anonymous cannot submit', (await call('/requests', { method: 'POST', body
 console.log('\n== department isolation ==')
 const oboTok = (await call('/auth/login', { method: 'POST', body: { email: 'obo@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const lcrTok = (await call('/auth/login', { method: 'POST', body: { email: 'lcr@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const oboQueue = await call('/staff/queue', { token: oboTok })
-check('OBO staff sees the request in its queue', oboQueue.json?.some((r) => r.id === reqId), JSON.stringify(oboQueue.json?.length))
-check('queue shows the resident name', oboQueue.json?.[0]?.residentName === 'Maria Clara D. Santos')
-const lcrQueue = await call('/staff/queue', { token: lcrTok })
-check('LCR staff does NOT see the OBO request', !lcrQueue.json?.some((r) => r.id === reqId))
+// The queue is oldest-first and paged, so a request just submitted sits at the
+// back — look it up the way a clerk with the reference in hand would.
+const oboQueue = await call(`/staff/queue?q=${submit.json.referenceNo}`, { token: oboTok })
+check('OBO staff sees the request in its queue', oboQueue.json?.items?.some((r) => r.id === reqId), JSON.stringify(oboQueue.json))
+check('queue shows the resident name', oboQueue.json?.items?.[0]?.residentName === 'Maria Clara D. Santos')
+const lcrQueue = await call(`/staff/queue?q=${submit.json.referenceNo}`, { token: lcrTok })
+check('LCR staff does NOT see the OBO request', !lcrQueue.json?.items?.some((r) => r.id === reqId))
 check('LCR staff cannot open the OBO request', (await call(`/staff/requests/${reqId}`, { token: lcrTok })).status === 404)
 check('LCR staff cannot assess the OBO request', (await call(`/staff/requests/${reqId}/assess`, { method: 'POST', token: lcrTok, body: { fee: 1 } })).status === 404)
 check('LCR staff cannot request another office queue', (await call('/staff/queue?departmentId=obo', { token: lcrTok })).status === 403)

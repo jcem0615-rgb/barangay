@@ -135,6 +135,8 @@ automatically, no new screen needed. If a category needs an icon not already in
   time — the accepted trade for not leaving accounts guessable.
 - **Required fields** are enforced in the client only. The API rejects undeclared
   fields and over-long values, but not a submission missing a required one.
+- **Queue paging** is keyset on `(submitted_at, id)`; the cursor must carry the
+  timestamp at full microsecond precision or pages overlap. See `server/README.md`.
 - Navigation stack resets on reload (in-memory, not URL-based).
 
 ## Deployment

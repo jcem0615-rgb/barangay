@@ -35,6 +35,38 @@ const officeNameFor = async (departmentId: string) =>
     `select office_name from departments where id = $1`, [departmentId]
   ))?.office_name ?? 'The municipal office'
 
+/**
+ * Keyset pagination on (submitted_at, id).
+ *
+ * Offset pagination would be simpler, but a queue takes new requests
+ * constantly: with OFFSET, a request arriving while a clerk reads page 1 shifts
+ * everything down and page 2 repeats a row that was already seen. A cursor
+ * anchored to the last row read is stable no matter what arrives meanwhile.
+ * The id breaks ties, since two requests can share a timestamp.
+ */
+/**
+ * The timestamp comes straight from Postgres as text. A JS Date only keeps
+ * milliseconds, and timestamptz keeps microseconds — round-tripping through
+ * toISOString() truncates .123456 to .123, so the next page starts *before* the
+ * row it should start after and returns it a second time.
+ */
+const encodeCursor = (row: { cursor_at: string; id: string }) =>
+  Buffer.from(`${row.cursor_at}|${row.id}`).toString('base64url')
+
+function decodeCursor(raw: unknown): { at: string; id: string } | null {
+  if (typeof raw !== 'string' || raw.length === 0) return null
+  try {
+    const [at, id] = Buffer.from(raw, 'base64url').toString('utf8').split('|')
+    if (!at || !id || Number.isNaN(Date.parse(at))) return null
+    return { at, id }
+  } catch {
+    return null
+  }
+}
+
+const DEFAULT_PAGE = 25
+const MAX_PAGE = 100
+
 /** The department queue: what this office has been asked to act on. */
 staffRouter.get('/queue', async (req, res) => {
   const user = req.user!
@@ -50,18 +82,63 @@ staffRouter.get('/queue', async (req, res) => {
 
   const status = typeof req.query.status === 'string' ? req.query.status : undefined
   const scope = departmentId ? [departmentId] : user.departments
+  const scopeAll = isAdmin && !departmentId
 
-  const rows = await query<RequestRow>(
-    `select ${REQUEST_SELECT}, u.full_name as resident_name
+  const limit = Math.min(Math.max(Number(req.query.limit ?? DEFAULT_PAGE) || DEFAULT_PAGE, 1), MAX_PAGE)
+
+  const cursor = decodeCursor(req.query.cursor)
+  if (req.query.cursor && !cursor) {
+    return res.status(400).json({ error: 'That page link is no longer valid. Reload the queue.' })
+  }
+
+  // Free-text search over what a clerk actually has in hand: a reference number
+  // on a printout, or the resident's name.
+  const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : ''
+  const search = rawSearch.length > 0 ? rawSearch : null
+
+  const filters = `
+    ($1::boolean or r.department_id = any($2::text[]))
+    and ($3::text is null or r.status = $3::request_status)
+    and ($4::text is null or (
+      r.reference_no ilike '%' || $4 || '%'
+      or u.full_name ilike '%' || $4 || '%'
+      or s.name ilike '%' || $4 || '%'
+    ))
+  `
+
+  // One extra row tells us whether another page exists without a second query.
+  const rows = await query<RequestRow & { cursor_at: string }>(
+    `select ${REQUEST_SELECT}, u.full_name as resident_name,
+            r.submitted_at::text as cursor_at
        from requests r
        join services s on s.id = r.service_id
        join users u on u.id = r.resident_id
-      where ($1::boolean or r.department_id = any($2::text[]))
-        and ($3::text is null or r.status = $3::request_status)
-      order by r.submitted_at asc`,
-    [isAdmin && !departmentId, scope, status ?? null]
+      where ${filters}
+        and ($5::timestamptz is null
+             or (r.submitted_at, r.id) > ($5::timestamptz, $6::uuid))
+      order by r.submitted_at asc, r.id asc
+      limit $7`,
+    [scopeAll, scope, status ?? null, search, cursor?.at ?? null, cursor?.id ?? null, limit + 1]
   )
-  res.json(rows.map(serializeRequest))
+
+  const hasMore = rows.length > limit
+  const page = hasMore ? rows.slice(0, limit) : rows
+
+  const totals = await one<{ count: number }>(
+    `select count(*)::int as count
+       from requests r
+       join services s on s.id = r.service_id
+       join users u on u.id = r.resident_id
+      where ${filters}`,
+    [scopeAll, scope, status ?? null, search]
+  )
+
+  res.json({
+    items: page.map(serializeRequest),
+    // Null when this is the last page, so the client stops asking.
+    nextCursor: hasMore && page.length > 0 ? encodeCursor(page[page.length - 1]!) : null,
+    total: totals?.count ?? page.length,
+  })
 })
 
 /** Counts per status, for the queue's summary tiles. */

@@ -265,12 +265,23 @@ export const api = {
   sendStaffReset: (id: string) =>
     request<{ message: string }>(`/admin/staff/${id}/send-reset`, { method: 'POST' }),
 
-  staffQueue: (departmentId?: string, status?: string) => {
+  staffQueue: (opts: {
+    departmentId?: string
+    status?: string
+    q?: string
+    cursor?: string
+    limit?: number
+  } = {}) => {
     const params = new URLSearchParams()
-    if (departmentId) params.set('departmentId', departmentId)
-    if (status) params.set('status', status)
+    if (opts.departmentId) params.set('departmentId', opts.departmentId)
+    if (opts.status) params.set('status', opts.status)
+    if (opts.q) params.set('q', opts.q)
+    if (opts.cursor) params.set('cursor', opts.cursor)
+    if (opts.limit) params.set('limit', String(opts.limit))
     const qs = params.toString()
-    return request<Application[]>(`/staff/queue${qs ? `?${qs}` : ''}`)
+    return request<{ items: Application[]; nextCursor: string | null; total: number }>(
+      `/staff/queue${qs ? `?${qs}` : ''}`
+    )
   },
 
   staffRequest: (id: string) =>
