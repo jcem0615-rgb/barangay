@@ -88,7 +88,8 @@ usually `1` behind a single load balancer or ingress.
 
 - [ ] `JWT_SECRET` is a fresh random value from a secret store, not a file
 - [ ] `TRUST_PROXY` matches the real proxy count
-- [ ] Seeded staff passwords have been changed
+- [ ] Seeded staff passwords have been changed, `admin@sanfernando.gov.ph` first
+- [ ] Staff onboarding goes through the Accounts tab, not the database
 - [ ] Postgres has automated backups with a tested restore
 - [ ] TLS is enforced and HTTP redirects
 - [ ] You have somewhere to read `console.error` output

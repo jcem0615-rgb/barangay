@@ -1,4 +1,3 @@
-import { createHash, randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
@@ -9,6 +8,7 @@ import {
 } from '../rateLimit.ts'
 import { resetEmail, sendMail } from '../mailer.ts'
 import { env } from '../env.ts'
+import { hashToken, issueResetToken, RESET_TTL_MINUTES } from '../resetTokens.ts'
 
 export const authRouter = Router()
 
@@ -100,12 +100,16 @@ authRouter.post('/login', async (req, res) => {
   }
 
   const user = await one<{ id: string; email: string; password_hash: string; role: 'resident' | 'staff' | 'admin'; full_name: string }>(
-    `select id, email, password_hash, role, full_name from users where lower(email) = lower($1)`,
+    `select id, email, password_hash, role, full_name
+       from users
+      where lower(email) = lower($1) and deactivated_at is null`,
     [email]
   )
 
-  // Same message and a real hash comparison either way, so timing and wording
-  // don't reveal which emails exist.
+  // A deactivated account is filtered out above, so it behaves exactly like one
+  // that does not exist — no token, and nothing that distinguishes "revoked"
+  // from "wrong password". Same message and a real hash comparison either way,
+  // so timing and wording don't reveal which emails exist.
   const hash = user?.password_hash ?? '$2b$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinv'
   const ok = await verifyPassword(password, hash)
   if (!user || !ok) {
@@ -148,11 +152,6 @@ authRouter.get('/me', authenticate, async (req, res) => {
 // Password reset
 // ---------------------------------------------------------------------------
 
-const RESET_TTL_MINUTES = 60
-
-/** Only the hash is stored, so a leaked table yields no usable links. */
-const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
-
 const forgotSchema = z.object({ email: z.email() })
 
 authRouter.post('/forgot', async (req, res) => {
@@ -185,12 +184,7 @@ authRouter.post('/forgot', async (req, res) => {
   )
   if (!user) return acknowledge()
 
-  const token = randomBytes(32).toString('base64url')
-  await query(
-    `insert into password_reset_tokens (user_id, token_hash, expires_at)
-     values ($1, $2, now() + ($3 || ' minutes')::interval)`,
-    [user.id, hashToken(token), RESET_TTL_MINUTES]
-  )
+  const token = await issueResetToken(user.id)
 
   const link = `${env.publicUrl}/?reset=${token}`
   try {

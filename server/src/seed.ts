@@ -20,6 +20,10 @@ if (process.env.NODE_ENV === 'production' && !process.env.SEED_PASSWORD) {
 
 const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? 'elgu-demo-2026'
 
+// The administrator manages staff accounts from inside the app; without one,
+// onboarding a new clerk means editing the database by hand.
+const ADMIN = { email: 'admin@sanfernando.gov.ph', name: 'Office of the Mayor — Administrator' }
+
 const STAFF: Array<{ email: string; name: string; department: string; position: string }> = [
   { email: 'treasury@sanfernando.gov.ph', name: 'Ana R. Lim', department: 'treasury', position: 'Revenue Officer II' },
   { email: 'bpls@sanfernando.gov.ph', name: 'Rico M. Dela Cruz', department: 'bpls', position: 'Licensing Officer' },
@@ -68,6 +72,19 @@ async function main() {
   const passwordHash = await hashPassword(DEMO_PASSWORD)
   let created = 0
   let kept = 0
+
+  const existingAdmin = await one<{ id: string }>(
+    `select id from users where lower(email) = lower($1)`, [ADMIN.email]
+  )
+  if (existingAdmin) {
+    kept++
+  } else {
+    await query(
+      `insert into users (email, password_hash, role, full_name) values ($1, $2, 'admin', $3)`,
+      [ADMIN.email, passwordHash, ADMIN.name]
+    )
+    created++
+  }
   for (const staff of STAFF) {
     const existing = await one<{ id: string }>(
       `select id from users where lower(email) = lower($1)`, [staff.email]
@@ -97,7 +114,7 @@ async function main() {
 
   // Existing accounts keep their own password — saying otherwise would send
   // someone hunting for a login that does not work.
-  console.log(`staff: ${created} created, ${kept} already existed`)
+  console.log(`accounts: ${created} created, ${kept} already existed (incl. ${ADMIN.email})`)
   if (created > 0) {
     // Only the development default is safe to print. A supplied SEED_PASSWORD
     // is a real secret and must not end up in deploy logs.

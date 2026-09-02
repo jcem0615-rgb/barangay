@@ -124,6 +124,19 @@ async function uploadFile(path: string, file: File, requirement?: string) {
   return body as Attachment
 }
 
+export interface StaffAccount {
+  id: string
+  email: string
+  fullName: string
+  role: 'staff' | 'admin'
+  active: boolean
+  createdAt: string
+  departments: string[]
+  position: string | null
+  /** Only on creation: false means the invitation email did not go out. */
+  invited?: boolean
+}
+
 export const api = {
   catalogue: () =>
     request<{
@@ -198,6 +211,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ method }),
     }),
+
+  listStaff: () => request<StaffAccount[]>('/admin/staff'),
+
+  createStaff: (body: {
+    email: string; fullName: string; role?: string
+    departments: string[]; position?: string
+  }) => request<StaffAccount>('/admin/staff', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateStaff: (id: string, body: { departments?: string[]; position?: string; fullName?: string }) =>
+    request<StaffAccount>(`/admin/staff/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deactivateStaff: (id: string) =>
+    request<void>(`/admin/staff/${id}/deactivate`, { method: 'POST' }),
+
+  reactivateStaff: (id: string) =>
+    request<void>(`/admin/staff/${id}/reactivate`, { method: 'POST' }),
+
+  sendStaffReset: (id: string) =>
+    request<{ message: string }>(`/admin/staff/${id}/send-reset`, { method: 'POST' }),
 
   staffQueue: (departmentId?: string, status?: string) => {
     const params = new URLSearchParams()

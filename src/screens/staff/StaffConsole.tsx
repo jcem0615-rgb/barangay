@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Building2, Inbox, LogOut, RefreshCw } from 'lucide-react'
+import { Building2, Inbox, LogOut, RefreshCw, Users } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { Application, ServiceCategory } from '../../types'
 import StaffRequestPanel from './StaffRequestPanel'
+import StaffAccounts from './StaffAccounts'
 import { formatPeso } from '../../lib/money'
 
 const STATUS_TABS = [
@@ -22,6 +23,7 @@ export default function StaffConsole() {
   const [status, setStatus] = useState<string>('')
   const [departmentId, setDepartmentId] = useState<string>('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [view, setView] = useState<'queue' | 'accounts'>('queue')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,8 +44,8 @@ export default function StaffConsole() {
   }, [departmentId, status])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    if (view === 'queue') void refresh()
+  }, [refresh, view])
 
   const myDepartments = useMemo(
     () => departments.filter((d) => user?.role === 'admin' || user?.departments.includes(d.id)),
@@ -67,16 +69,37 @@ export default function StaffConsole() {
               </p>
             </div>
           </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50"
-          >
-            <LogOut size={15} /> Sign out
-          </button>
+          <div className="flex items-center gap-2">
+            {user?.role === 'admin' && (
+              <div className="flex rounded-xl bg-slate-100 p-1">
+                {([['queue', 'Queue'], ['accounts', 'Accounts']] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setView(key)}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition ${
+                      view === key ? 'bg-white text-navy-950 shadow-sm' : 'text-slate-500'
+                    }`}
+                  >
+                    {key === 'accounts' ? <Users size={13} /> : <Inbox size={13} />} {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50"
+            >
+              <LogOut size={15} /> Sign out
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-6xl px-6 py-6">
+        {view === 'accounts' ? (
+          <StaffAccounts departments={departments} />
+        ) : (
+        <>
         <div className="mb-5 flex flex-wrap items-center gap-2">
           {myDepartments.length > 1 && (
             <select
@@ -121,6 +144,8 @@ export default function StaffConsole() {
             onClose={() => setSelectedId(null)}
           />
         </div>
+        </>
+        )}
       </div>
     </div>
   )

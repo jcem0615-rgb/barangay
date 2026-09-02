@@ -27,10 +27,10 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 |---|---|
 | `resident` | Register themselves, submit requests, read **only their own**, pay an assessed fee |
 | `staff` | Read and act on requests for **the offices they are assigned to** |
-| `admin` | Read and act across all offices |
+| `admin` | Everything staff can, across all offices, plus managing staff accounts |
 
 `POST /api/auth/register` only ever creates residents. Staff accounts are issued
-by seeding or by an administrator — there is no self-service path to a staff role.
+by an administrator (or the seed) — there is no self-service path to a staff role.
 
 ## Endpoints
 
@@ -61,6 +61,12 @@ by seeding or by an administrator — there is no self-service path to a staff r
 | `DELETE` | `/api/requests/:id/attachments/:aid` | resident — remove, while the request is open |
 | `GET` | `/api/staff/requests/:id/attachments` | staff — what the resident supplied |
 | `GET` | `/api/staff/requests/:id/attachments/:aid` | staff — download it |
+| `GET` | `/api/admin/staff` | admin — every staff and admin account |
+| `POST` | `/api/admin/staff` | admin — create an account and mail an invitation |
+| `PATCH` | `/api/admin/staff/:id` | admin — name, offices, position |
+| `POST` | `/api/admin/staff/:id/deactivate` | admin — revoke access |
+| `POST` | `/api/admin/staff/:id/reactivate` | admin — restore it |
+| `POST` | `/api/admin/staff/:id/send-reset` | admin — mail a fresh link |
 
 ## Workflow
 
@@ -90,6 +96,30 @@ verification code.
 
 Note that **paying carries a request to the final step but does not close it**.
 The office still advances it, and that release step is what issues the document.
+
+## Staff accounts
+
+Administrators manage accounts from the console's **Accounts** tab. Before this
+existed, onboarding a clerk meant editing the database by hand.
+
+- **An administrator never sets or sees anyone's password.** A new account is
+  created with an unusable random one and the person chooses their own through
+  an emailed invitation link (valid a week, for someone starting next Monday).
+  If the mail fails, the response says `invited: false` so the admin follows up
+  rather than assuming it arrived.
+- **Access is revoked by deactivating, not deleting.** Staff appear as the actor
+  on every assessment and release they made; deleting them would blank that
+  history. A deactivated account cannot sign in *and* cannot use an existing
+  session — `authenticate` re-reads the account on every request.
+- **Deactivating spends any outstanding invitation or reset link**, so one
+  cannot be used to walk back in after access was removed.
+- An administrator cannot deactivate their own account, which would lock the
+  municipality out of its own administration.
+- A staff account must serve at least one office; one with none would sign in to
+  an empty queue.
+
+The seed creates `admin@sanfernando.gov.ph`. Change its password immediately in
+any real deployment.
 
 ## Password reset
 
@@ -208,6 +238,7 @@ npm run test:hardening    # regressions for the issues found in the security pas
 npm run test:documents    # release, download, access rules, and verification
 npm run test:attachments  # upload validation, access rules, and lifecycle
 npm run test:password-reset  # token handling, enumeration, session invalidation
+npm run test:admin        # staff account management and its access boundaries
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```

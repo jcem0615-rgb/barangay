@@ -67,6 +67,7 @@ src/
 - no session → `SignIn` (residents can self-register; staff use issued accounts)
 - `resident` → the mobile PWA shell
 - `staff` / `admin` → `StaffConsole`, the desk-width department queue
+- `admin` additionally gets its Accounts tab, for creating and revoking staff accounts
 
 Roles are a server-side fact. The shell is a rendering convenience, never a control —
 the API refuses cross-role and cross-department access on its own.

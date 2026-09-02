@@ -79,7 +79,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     `select u.id, u.email, u.role, u.full_name, u.password_changed_at, sa.department_id
        from users u
        left join staff_assignments sa on sa.user_id = u.id
-      where u.id = $1`,
+      where u.id = $1 and u.deactivated_at is null`,
     [userId]
   )
 
