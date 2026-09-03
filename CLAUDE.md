@@ -139,6 +139,19 @@ automatically, no new screen needed. If a category needs an icon not already in
   timestamp at full microsecond precision or pages overlap. See `server/README.md`.
 - Navigation stack resets on reload (in-memory, not URL-based).
 
+## Demo build
+
+`VITE_DEMO=1 npm run build` produces a build that answers every API call in the
+browser (`src/lib/demoServer.ts`) instead of over the network, so the app can be
+clicked through without Postgres and the API. Its rules mirror the server's —
+department scoping, workflow order, who may read what — so the demo does not
+teach anything the real system would refuse.
+
+It is opt-in at build time and tree-shaken out of the production bundle; check
+with `grep -c demoServer dist/assets/*.js` after a normal build (expect 0).
+State lives in this browser's localStorage, so a second window or profile starts
+over: switching role means signing out, not opening another window.
+
 ## Deployment
 
 One container: the API serves the built SPA same-origin, so there is no CORS in

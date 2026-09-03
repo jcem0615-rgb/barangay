@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Building2, Loader2 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
-import { api, ApiError } from '../lib/api'
+import { api, ApiError, IS_DEMO } from '../lib/api'
 
 type Mode = 'login' | 'register' | 'forgot'
 
@@ -130,9 +130,39 @@ export default function SignIn() {
           )}
         </form>
 
-        <p className="mt-4 text-center text-[11.5px] leading-relaxed text-slate-400">
-          Municipal staff sign in with the account issued by their office.
-        </p>
+        {IS_DEMO ? (
+          <div className="mt-4 rounded-2xl border border-gold-500/40 bg-gold-100/50 p-4">
+            <p className="text-[12px] font-bold text-navy-950">Demo — sign in with any of these</p>
+            <dl className="mt-2 space-y-1 text-[11.5px] text-navy-900">
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-600">Resident</dt>
+                <dd className="font-medium">maria@example.ph</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-600">Treasury staff</dt>
+                <dd className="font-medium">treasury@sanfernando.gov.ph</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-600">Administrator</dt>
+                <dd className="font-medium">admin@sanfernando.gov.ph</dd>
+              </div>
+              <div className="flex justify-between gap-3 border-t border-gold-500/30 pt-1">
+                <dt className="text-slate-600">Password (all)</dt>
+                <dd className="font-mono font-medium">elgu-demo-2026</dd>
+              </div>
+            </dl>
+            <p className="mt-2.5 text-[11px] leading-snug text-slate-600">
+              To follow a request through both sides, sign out and switch
+              accounts &mdash; the demo keeps its data in <em>this</em> browser, so a
+              second window or incognito tab starts over. Email, SMS and virus
+              scanning need the real server and do nothing here.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-4 text-center text-[11.5px] leading-relaxed text-slate-400">
+            Municipal staff sign in with the account issued by their office.
+          </p>
+        )}
       </div>
     </div>
   )

@@ -5,6 +5,13 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // The demo build is published as a single self-contained page, so its dynamic
+  // import of the in-browser server has to be inlined rather than split out
+  // into a chunk the page would try to fetch.
+  build:
+    process.env.VITE_DEMO === '1'
+      ? { rollupOptions: { output: { inlineDynamicImports: true } } }
+      : {},
   plugins: [
     react(),
     tailwindcss(),

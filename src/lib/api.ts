@@ -2,6 +2,16 @@ import type { Application, ServiceCategory, ServiceDefinition } from '../types'
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'
 
+/**
+ * The demo build answers every call in the browser instead of over the network.
+ * Guarded by a build-time flag so the constant folds away and the demo server is
+ * tree-shaken out of the production bundle entirely.
+ */
+const DEMO = import.meta.env.VITE_DEMO === '1'
+
+/** True in the demo build only. Used to label the UI honestly. */
+export const IS_DEMO = DEMO
+
 const TOKEN_KEY = 'elgu-token'
 
 export function getToken(): string | null {
@@ -32,6 +42,18 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
+
+  if (DEMO) {
+    const { handleDemoRequest } = await import('./demoServer')
+    const parsed = typeof options.body === 'string' ? JSON.parse(options.body) : undefined
+    const out = await handleDemoRequest(options.method ?? 'GET', path, token, parsed)
+    if (out.status === 204) return undefined as T
+    if (out.status >= 400) {
+      throw new ApiError((out.body as { error?: string })?.error ?? 'Something went wrong.', out.status)
+    }
+    return out.body as T
+  }
+
   let res: Response
   try {
     res = await fetch(BASE + path, {
@@ -87,6 +109,16 @@ export interface RequestEvent {
  */
 async function downloadPdf(path: string): Promise<{ blob: Blob; fileName: string }> {
   const token = getToken()
+
+  if (DEMO) {
+    const { handleDemoRequest } = await import('./demoServer')
+    const out = await handleDemoRequest('GET', path, token, undefined)
+    if (out.status >= 400 || !out.blob) {
+      throw new ApiError((out.body as { error?: string })?.error ?? 'Could not download that file.', out.status)
+    }
+    return { blob: out.blob, fileName: out.fileName ?? 'document.pdf' }
+  }
+
   const res = await fetch(BASE + path, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
@@ -110,6 +142,15 @@ export interface Attachment {
 
 /** Uploads go as multipart; the browser sets its own Content-Type boundary. */
 async function uploadFile(path: string, file: File, requirement?: string) {
+  if (DEMO) {
+    const { handleDemoRequest } = await import('./demoServer')
+    const out = await handleDemoRequest('POST', path, getToken(), undefined, file, requirement)
+    if (out.status >= 400) {
+      throw new ApiError((out.body as { error?: string })?.error ?? 'Could not attach that file.', out.status)
+    }
+    return out.body as Attachment
+  }
+
   const form = new FormData()
   form.append('file', file)
   if (requirement) form.append('requirement', requirement)
