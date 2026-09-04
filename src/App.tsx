@@ -4,6 +4,7 @@ import { NavProvider, useNav } from './lib/nav'
 import { AppDataProvider } from './lib/appData'
 import { AuthProvider, useAuth } from './lib/auth'
 import { CatalogueProvider } from './lib/catalogue'
+import { I18nProvider } from './lib/i18n'
 import BottomNav from './components/BottomNav'
 import Dashboard from './screens/Dashboard'
 import Services from './screens/Services'
@@ -105,12 +106,14 @@ function RoleShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <CatalogueProvider>
-        <AppDataProvider>
-          <RoleShell />
-        </AppDataProvider>
-      </CatalogueProvider>
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <CatalogueProvider>
+          <AppDataProvider>
+            <RoleShell />
+          </AppDataProvider>
+        </CatalogueProvider>
+      </AuthProvider>
+    </I18nProvider>
   )
 }

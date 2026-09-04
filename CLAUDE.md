@@ -36,7 +36,9 @@ src/
   types.ts              Domain model: ServiceDefinition, Application, ResidentProfile, etc.
   data/mockData.ts       Resident profile, 6 service categories, 17 services, 2 seed applications,
                          and DATA_VERSION (bump to rebuild existing on-device stores)
+  i18n/strings.ts        English + Filipino dictionaries (en is the source of truth)
   lib/
+    i18n.tsx              I18nProvider + useT(); language persisted in localStorage
     nav.tsx               Screen stack + useNav()
     appData.tsx            React context wrapping useApplications()
     useApplications.ts     Loads/saves Application records via db.ts, auto-syncs offline drafts
@@ -97,13 +99,33 @@ that release step renders and stores the PDF (`server/src/documents.ts`).
 
 ## Adding a new service
 
-## Adding a new service
-
 Everything about a service (fields, requirements, fee, processing time) is data, not code.
 Add an entry to `SERVICES` in `src/data/mockData.ts` with a `ServiceField[]` — `ServiceForm.tsx`
 renders any combination of `text` / `select` / `date` / `textarea` / `number` fields
 automatically, no new screen needed. If a category needs an icon not already in
 `src/lib/icons.ts`, import it from `lucide-react` and register it there.
+
+## Language (English / Filipino)
+
+The resident app ships in both. `src/i18n/strings.ts` holds two dictionaries; `en` is the
+source of truth and `fil` is typed as `Record<StringKey, string>`, so adding an English
+string without its Filipino counterpart is a compile error rather than a stray English
+word in a Filipino screen. `src/lib/i18n.tsx` provides `I18nProvider` and `useT()`
+(`const { t, language, setLanguage } = useT()`); `t('some.key', { name })` substitutes
+`{name}` placeholders. The choice is stored in localStorage and, on a first visit, taken
+from `navigator.language` (`fil`/`tl` -> Filipino). `LanguageToggle` sits in Profile and,
+in a compact variant, on the sign-in screen so residents can switch before logging in.
+
+Two deliberate boundaries:
+
+- **The staff console stays English.** Municipal employees work in English-language
+  government documents and forms; translating the queue would put staff and the paperwork
+  in front of them in different languages.
+- **Official document and office names are not translated** — "Cedula", "Building Permit",
+  "Municipal Treasurer's Office". Those are what people say at the counter, and they come
+  from the service catalogue (the server), not from the dictionaries. Service descriptions,
+  requirements, and form field labels are catalogue data too, so they render in whatever
+  language the catalogue was authored in.
 
 ## Known simplifications (intentional, flag if scope grows)
 

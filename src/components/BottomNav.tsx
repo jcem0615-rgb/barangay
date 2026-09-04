@@ -1,15 +1,17 @@
 import { Home, LayoutGrid, FileClock, UserRound } from 'lucide-react'
 import { useNav } from '../lib/nav'
+import { useT } from '../lib/i18n'
 
 const ITEMS = [
-  { key: 'dashboard', label: 'Home', icon: Home },
-  { key: 'services', label: 'Services', icon: LayoutGrid },
-  { key: 'applications', label: 'My Requests', icon: FileClock },
-  { key: 'profile', label: 'Profile', icon: UserRound },
+  { key: 'dashboard', label: 'nav.home', icon: Home },
+  { key: 'services', label: 'nav.services', icon: LayoutGrid },
+  { key: 'applications', label: 'nav.requests', icon: FileClock },
+  { key: 'profile', label: 'nav.profile', icon: UserRound },
 ] as const
 
 export default function BottomNav() {
   const { screen, replace } = useNav()
+  const { t } = useT()
 
   const activeKey =
     screen.name === 'dashboard'
@@ -38,7 +40,7 @@ export default function BottomNav() {
               className={active ? 'text-navy-800' : 'text-slate-400'}
             />
             <span className={`text-[11px] ${active ? 'font-semibold text-navy-800' : 'font-medium text-slate-400'}`}>
-              {label}
+              {t(label)}
             </span>
             <span className={`h-1 w-1 rounded-full ${active ? 'bg-gold-500' : 'bg-transparent'}`} />
           </button>

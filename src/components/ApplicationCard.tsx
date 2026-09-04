@@ -3,6 +3,7 @@ import type { Application } from '../types'
 import StatusPill from './StatusPill'
 import { WORKFLOW_STEPS } from '../types'
 import { useCatalogue } from '../lib/catalogue'
+import { useT } from '../lib/i18n'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -11,6 +12,7 @@ function formatDate(iso: string) {
 export default function ApplicationCard({ app, onTap }: { app: Application; onTap: () => void }) {
   const { findCategory } = useCatalogue()
   const category = findCategory(app.categoryId)
+  const { t } = useT()
 
   return (
     <button
@@ -35,11 +37,11 @@ export default function ApplicationCard({ app, onTap }: { app: Application; onTa
       <div className="mt-3 flex items-center justify-between">
         {app.status === 'draft' ? (
           <span className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
-            <FileEdit size={13} /> Tap to finish and submit
+            <FileEdit size={13} /> {t('requests.finishDraft')}
           </span>
         ) : (
           <span className="text-[12px] font-medium text-navy-800">
-            {WORKFLOW_STEPS[app.currentStepIndex]}
+            {t(`step.${WORKFLOW_STEPS[app.currentStepIndex]}`)}
           </span>
         )}
         <ChevronRight size={16} className="text-slate-300" />

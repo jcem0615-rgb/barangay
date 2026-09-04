@@ -5,13 +5,15 @@ import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
 import { ApiError } from '../lib/api'
 import { formatPeso } from '../lib/money'
+import { useT } from '../lib/i18n'
+import type { StringKey } from '../i18n/strings'
 
 type Method = 'GCash' | 'Maya' | 'Landbank Online'
 
-const METHODS: { id: Method; label: string; blurb: string; bg: string; fg: string }[] = [
-  { id: 'GCash', label: 'GCash', blurb: 'Pay using your GCash wallet balance', bg: 'bg-[#0072ce]', fg: 'text-white' },
-  { id: 'Maya', label: 'Maya', blurb: 'Pay using your Maya wallet or linked card', bg: 'bg-[#00d13b]', fg: 'text-navy-950' },
-  { id: 'Landbank Online', label: 'Landbank Online', blurb: 'Pay via Landbank iAccess / online banking', bg: 'bg-[#00703c]', fg: 'text-white' },
+const METHODS: { id: Method; label: string; blurb: StringKey; bg: string; fg: string }[] = [
+  { id: 'GCash', label: 'GCash', blurb: 'pay.gcashBlurb', bg: 'bg-[#0072ce]', fg: 'text-white' },
+  { id: 'Maya', label: 'Maya', blurb: 'pay.mayaBlurb', bg: 'bg-[#00d13b]', fg: 'text-navy-950' },
+  { id: 'Landbank Online', label: 'Landbank Online', blurb: 'pay.landbankBlurb', bg: 'bg-[#00703c]', fg: 'text-white' },
 ]
 
 export default function PaymentScreen({ id }: { id: string }) {
@@ -22,6 +24,7 @@ export default function PaymentScreen({ id }: { id: string }) {
   const [selected, setSelected] = useState<Method | null>(null)
   const [step, setStep] = useState<'select' | 'confirm' | 'processing' | 'done'>('select')
   const [error, setError] = useState<string | null>(null)
+  const { t } = useT()
 
   if (!app) return null
 
@@ -34,7 +37,7 @@ export default function PaymentScreen({ id }: { id: string }) {
       await pay(app.id, selected)
       setStep('done')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Payment did not go through.')
+      setError(err instanceof ApiError ? err.message : t('pay.failed'))
       setStep('confirm')
     }
   }
@@ -45,15 +48,15 @@ export default function PaymentScreen({ id }: { id: string }) {
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
           <CheckCircle2 size={32} className="text-emerald-600" />
         </div>
-        <h1 className="font-display mt-5 text-[19px] font-extrabold text-navy-950">Payment successful</h1>
+        <h1 className="font-display mt-5 text-[19px] font-extrabold text-navy-950">{t('pay.successTitle')}</h1>
         <p className="mt-2 max-w-xs text-[13.5px] leading-relaxed text-slate-500">
-          {formatPeso(app.fee)} paid via {selected}. Your document is now being prepared for release.
+          {t('pay.successBlurb', { amount: formatPeso(app.fee), method: selected ?? '' })}
         </p>
         <button
           onClick={() => replace({ name: 'application-detail', id: app.id })}
           className="mt-7 w-full max-w-xs rounded-xl bg-navy-800 py-3.5 text-[14px] font-semibold text-white active:bg-navy-900"
         >
-          Back to request
+          {t('pay.backToRequest')}
         </button>
       </div>
     )
@@ -61,18 +64,18 @@ export default function PaymentScreen({ id }: { id: string }) {
 
   return (
     <div className="animate-tap-in pb-10">
-      <TopBar title="Pay Assessed Fee" subtitle={app.serviceName} />
+      <TopBar title={t('pay.title')} subtitle={app.serviceName} />
 
       <div className="px-4 pt-4">
         <div className="rounded-2xl bg-navy-800 p-5 text-white">
-          <p className="text-[11px] uppercase tracking-wide text-navy-100/80">Amount due</p>
+          <p className="text-[11px] uppercase tracking-wide text-navy-100/80">{t('pay.amount')}</p>
           <p className="font-display mt-1 text-[26px] font-extrabold">{formatPeso(app.fee)}</p>
-          <p className="mt-1 text-[12px] text-navy-100/70">Ref. {app.referenceNo}</p>
+          <p className="mt-1 text-[12px] text-navy-100/70">{t('pay.refShort', { ref: app.referenceNo })}</p>
         </div>
 
         {step === 'select' && (
           <>
-            <p className="mb-3 mt-5 text-[13px] font-bold text-navy-950">Choose a payment method</p>
+            <p className="mb-3 mt-5 text-[13px] font-bold text-navy-950">{t('pay.choose')}</p>
             <div className="space-y-2.5">
               {METHODS.map((m) => (
                 <button
@@ -88,7 +91,7 @@ export default function PaymentScreen({ id }: { id: string }) {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13.5px] font-bold text-navy-950">{m.label}</span>
-                    <span className="block text-[11.5px] text-slate-500">{m.blurb}</span>
+                    <span className="block text-[11.5px] text-slate-500">{t(m.blurb)}</span>
                   </span>
                   <ChevronRight size={17} className="text-slate-300" />
                 </button>
@@ -99,7 +102,7 @@ export default function PaymentScreen({ id }: { id: string }) {
 
         {(step === 'confirm' || step === 'processing') && selected && (
           <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="text-center text-[13px] font-semibold text-slate-500">Confirm payment with</p>
+            <p className="text-center text-[13px] font-semibold text-slate-500">{t('pay.confirmWith')}</p>
             <p className="font-display mt-1 text-center text-[18px] font-extrabold text-navy-950">{selected}</p>
 
             {error && (
@@ -110,21 +113,21 @@ export default function PaymentScreen({ id }: { id: string }) {
 
             <div className="mt-5 space-y-2.5 border-y border-dashed border-slate-200 py-4">
               <div className="flex justify-between text-[12.5px]">
-                <span className="text-slate-500">Service</span>
+                <span className="text-slate-500">{t('pay.service')}</span>
                 <span className="font-medium text-navy-950">{app.serviceName}</span>
               </div>
               <div className="flex justify-between text-[12.5px]">
-                <span className="text-slate-500">Reference No.</span>
+                <span className="text-slate-500">{t('pay.reference')}</span>
                 <span className="font-medium text-navy-950">{app.referenceNo}</span>
               </div>
               <div className="flex justify-between text-[13.5px] font-bold">
-                <span className="text-navy-950">Total</span>
+                <span className="text-navy-950">{t('pay.total')}</span>
                 <span className="text-navy-950">{formatPeso(app.fee)}</span>
               </div>
             </div>
 
             <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-              <ShieldCheck size={13} /> Simulated secure checkout — no real transaction is made
+              <ShieldCheck size={13} /> {t('pay.simulated')}
             </p>
 
             <button
@@ -137,7 +140,7 @@ export default function PaymentScreen({ id }: { id: string }) {
                   <Loader2 size={16} className="animate-spin" /> Processing payment…
                 </>
               ) : (
-                `Confirm & Pay ${formatPeso(app.fee)}`
+                `${t('pay.confirmAndPay')} ${formatPeso(app.fee)}`
               )}
             </button>
             {step === 'confirm' && (

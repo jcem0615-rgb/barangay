@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileUp, Loader2, Paperclip, Trash2 } from 'lucide-react'
 import { api, ApiError, type Attachment } from '../lib/api'
 import { saveBlob } from '../lib/download'
+import { useT } from '../lib/i18n'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -25,6 +26,7 @@ export default function Attachments({
   const [error, setError] = useState<string | null>(null)
   const pending = useRef<string | undefined>(undefined)
   const input = useRef<HTMLInputElement>(null)
+  const { t } = useT()
 
   const load = useCallback(async () => {
     try {
@@ -63,11 +65,11 @@ export default function Attachments({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="mb-1 text-[13px] font-bold text-navy-950">Requirements</p>
+      <p className="mb-1 text-[13px] font-bold text-navy-950">{t('files.title')}</p>
       <p className="mb-3 text-[11.5px] text-slate-500">
         {editable
-          ? 'Attach a photo or PDF of each requirement. Max 10 MB per file.'
-          : 'Files submitted with this request.'}
+          ? t('files.helpEditable')
+          : t('files.helpReadOnly')}
       </p>
 
       <input ref={input} type="file" accept=".pdf,.jpg,.jpeg,.png,.heic" onChange={onPicked} className="hidden" />
@@ -111,10 +113,10 @@ export default function Attachments({
                   className="mt-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-navy-800 disabled:opacity-50"
                 >
                   {busy === requirement ? <Loader2 size={13} className="animate-spin" /> : <FileUp size={13} />}
-                  {busy === requirement ? 'Uploading…' : 'Attach file'}
+                  {busy === requirement ? t('files.uploading') : t('files.attach')}
                 </button>
               ) : (
-                <p className="mt-1 text-[11.5px] text-amber-700">Not submitted</p>
+                <p className="mt-1 text-[11.5px] text-amber-700">{t('files.notSubmitted')}</p>
               )}
             </li>
           )
@@ -139,7 +141,7 @@ export default function Attachments({
           onClick={() => pick(undefined)}
           className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-[12.5px] font-medium text-slate-500 disabled:opacity-50"
         >
-          <FileUp size={14} /> Attach another file
+          <FileUp size={14} /> {t('files.attachAnother')}
         </button>
       )}
 

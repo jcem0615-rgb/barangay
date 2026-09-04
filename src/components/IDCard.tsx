@@ -1,8 +1,11 @@
 import { ShieldCheck, ChevronRight } from 'lucide-react'
 import type { ResidentProfile } from '../types'
 import QrPattern from './QrPattern'
+import { useT } from '../lib/i18n'
 
 export default function IDCard({ profile, onTap }: { profile: ResidentProfile; onTap?: () => void }) {
+  const { t } = useT()
+
   return (
     <button
       onClick={onTap}
@@ -25,13 +28,13 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
 
       <div className="relative mt-5 flex items-end justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-navy-100/70">PhilSys ID No.</p>
+          <p className="text-[10px] uppercase tracking-wider text-navy-100/70">{t('id.philsysNo')}</p>
           <p className="font-display text-[13.5px] font-semibold tracking-wide text-white">{profile.philSysId}</p>
         </div>
         <div className="flex items-center gap-1 rounded-full bg-emerald-400/15 px-2.5 py-1">
           <ShieldCheck size={13} className="text-emerald-400" />
           <span className="text-[11px] font-semibold text-emerald-300">
-            {profile.philSysSynced ? 'PhilSys Synced' : 'Sync Pending'}
+            {profile.philSysSynced ? t('id.synced') : t('id.notSynced')}
           </span>
         </div>
       </div>

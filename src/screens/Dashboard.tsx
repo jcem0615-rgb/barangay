@@ -10,11 +10,13 @@ import { useOnlineStatus } from '../lib/useOnlineStatus'
 import OfflineBanner from '../components/OfflineBanner'
 import ApplicationCard from '../components/ApplicationCard'
 import { resolveIcon } from '../lib/icons'
+import { useT } from '../lib/i18n'
 
 export default function Dashboard() {
   const { push } = useNav()
   const { departments } = useCatalogue()
   const resident = useResidentProfile()
+  const { t } = useT()
   const [unread, setUnread] = useState(0)
 
   // Refreshed on each visit to the dashboard; offices act while the app is closed.
@@ -29,7 +31,7 @@ export default function Dashboard() {
     <div className="animate-tap-in px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)]">
       <div className="mb-5 flex items-start justify-between">
         <div>
-          <p className="text-[13px] text-slate-500">Magandang araw,</p>
+          <p className="text-[13px] text-slate-500">{t('home.greeting')}</p>
           <h1 className="font-display text-[21px] font-extrabold text-navy-950">{resident?.firstName ?? ''} 👋</h1>
         </div>
         <button
@@ -56,9 +58,9 @@ export default function Dashboard() {
       {resident && <IDCard profile={resident} onTap={() => push({ name: 'id-card' })} />}
 
       <div className="mt-6 flex items-center justify-between">
-        <h2 className="font-display text-[15px] font-bold text-navy-950">Quick Services</h2>
+        <h2 className="font-display text-[15px] font-bold text-navy-950">{t('home.quickServices')}</h2>
         <button onClick={() => push({ name: 'services' })} className="text-[12.5px] font-semibold text-navy-800">
-          View all
+          {t('common.viewAll')}
         </button>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2.5">
@@ -82,15 +84,15 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-6 flex items-center justify-between">
-        <h2 className="font-display text-[15px] font-bold text-navy-950">Recent Requests</h2>
+        <h2 className="font-display text-[15px] font-bold text-navy-950">{t('home.recentRequests')}</h2>
         <button onClick={() => push({ name: 'applications' })} className="text-[12.5px] font-semibold text-navy-800">
-          See all
+          {t('common.seeAll')}
         </button>
       </div>
       <div className="mt-3 space-y-2.5">
         {recent.length === 0 && (
           <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-[13px] text-slate-400">
-            No requests yet. Start with Quick Services above.
+            {t('home.noRequests')}
           </p>
         )}
         {recent.map((app) => (

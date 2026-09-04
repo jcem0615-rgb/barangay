@@ -4,6 +4,7 @@ import TopBar from '../components/TopBar'
 import { api, type Notification } from '../lib/api'
 import { useNav } from '../lib/nav'
 import { useAppData } from '../lib/appData'
+import { useT } from '../lib/i18n'
 
 function timeAgo(iso: string): string {
   const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000)
@@ -22,16 +23,17 @@ const TONE: Record<Notification['kind'], string> = {
   rejected: 'bg-rose-100 text-rose-600',
 }
 
-const LABEL: Record<Notification['kind'], string> = {
-  assessed: 'Fee assessed',
-  advanced: 'Update',
-  released: 'Ready',
-  rejected: 'Needs attention',
+const LABEL: Record<Notification['kind'], 'notif.kindAssessed' | 'notif.kindAdvanced' | 'notif.kindReleased' | 'notif.kindRejected'> = {
+  assessed: 'notif.kindAssessed',
+  advanced: 'notif.kindAdvanced',
+  released: 'notif.kindReleased',
+  rejected: 'notif.kindRejected',
 }
 
 export default function Notifications() {
   const { push } = useNav()
   const { refresh } = useAppData()
+  const { t } = useT()
   const [items, setItems] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -62,8 +64,12 @@ export default function Notifications() {
   return (
     <div className="animate-tap-in pb-24">
       <TopBar
-        title="Notifications"
-        subtitle={items.some((n) => !n.readAt) ? `${items.filter((n) => !n.readAt).length} unread` : 'All caught up'}
+        title={t('notif.title')}
+        subtitle={
+          items.some((n) => !n.readAt)
+            ? t('notif.unread', { count: items.filter((n) => !n.readAt).length })
+            : t('notif.allRead')
+        }
       />
 
       {items.some((n) => !n.readAt) && (
@@ -75,7 +81,7 @@ export default function Notifications() {
             }}
             className="flex items-center gap-1.5 text-[12.5px] font-semibold text-navy-800"
           >
-            <CheckCheck size={14} /> Mark all as read
+            <CheckCheck size={14} /> {t('notif.markAll')}
           </button>
         </div>
       )}
@@ -84,9 +90,9 @@ export default function Notifications() {
         {!loading && items.length === 0 && (
           <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 py-14 text-center">
             <BellOff size={26} className="text-slate-300" />
-            <p className="mt-2.5 text-[13px] font-medium text-slate-400">Nothing yet</p>
+            <p className="mt-2.5 text-[13px] font-medium text-slate-400">{t('notif.empty')}</p>
             <p className="mt-1 px-8 text-[12px] leading-snug text-slate-400">
-              You&rsquo;ll hear from us when an office acts on one of your requests.
+              {t('notif.emptyBlurb')}
             </p>
           </div>
         )}
@@ -101,7 +107,7 @@ export default function Notifications() {
           >
             <div className="flex items-center gap-2">
               <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${TONE[item.kind]}`}>
-                {LABEL[item.kind]}
+                {t(LABEL[item.kind])}
               </span>
               {!item.readAt && <span className="h-1.5 w-1.5 rounded-full bg-navy-800" aria-label="Unread" />}
               <span className="ml-auto text-[11px] text-slate-400">{timeAgo(item.createdAt)}</span>

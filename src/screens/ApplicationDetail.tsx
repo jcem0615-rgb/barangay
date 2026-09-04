@@ -11,6 +11,7 @@ import { saveBlob } from '../lib/download'
 import Attachments from '../components/Attachments'
 import { resolveIcon } from '../lib/icons'
 import { formatPeso } from '../lib/money'
+import { useT } from '../lib/i18n'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -19,6 +20,7 @@ function formatDate(iso: string) {
 export default function ApplicationDetail({ id }: { id: string }) {
   const { applications } = useAppData()
   const { findCategory, findService } = useCatalogue()
+  const { t } = useT()
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const { push, replace } = useNav()
@@ -27,8 +29,8 @@ export default function ApplicationDetail({ id }: { id: string }) {
   if (!app) {
     return (
       <div className="p-6 text-center text-slate-400">
-        <TopBar title="Request not found" />
-        <p className="mt-4 text-[13px]">This request may have been removed.</p>
+        <TopBar title={t('detail.notFound')} />
+        <p className="mt-4 text-[13px]">{t('detail.removed')}</p>
       </div>
     )
   }
@@ -45,7 +47,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
         <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4">
           <div>
             <p className="text-[11.5px] text-slate-400">
-              {app.status === 'draft' ? 'Last edited' : 'Submitted'} {formatDate(app.dateSubmitted)}
+              {app.status === 'draft' ? t('detail.lastEdited') : t('detail.submittedOn')} {formatDate(app.dateSubmitted)}
             </p>
             <p className="mt-0.5 text-[12px] font-medium text-slate-500">
               {service?.processingTime ?? ''}
@@ -61,7 +63,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
             </span>
             <div className="min-w-0">
               <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-slate-400">
-                Handling office
+                {t('detail.handlingOffice')}
               </p>
               <p className="mt-0.5 text-[13.5px] font-semibold text-navy-950">{category.officeName}</p>
             </div>
@@ -72,7 +74,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
           <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-amber-800">
             <CloudOff size={16} className="shrink-0" />
             <p className="text-[12.5px] leading-snug">
-              Saved on this device while offline. It will sync to the LGU office automatically once you're connected.
+              {t('detail.offlineNotice')}
             </p>
           </div>
         )}
@@ -82,11 +84,11 @@ export default function ApplicationDetail({ id }: { id: string }) {
             onClick={() => replace({ name: 'service-form', serviceId: app.serviceId, draftId: app.id })}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[14px] font-semibold text-white active:bg-navy-900"
           >
-            <FileEdit size={16} /> Continue application
+            <FileEdit size={16} /> {t('detail.continueApplication')}
           </button>
         ) : (
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="mb-1 text-[13px] font-bold text-navy-950">Application progress</p>
+            <p className="mb-1 text-[13px] font-bold text-navy-950">{t('detail.progress')}</p>
             <div className="mt-3">
               <WorkflowTracker currentStepIndex={app.currentStepIndex} rejected={app.status === 'rejected'} />
             </div>
@@ -96,15 +98,15 @@ export default function ApplicationDetail({ id }: { id: string }) {
         {app.status === 'for_payment' && (
           <div className="rounded-2xl border border-gold-500/40 bg-gold-100/60 p-4">
             <div className="flex items-center justify-between">
-              <p className="text-[13px] font-bold text-navy-950">Assessed fee</p>
+              <p className="text-[13px] font-bold text-navy-950">{t('detail.assessedFee')}</p>
               <p className="font-display text-[17px] font-extrabold text-navy-950">{formatPeso(app.fee)}</p>
             </div>
-            <p className="mt-1 text-[12px] text-navy-900/70">Municipal Treasury has finalized your assessment. Pay to proceed to document release.</p>
+            <p className="mt-1 text-[12px] text-navy-900/70">{t('detail.assessedBlurb')}</p>
             <button
               onClick={() => push({ name: 'payment', id: app.id })}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3 text-[13.5px] font-semibold text-white active:bg-navy-900"
             >
-              <Wallet2 size={15} /> Pay Now
+              <Wallet2 size={15} /> {t('detail.payNow')}
             </button>
           </div>
         )}
@@ -129,7 +131,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
               }}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-[14px] font-semibold text-white transition active:bg-emerald-700 disabled:opacity-70"
             >
-              <Download size={16} /> {downloading ? 'Preparing…' : 'Download e-Document'}
+              <Download size={16} /> {downloading ? t('detail.preparing') : t('detail.download')}
             </button>
             {downloadError && (
               <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700">
@@ -149,7 +151,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
 
         {app.status !== 'draft' && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="mb-2.5 text-[13px] font-bold text-navy-950">Submitted details</p>
+            <p className="mb-2.5 text-[13px] font-bold text-navy-950">{t('detail.submittedDetails')}</p>
             <dl className="space-y-2">
               {Object.entries(app.formValues).map(([key, val]) => (
                 <div key={key} className="flex justify-between gap-3 text-[12.5px]">

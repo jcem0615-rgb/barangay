@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Building2, CheckCircle2, Loader2 } from 'lucide-react'
 import { api, ApiError } from '../lib/api'
+import { useT } from '../lib/i18n'
 
 /**
  * Reached by opening a reset link. The token comes from the URL, which App
@@ -12,11 +13,12 @@ export default function ResetPassword({ token, onDone }: { token: string; onDone
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const { t } = useT()
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (password !== confirm) {
-      setError('Those passwords do not match.')
+      setError(t('auth.passwordsDiffer'))
       return
     }
     setBusy(true)
@@ -25,7 +27,7 @@ export default function ResetPassword({ token, onDone }: { token: string; onDone
       await api.resetPassword(token, password)
       setDone(true)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not reset your password.')
+      setError(err instanceof ApiError ? err.message : t('auth.resetFailed'))
     } finally {
       setBusy(false)
     }
@@ -38,27 +40,27 @@ export default function ResetPassword({ token, onDone }: { token: string; onDone
           <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-navy-800 text-white">
             <Building2 size={26} strokeWidth={1.9} />
           </span>
-          <h1 className="font-display text-[20px] font-extrabold text-navy-950">Choose a new password</h1>
+          <h1 className="font-display text-[20px] font-extrabold text-navy-950">{t('auth.choosePassword')}</h1>
         </div>
 
         {done ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center">
             <CheckCircle2 size={28} className="mx-auto text-emerald-600" />
-            <p className="mt-3 text-[14px] font-semibold text-navy-950">Your password has been changed.</p>
+            <p className="mt-3 text-[14px] font-semibold text-navy-950">{t('auth.passwordChanged')}</p>
             <p className="mt-1 text-[12.5px] text-slate-500">
-              Anyone signed in to your account has been signed out.
+              {t('auth.signedOutElsewhere')}
             </p>
             <button
               onClick={onDone}
               className="mt-5 w-full rounded-xl bg-navy-800 py-3 text-[14px] font-semibold text-white active:bg-navy-900"
             >
-              Sign in
+              {t('auth.signIn')}
             </button>
           </div>
         ) : (
           <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
             <label className="block">
-              <span className="mb-1 block text-[12.5px] font-medium text-navy-950">New password</span>
+              <span className="mb-1 block text-[12.5px] font-medium text-navy-950">{t('auth.newPassword')}</span>
               <input
                 type="password"
                 value={password}
@@ -67,10 +69,10 @@ export default function ResetPassword({ token, onDone }: { token: string; onDone
                 autoComplete="new-password"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[14px] outline-none focus:border-navy-600 focus:bg-white focus:ring-2 focus:ring-navy-600/15"
               />
-              <span className="mt-1 block text-[11.5px] text-slate-400">At least 10 characters.</span>
+              <span className="mt-1 block text-[11.5px] text-slate-400">{t('auth.passwordHint')}</span>
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12.5px] font-medium text-navy-950">Confirm new password</span>
+              <span className="mb-1 block text-[12.5px] font-medium text-navy-950">{t('auth.confirmPassword')}</span>
               <input
                 type="password"
                 value={confirm}
@@ -90,14 +92,14 @@ export default function ResetPassword({ token, onDone }: { token: string; onDone
               disabled={busy}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[14px] font-semibold text-white active:bg-navy-900 disabled:opacity-70"
             >
-              {busy && <Loader2 size={16} className="animate-spin" />} Change password
+              {busy && <Loader2 size={16} className="animate-spin" />} {t('auth.changePassword')}
             </button>
             <button
               type="button"
               onClick={onDone}
               className="w-full py-1 text-[12.5px] font-medium text-slate-500"
             >
-              Back to sign in
+              {t('auth.backToSignIn')}
             </button>
           </form>
         )}

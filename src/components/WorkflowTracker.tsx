@@ -1,19 +1,15 @@
 import { Check, Clock } from 'lucide-react'
 import { WORKFLOW_STEPS } from '../types'
+import { useT } from '../lib/i18n'
 
 interface WorkflowTrackerProps {
   currentStepIndex: number
   rejected?: boolean
 }
 
-const STEP_DETAIL: Record<string, string> = {
-  Submitted: 'Your application was received and queued for review.',
-  'Municipal Treasury Assessment': 'Municipal Treasury is computing your applicable fees.',
-  Payment: 'Settle your assessed fee to proceed to document release.',
-  'e-Document Release': 'Your document is being prepared for release or pickup.',
-}
-
 export default function WorkflowTracker({ currentStepIndex, rejected }: WorkflowTrackerProps) {
+  const { t } = useT()
+
   return (
     <ol className="relative">
       {WORKFLOW_STEPS.map((step, index) => {
@@ -45,11 +41,11 @@ export default function WorkflowTracker({ currentStepIndex, rejected }: Workflow
             </span>
             <div className="min-w-0 pt-0.5">
               <p className={`text-[13.5px] font-semibold ${isDone || isCurrent ? 'text-navy-950' : 'text-slate-400'}`}>
-                {step}
+                {t(`step.${step}`)}
               </p>
               {(isDone || isCurrent) && (
                 <p className="mt-0.5 text-[12px] leading-snug text-slate-500">
-                  {isCurrent && rejected ? 'This step needs your attention. See details below.' : STEP_DETAIL[step]}
+                  {isCurrent && rejected ? t('stepDetail.rejected') : t(`stepDetail.${step}`)}
                 </p>
               )}
             </div>

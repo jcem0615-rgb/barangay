@@ -2,14 +2,16 @@ import { ShieldCheck, Fingerprint } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import QrPattern from '../components/QrPattern'
 import { useResidentProfile } from '../lib/resident'
+import { useT } from '../lib/i18n'
 
 export default function IdCardScreen() {
   const resident = useResidentProfile()
+  const { t } = useT()
   if (!resident) return null
 
   return (
     <div className="animate-tap-in pb-10">
-      <TopBar title="Digital ID" subtitle="Present this for verification" />
+      <TopBar title={t('id.title')} subtitle={t('id.subtitle')} />
 
       <div className="px-4 pt-4">
         <div className="relative overflow-hidden rounded-3xl bg-navy-800 p-6 text-white shadow-lg shadow-navy-900/25">
@@ -35,11 +37,11 @@ export default function IdCardScreen() {
 
           <div className="relative mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-navy-100/60">PhilSys ID No.</p>
+              <p className="text-[10px] uppercase tracking-wider text-navy-100/60">{t('id.philsysNo')}</p>
               <p className="mt-0.5 text-[12.5px] font-semibold tracking-wide">{resident.philSysId}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-navy-100/60">Date of Birth</p>
+              <p className="text-[10px] uppercase tracking-wider text-navy-100/60">{t('id.dateOfBirth')}</p>
               <p className="mt-0.5 text-[12.5px] font-semibold">
                 {resident.birthDate
                   ? new Date(resident.birthDate).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -54,15 +56,15 @@ export default function IdCardScreen() {
             <Fingerprint size={17} className="text-emerald-700" />
           </span>
           <div>
-            <p className="text-[13px] font-bold text-emerald-800">PhilSys verified identity</p>
+            <p className="text-[13px] font-bold text-emerald-800">{t('id.verifiedTitle')}</p>
             <p className="text-[11.5px] leading-snug text-emerald-700/80">
-              Synced with the Philippine Identification System. This QR refreshes automatically for secure, one-time verification at LGU counters.
+              {t('id.verifiedBlurb')}
             </p>
           </div>
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="text-[13px] font-bold text-navy-950">Registered address</p>
+          <p className="text-[13px] font-bold text-navy-950">{t('id.registeredAddress')}</p>
           <p className="mt-1.5 text-[13px] leading-relaxed text-slate-600">{resident.address}</p>
           <p className="text-[13px] text-slate-600">{resident.barangay}, {resident.municipality}, {resident.province}</p>
         </div>

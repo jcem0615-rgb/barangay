@@ -10,12 +10,14 @@ import { useOnlineStatus } from '../lib/useOnlineStatus'
 import { ApiError } from '../lib/api'
 import type { Application } from '../types'
 import { formatPeso } from '../lib/money'
+import { useT } from '../lib/i18n'
 
 export default function ServiceForm({ serviceId, draftId }: { serviceId: string; draftId?: string }) {
   const { replace } = useNav()
   const { submit, applications } = useAppData()
   const { findService } = useCatalogue()
   const isOnline = useOnlineStatus()
+  const { t } = useT()
   const service = findService(serviceId)
   const draft = draftId ? applications.find((a) => a.id === draftId) : undefined
 
@@ -28,8 +30,8 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
   if (!service) {
     return (
       <div className="p-6 text-center text-slate-400">
-        <TopBar title="Service unavailable" />
-        <p className="mt-4 text-[13px]">This service is no longer offered.</p>
+        <TopBar title={t('form.unavailable')} />
+        <p className="mt-4 text-[13px]">{t('form.noLongerOffered')}</p>
       </div>
     )
   }
@@ -43,7 +45,7 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
     const nextErrors: Record<string, string> = {}
     for (const field of service.fields) {
       if (field.required && !values[field.id]?.trim()) {
-        nextErrors[field.id] = 'This field is required.'
+        nextErrors[field.id] = t('form.required')
       }
     }
     setErrors(nextErrors)
@@ -63,7 +65,7 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
       )
       setSubmitted(created)
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : 'Could not submit. Please try again.')
+      setSubmitError(err instanceof ApiError ? err.message : t('form.failed'))
     } finally {
       setSubmitting(false)
     }
@@ -111,7 +113,7 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-2">
             <ClipboardList size={16} className="text-navy-800" />
-            <p className="text-[13px] font-bold text-navy-950">Requirements to prepare</p>
+            <p className="text-[13px] font-bold text-navy-950">{t('form.requirementsTitle')}</p>
           </div>
           <ul className="mt-2.5 space-y-1.5">
             {service.requirements.map((req) => (
@@ -122,15 +124,15 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
             ))}
           </ul>
           <div className="mt-3 flex items-center justify-between border-t border-dashed border-slate-200 pt-3">
-            <span className="text-[12px] font-medium text-slate-500">Applicable fee</span>
+            <span className="text-[12px] font-medium text-slate-500">{t('form.applicableFee')}</span>
             <span className="text-[13.5px] font-bold text-navy-950">
-              {service.requiresPayment ? formatPeso(service.fee) : 'Free of charge'}
+              {service.requiresPayment ? formatPeso(service.fee) : t('form.free')}
             </span>
           </div>
         </div>
 
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="text-[13px] font-bold text-navy-950">Application details</p>
+          <p className="text-[13px] font-bold text-navy-950">{t('form.details')}</p>
           {service.fields.map((field) => (
             <FormField
               key={field.id}
@@ -157,11 +159,11 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
           >
             {submitting ? (
               <>
-                <Loader2 size={16} className="animate-spin" /> Submitting…
+                <Loader2 size={16} className="animate-spin" /> {t('form.submitting')}
               </>
             ) : (
               <>
-                <Send size={15} /> {isOnline ? 'Submit Application' : 'Save Offline & Queue'}
+                <Send size={15} /> {isOnline ? t('form.submit') : t('form.submitOffline')}
               </>
             )}
           </button>

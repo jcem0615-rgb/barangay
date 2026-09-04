@@ -2,12 +2,15 @@ import { useState, type FormEvent } from 'react'
 import { Building2, Loader2 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { api, ApiError, IS_DEMO } from '../lib/api'
+import LanguageToggle from '../components/LanguageToggle'
+import { useT } from '../lib/i18n'
 
 type Mode = 'login' | 'register' | 'forgot'
 
 export default function SignIn() {
   const { login, register } = useAuth()
   const [notice, setNotice] = useState<string | null>(null)
+  const { t } = useT()
   const [mode, setMode] = useState<Mode>('login')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,7 +48,11 @@ export default function SignIn() {
             <Building2 size={26} strokeWidth={1.9} />
           </span>
           <h1 className="font-display text-[22px] font-extrabold text-navy-950">eLGU Citizen Portal</h1>
-          <p className="mt-1 text-[13px] text-slate-500">Municipality of San Fernando</p>
+          <p className="mt-1 text-[13px] text-slate-500">{t('auth.municipalityOf')}</p>
+        </div>
+
+        <div className="mb-3">
+          <LanguageToggle compact />
         </div>
 
         <div className="mb-4 flex rounded-xl bg-white p-1 shadow-sm">
@@ -60,7 +67,7 @@ export default function SignIn() {
                   : 'text-slate-500'
               }`}
             >
-              {m === 'login' ? 'Sign in' : 'Create account'}
+              {m === 'login' ? t('auth.signIn') : t('auth.createAccount')}
             </button>
           ))}
         </div>
@@ -68,26 +75,26 @@ export default function SignIn() {
         <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
           {mode === 'forgot' && (
             <p className="text-[12.5px] leading-snug text-slate-500">
-              Enter the email you registered with and we&rsquo;ll send a link to choose a new password.
+              {t('auth.forgotBlurb')}
             </p>
           )}
           {mode === 'register' && (
-            <Field label="Full name" value={form.fullName} onChange={set('fullName')} required autoComplete="name" />
+            <Field label={t('auth.fullName')} value={form.fullName} onChange={set('fullName')} required autoComplete="name" />
           )}
-          <Field label="Email" type="email" value={form.email} onChange={set('email')} required autoComplete="email" />
+          <Field label={t('auth.email')} type="email" value={form.email} onChange={set('email')} required autoComplete="email" />
           {mode !== 'forgot' && (
             <Field
-              label="Password"
+              label={t('auth.password')}
               type="password"
               value={form.password}
               onChange={set('password')}
               required
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              helper={mode === 'register' ? 'At least 10 characters.' : undefined}
+              helper={mode === 'register' ? t('auth.passwordHint') : undefined}
             />
           )}
           {mode === 'register' && (
-            <Field label="Barangay" value={form.barangay} onChange={set('barangay')} autoComplete="address-level4" />
+            <Field label={t('auth.barangay')} value={form.barangay} onChange={set('barangay')} autoComplete="address-level4" />
           )}
 
           {error && (
@@ -107,7 +114,7 @@ export default function SignIn() {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[14px] font-semibold text-white transition active:bg-navy-900 disabled:opacity-70"
           >
             {busy && <Loader2 size={16} className="animate-spin" />}
-            {mode === 'login' ? 'Sign in' : mode === 'forgot' ? 'Send reset link' : 'Create account'}
+            {mode === 'login' ? t('auth.signIn') : mode === 'forgot' ? t('auth.sendResetLink') : t('auth.createAccount')}
           </button>
 
           {mode === 'login' && (
@@ -116,7 +123,7 @@ export default function SignIn() {
               onClick={() => { setMode('forgot'); setError(null); setNotice(null) }}
               className="w-full py-1 text-[12.5px] font-medium text-navy-800"
             >
-              Forgot your password?
+              {t('auth.forgot')}
             </button>
           )}
           {mode === 'forgot' && (
@@ -125,7 +132,7 @@ export default function SignIn() {
               onClick={() => { setMode('login'); setError(null); setNotice(null) }}
               className="w-full py-1 text-[12.5px] font-medium text-slate-500"
             >
-              Back to sign in
+              {t('auth.backToSignIn')}
             </button>
           )}
         </form>
@@ -160,7 +167,7 @@ export default function SignIn() {
           </div>
         ) : (
           <p className="mt-4 text-center text-[11.5px] leading-relaxed text-slate-400">
-            Municipal staff sign in with the account issued by their office.
+            {t('auth.staffNote')}
           </p>
         )}
       </div>

@@ -4,19 +4,21 @@ import ApplicationCard from '../components/ApplicationCard'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
 import { Inbox } from 'lucide-react'
+import { useT } from '../lib/i18n'
 
 const TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'in_progress', label: 'Active' },
-  { key: 'for_payment', label: 'For Payment' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'draft', label: 'Drafts' },
+  { key: 'all', label: 'requests.tabAll' },
+  { key: 'in_progress', label: 'requests.tabActive' },
+  { key: 'for_payment', label: 'requests.tabForPayment' },
+  { key: 'completed', label: 'requests.tabCompleted' },
+  { key: 'draft', label: 'requests.tabDrafts' },
 ] as const
 
 export default function ApplicationsList() {
   const { applications } = useAppData()
   const { push } = useNav()
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('all')
+  const { t } = useT()
 
   const filtered =
     tab === 'all'
@@ -27,18 +29,23 @@ export default function ApplicationsList() {
 
   return (
     <div className="animate-tap-in pb-24">
-      <TopBar title="My Requests" subtitle={`${applications.length} total request${applications.length === 1 ? '' : 's'}`} />
+      <TopBar
+        title={t('requests.title')}
+        subtitle={t(applications.length === 1 ? 'requests.count' : 'requests.countPlural', {
+          count: applications.length,
+        })}
+      />
 
       <div className="scrollbar-none flex gap-2 overflow-x-auto px-4 pt-3">
-        {TABS.map((t) => (
+        {TABS.map((option) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={option.key}
+            onClick={() => setTab(option.key)}
             className={`shrink-0 rounded-full px-3.5 py-2 text-[12.5px] font-semibold transition ${
-              tab === t.key ? 'bg-navy-800 text-white' : 'bg-white text-slate-500 border border-slate-200'
+              tab === option.key ? 'bg-navy-800 text-white' : 'bg-white text-slate-500 border border-slate-200'
             }`}
           >
-            {t.label}
+            {t(option.label)}
           </button>
         ))}
       </div>
@@ -47,7 +54,7 @@ export default function ApplicationsList() {
         {filtered.length === 0 && (
           <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 py-12 text-center">
             <Inbox size={26} className="text-slate-300" />
-            <p className="mt-2.5 text-[13px] font-medium text-slate-400">No requests in this category yet</p>
+            <p className="mt-2.5 text-[13px] font-medium text-slate-400">{t('requests.empty')}</p>
           </div>
         )}
         {filtered.map((app) => (

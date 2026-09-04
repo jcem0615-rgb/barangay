@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { api, ApiError, type NotificationPreferences } from '../lib/api'
+import { useT } from '../lib/i18n'
 
 /**
  * How a resident hears from the LGU. SMS is listed but only useful once the
@@ -13,6 +14,7 @@ export default function NotificationSettings() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const { t } = useT()
 
   const load = useCallback(async () => {
     try {
@@ -45,14 +47,14 @@ export default function NotificationSettings() {
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-[13px] font-bold text-navy-950">How we reach you</p>
+      <p className="text-[13px] font-bold text-navy-950">{t('profile.reachYou')}</p>
       <p className="mt-0.5 text-[11.5px] text-slate-500">
-        Updates always appear in the app. Choose anything extra.
+        {t('profile.reachBlurb')}
       </p>
 
       <div className="mt-3 space-y-3">
         <label className="flex items-center justify-between gap-3">
-          <span className="text-[13px] text-navy-950">Email</span>
+          <span className="text-[13px] text-navy-950">{t('profile.email')}</span>
           <input
             type="checkbox"
             checked={prefs.notifyEmail}
@@ -63,7 +65,7 @@ export default function NotificationSettings() {
         </label>
 
         <label className="flex items-center justify-between gap-3">
-          <span className="text-[13px] text-navy-950">Text message</span>
+          <span className="text-[13px] text-navy-950">{t('profile.sms')}</span>
           <input
             type="checkbox"
             checked={prefs.notifySms}
@@ -75,7 +77,7 @@ export default function NotificationSettings() {
 
         <div>
           <label className="block">
-            <span className="mb-1 block text-[12px] font-medium text-navy-950">Mobile number</span>
+            <span className="mb-1 block text-[12px] font-medium text-navy-950">{t('profile.mobile')}</span>
             <div className="flex gap-2">
               <input
                 value={phone}
@@ -89,12 +91,12 @@ export default function NotificationSettings() {
                 disabled={busy || phone === (prefs.phone ?? '')}
                 className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-[12.5px] font-semibold text-navy-800 disabled:opacity-40"
               >
-                {busy && <Loader2 size={13} className="animate-spin" />} Save
+                {busy && <Loader2 size={13} className="animate-spin" />} {t('common.save')}
               </button>
             </div>
           </label>
           {!prefs.phone && (
-            <p className="mt-1 text-[11.5px] text-slate-400">Add a number to turn on text messages.</p>
+            <p className="mt-1 text-[11.5px] text-slate-400">{t('profile.addNumber')}</p>
           )}
         </div>
 
@@ -102,7 +104,7 @@ export default function NotificationSettings() {
           <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700">{error}</p>
         )}
         {saved && !error && (
-          <p role="status" className="text-[12px] text-emerald-700">Saved.</p>
+          <p role="status" className="text-[12px] text-emerald-700">{t('common.saved')}</p>
         )}
       </div>
     </div>
