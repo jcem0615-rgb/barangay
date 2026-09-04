@@ -1,13 +1,16 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { api } from './api'
-import type { ServiceCategory, ServiceDefinition } from '../types'
+import type { SectoralProgram, ServiceCategory, ServiceDefinition } from '../types'
 
 interface CatalogueValue {
   departments: ServiceCategory[]
   services: ServiceDefinition[]
+  /** Sectoral registries and poverty-reduction programmes, in display order. */
+  programs: SectoralProgram[]
   loaded: boolean
   findCategory: (id: string) => ServiceCategory | undefined
   findService: (id: string) => ServiceDefinition | undefined
+  findProgram: (code: string) => SectoralProgram | undefined
 }
 
 const CatalogueContext = createContext<CatalogueValue | null>(null)
@@ -16,6 +19,7 @@ const CatalogueContext = createContext<CatalogueValue | null>(null)
 export function CatalogueProvider({ children }: { children: ReactNode }) {
   const [departments, setDepartments] = useState<ServiceCategory[]>([])
   const [services, setServices] = useState<ServiceDefinition[]>([])
+  const [programs, setPrograms] = useState<SectoralProgram[]>([])
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
@@ -24,6 +28,7 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
       .then((c) => {
         setDepartments(c.departments)
         setServices(c.services)
+        setPrograms(c.programs ?? [])
       })
       .catch(() => undefined)
       .finally(() => setLoaded(true))
@@ -34,9 +39,11 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
       value={{
         departments,
         services,
+        programs,
         loaded,
         findCategory: (id) => departments.find((d) => d.id === id),
         findService: (id) => services.find((s) => s.id === id),
+        findProgram: (code) => programs.find((p) => p.code === code),
       }}
     >
       {children}

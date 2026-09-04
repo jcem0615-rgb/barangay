@@ -1,4 +1,6 @@
-import type { Application, ServiceCategory, ServiceDefinition } from '../types'
+import type {
+  Application, ResidentProgram, SectoralProgram, ServiceCategory, ServiceDefinition,
+} from '../types'
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'
 
@@ -92,6 +94,7 @@ export interface ResidentProfileData {
   province: string | null
   birthDate: string | null
   address: string | null
+  programs: ResidentProgram[]
 }
 
 export interface RequestEvent {
@@ -199,6 +202,7 @@ export const api = {
     request<{
       departments: ServiceCategory[]
       services: ServiceDefinition[]
+      programs: SectoralProgram[]
       workflowSteps: string[]
     }>('/catalogue'),
 
@@ -270,6 +274,26 @@ export const api = {
     downloadPdf(`/requests/${id}/attachments/${attachmentId}`),
 
   staffAttachments: (id: string) => request<Attachment[]>(`/staff/requests/${id}/attachments`),
+
+  /** The resident's programme record, read through a request of theirs. */
+  staffPrograms: (id: string) =>
+    request<{ residentName: string; programs: ResidentProgram[]; mayEdit: boolean }>(
+      `/staff/requests/${id}/programs`
+    ),
+
+  staffGrantProgram: (
+    id: string,
+    body: { code: string; referenceNo?: string; validUntil?: string }
+  ) =>
+    request<{ programs: ResidentProgram[] }>(`/staff/requests/${id}/programs`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  staffRevokeProgram: (id: string, code: string) =>
+    request<{ programs: ResidentProgram[] }>(`/staff/requests/${id}/programs/${code}`, {
+      method: 'DELETE',
+    }),
 
   staffAttachmentFile: (id: string, attachmentId: string) =>
     downloadPdf(`/staff/requests/${id}/attachments/${attachmentId}`),

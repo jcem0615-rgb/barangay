@@ -2,9 +2,24 @@ import { ShieldCheck, ChevronRight } from 'lucide-react'
 import type { ResidentProfile } from '../types'
 import QrPattern from './QrPattern'
 import { useT } from '../lib/i18n'
+import { useCatalogue } from '../lib/catalogue'
+
+/**
+ * Three badges fit across the card before the row starts to wrap, and the card
+ * is the one deliberate flourish in this app — so the rest become a count and
+ * the full list lives on the ID screen behind the tap.
+ */
+const BADGES_ON_CARD = 3
 
 export default function IDCard({ profile, onTap }: { profile: ResidentProfile; onTap?: () => void }) {
   const { t } = useT()
+  const { findProgram } = useCatalogue()
+
+  // A lapsed record is not a badge: it should not read as a live entitlement at
+  // a counter. It still shows, marked as expired, on the ID screen.
+  const active = profile.programs.filter((p) => !p.expired)
+  const shown = active.slice(0, BADGES_ON_CARD)
+  const overflow = active.length - shown.length
 
   return (
     <button
@@ -38,6 +53,24 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
           </span>
         </div>
       </div>
+
+      {active.length > 0 && (
+        <div className="relative mt-4 flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-3">
+          {shown.map((p) => (
+            <span
+              key={p.code}
+              className="rounded-full bg-gold-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-gold-400"
+            >
+              {findProgram(p.code)?.shortName ?? p.code}
+            </span>
+          ))}
+          {overflow > 0 && (
+            <span className="text-[10.5px] font-medium text-navy-100/70">
+              {t('programs.more', { count: overflow })}
+            </span>
+          )}
+        </div>
+      )}
 
       {onTap && (
         <ChevronRight

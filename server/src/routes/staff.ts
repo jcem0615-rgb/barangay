@@ -9,6 +9,9 @@ import { sendAttachment } from '../attachments.ts'
 import {
   deliverNotification, notificationFor, recordNotification, type NotificationInput,
 } from '../notifications.ts'
+import {
+  listResidentPrograms, listResidentProgramsIn, mayAdministerPrograms, programNoticeFor,
+} from '../programs.ts'
 
 export const staffRouter = Router()
 staffRouter.use(authenticate, requireRole('staff', 'admin'))
@@ -434,4 +437,132 @@ staffRouter.get('/requests/:id/attachments/:attachmentId', async (req, res) => {
   )
   if (!row) return res.status(404).json({ error: 'Attachment not found.' })
   await sendAttachment(res, row)
+})
+
+// ---------------------------------------------------------------------------
+// Sectoral registries and poverty-reduction programmes
+//
+// Reached through a request, so the office is always looking at a resident it
+// already has business with — there is no resident-search surface to abuse.
+// Reading is open to any office that can open the request; writing is not.
+// ---------------------------------------------------------------------------
+
+/** The resident's memberships, alongside the catalogue that describes them. */
+staffRouter.get('/requests/:id/programs', async (req, res) => {
+  const user = req.user!
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+
+  res.json({
+    residentName: row.resident_name ?? '',
+    programs: await listResidentPrograms(row.resident_id),
+    mayEdit: mayAdministerPrograms(user.role, user.departments),
+  })
+})
+
+const grantSchema = z.object({
+  code: z.string().min(1).max(40),
+  referenceNo: z.string().max(60).optional(),
+  validUntil: z.iso.date().optional(),
+  note: z.string().max(300).optional(),
+})
+
+/**
+ * Enrol a resident, or correct an existing record. Upsert rather than insert:
+ * a clerk fixing a mistyped OSCA number should not have to revoke first, and
+ * re-enrolling someone already on the list is not an error worth a 409.
+ */
+staffRouter.post('/requests/:id/programs', async (req, res) => {
+  const parsed = grantSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  const user = req.user!
+
+  if (!mayAdministerPrograms(user.role, user.departments)) {
+    return res.status(403).json({
+      error: 'Only the social welfare office can record programme membership.',
+    })
+  }
+
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+
+  const program = await one<{ name: string; issuing_office: string; expires: boolean }>(
+    `select name, issuing_office, expires from sectoral_programs where code = $1`,
+    [parsed.data.code]
+  )
+  if (!program) return res.status(404).json({ error: 'Unknown programme.' })
+  if (!program.expires && parsed.data.validUntil) {
+    return res.status(400).json({ error: `${program.name} records do not expire.` })
+  }
+
+  const notice: NotificationInput = {
+    userId: row.resident_id,
+    requestId: null,
+    kind: 'program_granted',
+    ...programNoticeFor('granted', program.name, program.issuing_office),
+  }
+
+  const programs = await transaction(async (client) => {
+    await client.query(
+      `insert into resident_programs
+         (user_id, program_code, reference_no, valid_until, granted_by, note)
+       values ($1, $2, $3, $4, $5, $6)
+       on conflict (user_id, program_code) do update set
+         reference_no = excluded.reference_no,
+         valid_until = excluded.valid_until,
+         granted_by = excluded.granted_by,
+         granted_at = now(),
+         note = excluded.note`,
+      [
+        row.resident_id, parsed.data.code, parsed.data.referenceNo ?? null,
+        parsed.data.validUntil ?? null, user.id, parsed.data.note ?? null,
+      ]
+    )
+    await recordNotification(client, notice)
+    return listResidentProgramsIn(client, row.resident_id)
+  })
+  void deliverNotification(notice)
+
+  res.json({ programs })
+})
+
+/** Remove a record — a lapsed registration, or one entered against the wrong person. */
+staffRouter.delete('/requests/:id/programs/:code', async (req, res) => {
+  const user = req.user!
+  if (!mayAdministerPrograms(user.role, user.departments)) {
+    return res.status(403).json({
+      error: 'Only the social welfare office can record programme membership.',
+    })
+  }
+
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+
+  const program = await one<{ name: string; issuing_office: string }>(
+    `select name, issuing_office from sectoral_programs where code = $1`,
+    [req.params.code]
+  )
+  if (!program) return res.status(404).json({ error: 'Unknown programme.' })
+
+  const notice: NotificationInput = {
+    userId: row.resident_id,
+    requestId: null,
+    kind: 'program_revoked',
+    ...programNoticeFor('revoked', program.name, program.issuing_office),
+  }
+
+  const result = await transaction(async (client) => {
+    const deleted = await client.query(
+      `delete from resident_programs where user_id = $1 and program_code = $2`,
+      [row.resident_id, req.params.code]
+    )
+    // Nothing to tell the resident about if they were never on the list.
+    if (deleted.rowCount === 0) return null
+    await recordNotification(client, notice)
+    return listResidentProgramsIn(client, row.resident_id)
+  })
+
+  if (!result) return res.status(404).json({ error: 'That resident is not on this programme.' })
+  void deliverNotification(notice)
+  res.json({ programs: result })
 })

@@ -3,7 +3,7 @@
  * database and the frontend never drift apart on what the LGU offers.
  * Safe to re-run: catalogue rows are upserted, demo accounts are skipped if present.
  */
-import { SERVICES, SERVICE_CATEGORIES } from '../../src/data/mockData.ts'
+import { SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES } from '../../src/data/mockData.ts'
 import { hashPassword } from './auth.ts'
 import { one, pool, query, transaction } from './db.ts'
 import { toCentavos } from './serialize.ts'
@@ -66,8 +66,28 @@ async function main() {
         ]
       )
     }
+
+    for (const [index, program] of SECTORAL_PROGRAMS.entries()) {
+      await client.query(
+        `insert into sectoral_programs (code, name, kind, short_name, description, benefit,
+                                        issuing_office, id_label, expires, sort_order)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         on conflict (code) do update set
+           name = excluded.name, kind = excluded.kind, short_name = excluded.short_name,
+           description = excluded.description, benefit = excluded.benefit,
+           issuing_office = excluded.issuing_office, id_label = excluded.id_label,
+           expires = excluded.expires, sort_order = excluded.sort_order`,
+        [
+          program.code, program.name, program.kind, program.shortName, program.description,
+          program.benefit, program.issuingOffice, program.idLabel, program.expires, index,
+        ]
+      )
+    }
   })
-  console.log(`catalogue: ${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services`)
+  console.log(
+    `catalogue: ${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services, ` +
+      `${SECTORAL_PROGRAMS.length} programmes`
+  )
 
   const passwordHash = await hashPassword(DEMO_PASSWORD)
   let created = 0

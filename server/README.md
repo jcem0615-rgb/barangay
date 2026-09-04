@@ -36,7 +36,7 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 
 | Method | Path | Who |
 |---|---|---|
-| `GET` | `/api/catalogue` | public — offices, services, workflow steps |
+| `GET` | `/api/catalogue` | public — offices, services, programmes, workflow steps |
 | `POST` | `/api/auth/register` | public — resident sign-up |
 | `POST` | `/api/auth/login` | public |
 | `GET` | `/api/auth/me` | signed in |
@@ -61,6 +61,9 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `DELETE` | `/api/requests/:id/attachments/:aid` | resident — remove, while the request is open |
 | `GET` | `/api/staff/requests/:id/attachments` | staff — what the resident supplied |
 | `GET` | `/api/staff/requests/:id/attachments/:aid` | staff — download it |
+| `GET` | `/api/staff/requests/:id/programs` | staff — the resident's programme record |
+| `POST` | `/api/staff/requests/:id/programs` | CSWDO/admin — enrol or correct a record |
+| `DELETE` | `/api/staff/requests/:id/programs/:code` | CSWDO/admin — remove a record |
 | `GET` | `/api/notifications` | resident — their own, with an unread count |
 | `POST` | `/api/notifications/:id/read` | resident — mark one read |
 | `POST` | `/api/notifications/read-all` | resident — mark all read |
@@ -284,6 +287,7 @@ npm run test:password-reset  # token handling, enumeration, session invalidation
 npm run test:admin        # staff account management and its access boundaries
 npm run test:notifications  # recording, delivery, preferences, and isolation
 npm run test:pagination   # paging boundaries, cursor stability, and search
+npm run test:programs     # sectoral registries: who may write, expiry, and isolation
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```
@@ -291,6 +295,28 @@ npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
 Covers registration and login, request submission, the full assess → pay →
 release path, rejection, and the access rules: one department cannot read or act
 on another's requests, and one resident cannot read another's.
+
+## Sectoral programmes
+
+`sectoral_programs` holds the catalogue (seeded from `src/data/mockData.ts`);
+`resident_programs` holds who is on what. A membership is worth real money at a
+counter — a senior-citizen record is a 20% statutory discount, 4Ps is a cash grant —
+so `mayAdministerPrograms` in `src/programs.ts` restricts writes to staff assigned to
+`REGISTRAR_DEPARTMENT` (`cswdo`) and to admins. Reading is open to any office that can
+already open the request, because knowing someone is a senior citizen changes how any
+counter serves them.
+
+Writes are reached through a request the office is handling, so there is no
+resident-search surface: `loadForStaff` still scopes the request to the caller's
+departments, and the write check is applied on top of it. A Treasury clerk who can open
+a request cannot enrol its resident in anything.
+
+`expired` is derived in the query (`valid_until < current_date`), never stored, so a
+lapsed record needs no nightly job to start reading as lapsed. Programmes that do not
+lapse reject a `validUntil` outright rather than storing one that means nothing.
+
+Grants and revocations notify the resident with `request_id` null — the notice is about
+their record, not about a request.
 
 ## Security notes
 

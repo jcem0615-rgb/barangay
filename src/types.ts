@@ -61,6 +61,36 @@ export interface Application {
   rejectionReason?: string
 }
 
+/**
+ * A sectoral registry or poverty-reduction programme the municipality keeps.
+ * Authored in src/data/mockData.ts, seeded into the database, and read back
+ * from the server as part of the catalogue.
+ */
+export interface SectoralProgram {
+  code: string
+  name: string
+  /** Short label for the badge on the ID card face. */
+  shortName: string
+  kind: 'poverty_reduction' | 'sectoral'
+  description: string
+  /** What the membership entitles the resident to. */
+  benefit: string
+  issuingOffice: string
+  /** Label for the programme's own number, or null when it issues none. */
+  idLabel: string | null
+  expires: boolean
+}
+
+/** One resident's membership in a programme, as issued by the office. */
+export interface ResidentProgram {
+  code: string
+  referenceNo: string | null
+  enrolledOn: string
+  /** ISO date, or null when the membership does not lapse. */
+  validUntil: string | null
+  expired: boolean
+}
+
 export interface ResidentProfile {
   fullName: string
   firstName: string
@@ -72,5 +102,6 @@ export interface ResidentProfile {
   birthDate: string
   address: string
   qrSeed: string
-  seniorOrPwd?: 'Senior Citizen' | 'PWD'
+  /** Sectoral and poverty-reduction memberships, newest office record first. */
+  programs: ResidentProgram[]
 }

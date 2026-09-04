@@ -9,6 +9,7 @@ import {
 import { resetEmail, sendMail } from '../mailer.ts'
 import { env } from '../env.ts'
 import { hashToken, issueResetToken, RESET_TTL_MINUTES } from '../resetTokens.ts'
+import { listResidentPrograms } from '../programs.ts'
 
 export const authRouter = Router()
 
@@ -145,7 +146,10 @@ authRouter.get('/me', authenticate, async (req, res) => {
        from resident_profiles where user_id = $1`,
     [req.user!.id]
   )
-  res.json({ user: req.user, profile: profile ?? null })
+  // Memberships ride along with the profile: the digital ID needs them on its
+  // first paint, and there are at most a handful per resident.
+  const programs = await listResidentPrograms(req.user!.id)
+  res.json({ user: req.user, profile: profile ? { ...profile, programs } : null })
 })
 
 // ---------------------------------------------------------------------------

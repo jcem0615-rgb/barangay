@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, Download, Loader2, Paperclip, X } from 'lucide-react'
 import { api, ApiError, type Attachment, type RequestEvent } from '../../lib/api'
 import { saveBlob } from '../../lib/download'
+import StaffPrograms from './StaffPrograms'
 import type { Application } from '../../types'
 import { WORKFLOW_STEPS } from '../../types'
 
@@ -153,6 +154,8 @@ export default function StaffRequestPanel({
             </ul>
           )}
         </div>
+
+        <StaffPrograms requestId={detail.id} residentName={detail.residentName ?? ''} />
 
         {Object.keys(detail.formValues).length > 0 && (
           <div>

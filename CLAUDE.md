@@ -34,8 +34,8 @@ PhilSys verification and payment settlement are still simulated.
 ```
 src/
   types.ts              Domain model: ServiceDefinition, Application, ResidentProfile, etc.
-  data/mockData.ts       Resident profile, 6 service categories, 17 services, 2 seed applications,
-                         and DATA_VERSION (bump to rebuild existing on-device stores)
+  data/mockData.ts       Resident profile, 6 service categories, 17 services, 8 sectoral
+                         programmes, 2 seed applications, and DATA_VERSION
   i18n/strings.ts        English + Filipino dictionaries (en is the source of truth)
   lib/
     i18n.tsx              I18nProvider + useT(); language persisted in localStorage
@@ -127,6 +127,32 @@ Two deliberate boundaries:
   requirements, and form field labels are catalogue data too, so they render in whatever
   language the catalogue was authored in.
 
+## Sectoral registries and poverty-reduction programmes
+
+The digital ID shows what the municipality has on record for a resident: 4Ps, the
+Listahanan indigent register and the Sustainable Livelihood Program on the
+poverty-reduction side, and the sectoral lists — senior citizen, PWD, solo parent,
+farmer/fisherfolk (RSBSA), indigenous peoples — that carry statutory discounts and
+priority lanes. The catalogue is authored in `SECTORAL_PROGRAMS` (`src/data/mockData.ts`),
+seeded into `sectoral_programs`, and read back through `/api/catalogue`; a resident's
+memberships live in `resident_programs` and ride along with `/auth/me`.
+
+**Membership is issued, never self-declared.** A senior-citizen badge is a 20% statutory
+discount and a 4Ps record is a cash grant, so `mayAdministerPrograms` (`server/src/programs.ts`)
+restricts writes to CSWDO staff and admins — being able to open someone's request in another
+queue is not authority to enrol them. Staff reach the record through a request the office is
+already handling, which is why there is no resident-search endpoint to abuse. Every grant and
+revoke notifies the resident, recorded in the same transaction as the change.
+
+`expired` is computed on read rather than stored, so a lapsed solo-parent ID reads as
+"renew at the issuing office" on the day it lapses, with no nightly job. Expired records
+still show on the ID screen but are dropped from the badges on the card face — a lapsed
+entitlement must not read as a live one at a counter.
+
+Programme names, ID labels and issuing offices are catalogue data, so they stay in English
+in both languages, exactly like "Cedula" and "Building Permit"; the chrome around them
+("Programs & assistance", "Valid until") is translated.
+
 ## Known simplifications (intentional, flag if scope grows)
 
 - **PhilSys sync** and the **QR code** are visual only — `qrPattern.ts` renders a
@@ -141,6 +167,13 @@ Two deliberate boundaries:
 - **Attachments** are type-checked by magic number, scanned by clamd when
   `CLAMAV_HOST` is set, and served only as downloads. Scanning is off by default
   in development and **fails closed** when configured — see `server/README.md`.
+- **The farmer registry (RSBSA)** is really the Municipal Agriculture Office's, and PWD
+  and senior-citizen records are OSCA's. This app has neither office, so CSWDO administers
+  every sectoral register. Adding those offices means a new department row and moving the
+  `REGISTRAR_DEPARTMENT` check in `server/src/programs.ts` to a per-programme one.
+- **Programme enrolment is reached through a request**, so a resident who has never filed
+  one cannot be enrolled from the console. A real deployment would want a resident lookup,
+  which is a new authorization surface worth designing deliberately rather than bolting on.
 - **Drafts** have no API endpoint yet. `ApplicationStatus` still includes `draft` and the
   request list still has a Drafts tab, but nothing writes one; the Save Draft button was
   removed rather than left lying about what it did.
@@ -205,7 +238,8 @@ npm run dev                   # http://localhost:5173
 ```
 
 Seeded staff logins are `<office>@sanfernando.gov.ph` (treasury, bpls, obo, lcr, cswdo,
-health) with the password printed by `npm run seed`. Residents register in the app.
+health) with the password printed by `npm run seed`. Sign in as `cswdo@` to see the
+programme record on a request. Residents register in the app.
 
 ```bash
 npm run build     # tsc -b && vite build -> dist/

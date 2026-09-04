@@ -9,10 +9,13 @@
  * Everything lives in this browser's localStorage, tokens are not verified, and
  * nothing here is used by the production build.
  */
-import { SERVICES, SERVICE_CATEGORIES } from '../data/mockData'
+import { SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES } from '../data/mockData'
 import { WORKFLOW_STEPS } from '../types'
 
-const STORE_KEY = 'elgu-demo-state'
+// Bumped whenever the seeded shape changes: a store written by an older build
+// would be missing fields this one reads, so it is discarded rather than
+// patched. Losing a demo's clicked-through state is the cheaper failure.
+const STORE_KEY = 'elgu-demo-state-v2'
 
 interface DemoUser {
   id: string
@@ -29,6 +32,10 @@ interface DemoUser {
     philSysId: string | null; barangay: string | null; municipality: string | null
     province: string | null; birthDate: string | null; address: string | null; phone: string | null
   }
+  /** Sectoral and poverty-reduction memberships, as the office recorded them. */
+  programs: Array<{
+    code: string; referenceNo: string | null; enrolledOn: string; validUntil: string | null
+  }>
 }
 
 interface DemoRequest {
@@ -83,12 +90,14 @@ function seed(): DemoState {
       fullName: 'Office of the Mayor — Administrator', role: 'admin', departments: [],
       position: null, active: true, notifyEmail: true, notifySms: false,
       profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
+      programs: [],
     },
     ...STAFF_SEED.map((s) => ({
       id: uid(), email: s.email, password: DEMO_PASSWORD, fullName: s.name,
       role: 'staff' as const, departments: [s.dept], position: s.position, active: true,
       notifyEmail: true, notifySms: false,
       profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
+      programs: [],
     })),
   ]
 
@@ -102,6 +111,12 @@ function seed(): DemoState {
       municipality: 'Municipality of San Fernando', province: 'Cebu',
       birthDate: '1994-03-18', address: 'Blk 4 Lot 12, Purok 3', phone: null,
     },
+    // Seeded so the demo ID card shows a real record rather than an empty one.
+    programs: [
+      { code: '4ps', referenceNo: 'HH-2019-88214', enrolledOn: '2024-06-11', validUntil: null },
+      { code: 'solo_parent', referenceNo: 'SP-2026-0417', enrolledOn: '2026-01-20', validUntil: '2027-01-20' },
+      { code: 'farmer', referenceNo: 'RSBSA-07-114522', enrolledOn: '2023-08-02', validUntil: null },
+    ],
   }
   users.push(resident)
 
@@ -129,6 +144,17 @@ function seed(): DemoState {
     { eventType: 'assessed', note: null, createdAt: new Date(now - 86400000 * 28).toISOString(), actorName: 'Carmen S. Reyes' },
     { eventType: 'paid', note: 'Paid via GCash', createdAt: new Date(now - 86400000 * 27).toISOString(), actorName: 'Maria Clara D. Santos' },
     { eventType: 'released', note: 'Document released (code K4TR-9WQ2-JH5N-P0CX)', createdAt: new Date(now - 86400000 * 26).toISOString(), actorName: 'Carmen S. Reyes' },
+  )
+
+  // A live social-welfare request, so a CSWDO clerk opening the demo has a
+  // queue to work and the programme record is reachable from it.
+  const soloParent = SERVICES.find((s) => s.id === 'solo-parent-id')!
+  state.requests.push(
+    makeRequest(
+      state, resident, soloParent,
+      { groundForSoloParent: 'Death of Spouse', childrenCount: '2', monthlyIncome: '12000' },
+      now - 86400000 * 3
+    )
   )
 
   return state
@@ -209,12 +235,36 @@ class DemoError extends Error {
   }
 }
 
-const notify = (userId: string, requestId: string, kind: string, title: string, body: string) => {
+const notify = (userId: string, requestId: string | null, kind: string, title: string, body: string) => {
   state.notifications.unshift({
     id: uid(), userId, requestId, kind, title, body,
     createdAt: new Date().toISOString(), readAt: null,
   })
 }
+
+/**
+ * Memberships in catalogue order, with `expired` derived on read — the same
+ * rule as the server, so a lapsed record reads as needing renewal rather than
+ * silently vanishing.
+ */
+const serializePrograms = (user: DemoUser) =>
+  SECTORAL_PROGRAMS.flatMap((def) => {
+    const held = user.programs.find((p) => p.code === def.code)
+    if (!held) return []
+    return [{
+      code: held.code,
+      referenceNo: held.referenceNo,
+      enrolledOn: held.enrolledOn,
+      validUntil: held.validUntil,
+      expired: Boolean(held.validUntil && held.validUntil < today()),
+    }]
+  })
+
+const today = () => new Date().toISOString().slice(0, 10)
+
+/** Only the social welfare office and admins may write a programme record. */
+const mayAdministerPrograms = (user: DemoUser) =>
+  user.role === 'admin' || user.departments.includes('cswdo')
 
 const officeName = (categoryId: string) =>
   SERVICE_CATEGORIES.find((c) => c.id === categoryId)?.officeName ?? 'The municipal office'
@@ -311,7 +361,13 @@ async function route(
 
   // ---- catalogue ----
   if (parts[0] === 'catalogue') {
-    return { status: 200, body: { departments: SERVICE_CATEGORIES, services: SERVICES, workflowSteps: WORKFLOW_STEPS } }
+    return {
+      status: 200,
+      body: {
+        departments: SERVICE_CATEGORIES, services: SERVICES,
+        programs: SECTORAL_PROGRAMS, workflowSteps: WORKFLOW_STEPS,
+      },
+    }
   }
 
   // ---- auth ----
@@ -330,6 +386,7 @@ async function route(
           municipality: body.municipality ?? 'Municipality of San Fernando',
           province: body.province ?? 'Cebu', birthDate: null, address: body.address ?? null, phone: null,
         },
+        programs: [],
       }
       state.users.push(user); persist()
       return { status: 201, body: { token: user.id, user: publicUser(user) } }
@@ -343,7 +400,10 @@ async function route(
     }
     if (parts[1] === 'me') {
       const user = need('resident', 'staff', 'admin')
-      return { status: 200, body: { user: publicUser(user), profile: user.profile } }
+      return {
+        status: 200,
+        body: { user: publicUser(user), profile: { ...user.profile, programs: serializePrograms(user) } },
+      }
     }
     if (parts[1] === 'forgot' && method === 'POST') {
       return { status: 202, body: { message: 'Password reset needs a mail server, so it is not part of this demo.' } }
@@ -485,6 +545,68 @@ async function route(
         if (!found) throw new DemoError(404, 'Attachment not found.')
         return { status: 200, blob: dataUrlToBlob(found.data, found.contentType), fileName: found.fileName }
       }
+      // ---- programme record ----
+      // Readable by any office that can open the request; writable only by the
+      // social welfare office, exactly as the real API rules it.
+      if (parts[3] === 'programs') {
+        const resident = state.users.find((u) => u.id === target.residentId)
+        if (!resident) throw new DemoError(404, 'Resident not found.')
+
+        if (method === 'GET' && !parts[4]) {
+          return {
+            status: 200,
+            body: {
+              residentName: resident.fullName,
+              programs: serializePrograms(resident),
+              mayEdit: mayAdministerPrograms(user),
+            },
+          }
+        }
+
+        if (!mayAdministerPrograms(user)) {
+          throw new DemoError(403, 'Only the social welfare office can record programme membership.')
+        }
+
+        if (method === 'POST') {
+          const def = SECTORAL_PROGRAMS.find((pr) => pr.code === body.code)
+          if (!def) throw new DemoError(404, 'Unknown programme.')
+          if (!def.expires && body.validUntil) {
+            throw new DemoError(400, `${def.name} records do not expire.`)
+          }
+          const existing = resident.programs.find((pr) => pr.code === def.code)
+          const record = {
+            code: def.code,
+            referenceNo: body.referenceNo || null,
+            enrolledOn: existing?.enrolledOn ?? today(),
+            validUntil: body.validUntil || null,
+          }
+          if (existing) Object.assign(existing, record)
+          else resident.programs.push(record)
+          notify(
+            resident.id, null, 'program_granted', `${def.name} — you are now enrolled`,
+            `${def.issuingOffice} has recorded you under ${def.name}. ` +
+              'It now appears on your digital ID; show it when you transact with the LGU.'
+          )
+          persist()
+          return { status: 200, body: { programs: serializePrograms(resident) } }
+        }
+
+        if (method === 'DELETE' && parts[4]) {
+          const def = SECTORAL_PROGRAMS.find((pr) => pr.code === parts[4])
+          if (!def) throw new DemoError(404, 'Unknown programme.')
+          const at = resident.programs.findIndex((pr) => pr.code === parts[4])
+          if (at < 0) throw new DemoError(404, 'That resident is not on this programme.')
+          resident.programs.splice(at, 1)
+          notify(
+            resident.id, null, 'program_revoked', `${def.name} — record removed`,
+            `${def.issuingOffice} has removed your ${def.name} record. ` +
+              'It no longer appears on your digital ID. Contact the office if this is a mistake.'
+          )
+          persist()
+          return { status: 200, body: { programs: serializePrograms(resident) } }
+        }
+      }
+
       if (parts[3] === 'document') {
         if (!target.document) throw new DemoError(404, 'No document has been released yet.')
         return { status: 200, blob: documentFor(target), fileName: target.document.fileName }
@@ -592,6 +714,7 @@ async function route(
         role: 'staff', departments: body.departments, position: body.position ?? null,
         active: true, notifyEmail: true, notifySms: false,
         profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
+        programs: [],
       }
       state.users.push(created); persist()
       return { status: 201, body: { ...publicStaff(created), invited: true } }

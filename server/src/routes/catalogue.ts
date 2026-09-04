@@ -21,8 +21,15 @@ catalogueRouter.get('/', async (_req, res) => {
        from services where active = true order by department_id, name`
   )
 
+  const programs = await query(
+    `select code, name, short_name as "shortName", kind, description, benefit,
+            issuing_office as "issuingOffice", id_label as "idLabel", expires
+       from sectoral_programs order by sort_order, name`
+  )
+
   res.json({
     departments,
+    programs,
     services: serviceRows.map((s) => ({
       id: s.id,
       categoryId: s.department_id,

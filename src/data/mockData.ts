@@ -1,7 +1,7 @@
 // Catalogue of municipal offices and the services they provide.
 // The API seeds from this file (server/src/seed.ts), and the app reads the
 // catalogue back from the server at runtime — this is the authoring source.
-import type { ServiceCategory, ServiceCategoryId, ServiceDefinition } from '../types'
+import type { SectoralProgram, ServiceCategory, ServiceCategoryId, ServiceDefinition } from '../types'
 
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
@@ -332,5 +332,106 @@ export const SERVICES: ServiceDefinition[] = [
       { id: 'childrenCount', label: 'Number of dependent children', type: 'number', placeholder: 'e.g. 2', required: true },
       { id: 'monthlyIncome', label: 'Monthly income (\u20b1)', type: 'number', placeholder: 'e.g. 12000', required: true },
     ],
+  },
+]
+
+/**
+ * Sectoral registries and poverty-reduction programmes the municipality keeps
+ * on a resident. These are what the digital ID shows under the resident's name:
+ * a counter clerk needs to see at a glance that someone is a senior citizen or
+ * a 4Ps household, because that is what decides the discount or the priority
+ * lane.
+ *
+ * Membership is issued by the registering office, never self-declared — the
+ * server refuses a write from anyone but CSWDO staff and admins.
+ */
+export const SECTORAL_PROGRAMS: SectoralProgram[] = [
+  {
+    code: '4ps',
+    name: 'Pantawid Pamilyang Pilipino Program (4Ps)',
+    shortName: '4Ps',
+    kind: 'poverty_reduction',
+    description: 'National conditional cash transfer for the poorest households.',
+    benefit: 'Cash grants for health and education, conditional on check-ups and school attendance.',
+    issuingOffice: 'Municipal Social Welfare & Development Office',
+    idLabel: 'Household ID No.',
+    expires: false,
+  },
+  {
+    code: 'indigent',
+    name: 'Indigent Household (Listahanan)',
+    shortName: 'Indigent',
+    kind: 'poverty_reduction',
+    description: 'Household listed in the national household targeting system.',
+    benefit: 'Free medical assistance, PhilHealth sponsorship, and priority in relief operations.',
+    issuingOffice: 'Municipal Social Welfare & Development Office',
+    idLabel: 'Household No.',
+    expires: false,
+  },
+  {
+    code: 'slp',
+    name: 'Sustainable Livelihood Program',
+    shortName: 'Livelihood',
+    kind: 'poverty_reduction',
+    description: 'Livelihood capital and skills training for low-income families.',
+    benefit: 'Seed capital, skills training, and access to the municipal livelihood grant.',
+    issuingOffice: 'Municipal Social Welfare & Development Office',
+    idLabel: 'Member No.',
+    expires: false,
+  },
+  {
+    code: 'senior',
+    name: 'Senior Citizen',
+    shortName: 'Senior Citizen',
+    kind: 'sectoral',
+    description: 'Registered with the Office for Senior Citizens Affairs.',
+    benefit: '20% discount and VAT exemption on medicine, transport, and food, plus priority lanes.',
+    issuingOffice: 'Office for Senior Citizens Affairs (OSCA)',
+    idLabel: 'OSCA ID No.',
+    expires: false,
+  },
+  {
+    code: 'pwd',
+    name: 'Person with Disability',
+    shortName: 'PWD',
+    kind: 'sectoral',
+    description: 'Registered in the municipal PWD registry.',
+    benefit: '20% discount and VAT exemption on medicine and services, plus priority lanes.',
+    issuingOffice: 'Municipal Social Welfare & Development Office',
+    idLabel: 'PWD ID No.',
+    expires: true,
+  },
+  {
+    code: 'solo_parent',
+    name: 'Solo Parent',
+    shortName: 'Solo Parent',
+    kind: 'sectoral',
+    description: 'Registered solo parent under the Expanded Solo Parents Welfare Act.',
+    benefit: '10% discount on baby needs and medicine, parental leave, and educational assistance.',
+    issuingOffice: 'Municipal Social Welfare & Development Office',
+    idLabel: 'Solo Parent ID No.',
+    expires: true,
+  },
+  {
+    code: 'farmer',
+    name: 'Farmer / Fisherfolk (RSBSA)',
+    shortName: 'Farmer',
+    kind: 'sectoral',
+    description: 'Listed in the Registry System for Basic Sectors in Agriculture.',
+    benefit: 'Seed and fertiliser subsidy, crop insurance, and fuel discount programmes.',
+    issuingOffice: 'Municipal Agriculture Office',
+    idLabel: 'RSBSA Ref. No.',
+    expires: false,
+  },
+  {
+    code: 'ip',
+    name: 'Indigenous Peoples',
+    shortName: 'IP',
+    kind: 'sectoral',
+    description: 'Member of a recognised indigenous cultural community.',
+    benefit: 'Educational assistance, scholarship slots, and representation in local councils.',
+    issuingOffice: 'Municipal Social Welfare & Development Office',
+    idLabel: null,
+    expires: false,
   },
 ]

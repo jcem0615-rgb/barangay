@@ -14,11 +14,16 @@ import { env } from './env.ts'
  * "Advance" button hang, and a bounced message must not roll back the work.
  */
 
-export type NotificationKind = 'assessed' | 'advanced' | 'released' | 'rejected'
+/** Notices about a request's progress. */
+export type RequestNotificationKind = 'assessed' | 'advanced' | 'released' | 'rejected'
+
+/** Everything a notification row can be, including notices tied to no request. */
+export type NotificationKind = RequestNotificationKind | 'program_granted' | 'program_revoked'
 
 export interface NotificationInput {
   userId: string
-  requestId: string
+  /** Null for notices that are not about a request, such as a programme record. */
+  requestId: string | null
   kind: NotificationKind
   title: string
   body: string
@@ -29,7 +34,7 @@ export async function recordNotification(client: PoolClient, input: Notification
   const inserted = await client.query<{ id: string }>(
     `insert into notifications (user_id, request_id, kind, title, body)
      values ($1, $2, $3, $4, $5) returning id`,
-    [input.userId, input.requestId, input.kind, input.title, input.body]
+    [input.userId, input.requestId ?? null, input.kind, input.title, input.body]
   )
   return inserted.rows[0]!.id
 }
@@ -73,7 +78,7 @@ export async function deliverNotification(input: NotificationInput): Promise<voi
 
 /** The wording residents actually receive, kept in one place. */
 export function notificationFor(
-  kind: NotificationKind,
+  kind: RequestNotificationKind,
   ctx: { serviceName: string; referenceNo: string; officeName: string; fee?: number; reason?: string }
 ): { title: string; body: string } {
   switch (kind) {

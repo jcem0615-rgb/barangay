@@ -1,6 +1,7 @@
 import { ShieldCheck, Fingerprint } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import QrPattern from '../components/QrPattern'
+import ProgramList from '../components/ProgramList'
 import { useResidentProfile } from '../lib/resident'
 import { useT } from '../lib/i18n'
 
@@ -61,6 +62,10 @@ export default function IdCardScreen() {
               {t('id.verifiedBlurb')}
             </p>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <ProgramList programs={resident.programs} />
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">

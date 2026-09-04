@@ -24,5 +24,6 @@ export function useResidentProfile(): ResidentProfile | null {
     birthDate: profile?.birthDate ?? '',
     address: profile?.address ?? '',
     qrSeed: profile?.philSysId ?? user.id,
+    programs: profile?.programs ?? [],
   }
 }
