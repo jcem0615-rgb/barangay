@@ -12,6 +12,8 @@ export type Screen =
   | { name: 'profile' }
   | { name: 'id-card' }
   | { name: 'notifications' }
+  | { name: 'help' }
+  | { name: 'privacy' }
 
 interface NavContextValue {
   screen: Screen

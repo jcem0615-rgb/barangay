@@ -18,8 +18,8 @@ export default function ProgramList({ programs }: { programs: ResidentProgram[] 
   if (programs.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-[13px] font-bold text-navy-950">{t('programs.title')}</p>
-        <p className="mt-1.5 text-[12.5px] leading-relaxed text-slate-500">{t('programs.none')}</p>
+        <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">{t('programs.title')}</p>
+        <p className="mt-1.5 text-[calc(13.5px_*_var(--text-scale))] leading-relaxed text-slate-500">{t('programs.none')}</p>
       </div>
     )
   }
@@ -37,8 +37,8 @@ export default function ProgramList({ programs }: { programs: ResidentProgram[] 
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-[13px] font-bold text-navy-950">{t('programs.title')}</p>
-      <p className="mt-0.5 text-[11.5px] text-slate-500">{t('programs.subtitle')}</p>
+      <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">{t('programs.title')}</p>
+      <p className="mt-0.5 text-[calc(12.5px_*_var(--text-scale))] text-slate-500">{t('programs.subtitle')}</p>
 
       {groups
         .filter((g) => g.items.length > 0)
@@ -46,7 +46,7 @@ export default function ProgramList({ programs }: { programs: ResidentProgram[] 
           <section key={kind} className="mt-4">
             <div className="flex items-center gap-1.5">
               <Icon size={13} className="text-navy-800" />
-              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-navy-800">{heading}</h3>
+              <h3 className="text-[calc(12px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-navy-800">{heading}</h3>
             </div>
 
             <ul className="mt-2 space-y-2.5">
@@ -57,21 +57,21 @@ export default function ProgramList({ programs }: { programs: ResidentProgram[] 
                     record.expired ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'
                   }`}
                 >
-                  <p className="text-[13px] font-bold leading-snug text-navy-950">{def.name}</p>
+                  <p className="text-[calc(14px_*_var(--text-scale))] font-bold leading-snug text-navy-950">{def.name}</p>
 
                   {def.idLabel && record.referenceNo && (
-                    <p className="mt-1 text-[12px] text-slate-600">
+                    <p className="mt-1 text-[calc(13px_*_var(--text-scale))] text-slate-600">
                       <span className="text-slate-500">{def.idLabel} </span>
                       <span className="font-medium tabular-nums text-navy-950">{record.referenceNo}</span>
                     </p>
                   )}
 
-                  <p className="mt-1.5 text-[11.5px] leading-snug text-slate-600">
+                  <p className="mt-1.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-600">
                     <span className="font-medium text-navy-950">{t('programs.entitles')}: </span>
                     {def.benefit}
                   </p>
 
-                  <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 border-t border-dashed border-slate-200 pt-2 text-[11px]">
+                  <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 border-t border-dashed border-slate-200 pt-2 text-[calc(12px_*_var(--text-scale))]">
                     <div>
                       <dt className="text-slate-500">{t('programs.enrolledOn')}</dt>
                       <dd className="font-medium text-navy-950">{formatDate(record.enrolledOn)}</dd>
@@ -89,7 +89,7 @@ export default function ProgramList({ programs }: { programs: ResidentProgram[] 
                   </dl>
 
                   {record.expired && (
-                    <p className="mt-2 flex items-center gap-1.5 text-[11.5px] font-semibold text-amber-800">
+                    <p className="mt-2 flex items-center gap-1.5 text-[calc(12.5px_*_var(--text-scale))] font-semibold text-amber-800">
                       <AlertTriangle size={13} className="shrink-0" />
                       {t('programs.expired')}
                     </p>

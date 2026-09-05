@@ -31,8 +31,8 @@ export default function Dashboard() {
     <div className="animate-tap-in px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)]">
       <div className="mb-5 flex items-start justify-between">
         <div>
-          <p className="text-[13px] text-slate-500">{t('home.greeting')}</p>
-          <h1 className="font-display text-[21px] font-extrabold text-navy-950">{resident?.firstName ?? ''} 👋</h1>
+          <p className="text-[calc(14px_*_var(--text-scale))] text-slate-500">{t('home.greeting')}</p>
+          <h1 className="font-display text-[calc(21px_*_var(--text-scale))] font-extrabold text-navy-950">{resident?.firstName ?? ''} 👋</h1>
         </div>
         <button
           onClick={() => push({ name: 'notifications' })}
@@ -42,7 +42,7 @@ export default function Dashboard() {
           <Bell size={18} className="text-navy-800" />
           {/* Only lit when something is actually waiting. */}
           {unread > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gold-500 px-1 text-[10px] font-bold text-navy-950">
+            <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gold-500 px-1 text-[calc(11.5px_*_var(--text-scale))] font-bold text-navy-950">
               {unread > 9 ? '9+' : unread}
             </span>
           )}
@@ -58,8 +58,8 @@ export default function Dashboard() {
       {resident && <IDCard profile={resident} onTap={() => push({ name: 'id-card' })} />}
 
       <div className="mt-6 flex items-center justify-between">
-        <h2 className="font-display text-[15px] font-bold text-navy-950">{t('home.quickServices')}</h2>
-        <button onClick={() => push({ name: 'services' })} className="text-[12.5px] font-semibold text-navy-800">
+        <h2 className="font-display text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">{t('home.quickServices')}</h2>
+        <button onClick={() => push({ name: 'services' })} className="text-[calc(13.5px_*_var(--text-scale))] font-semibold text-navy-800">
           {t('common.viewAll')}
         </button>
       </div>
@@ -75,7 +75,7 @@ export default function Dashboard() {
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-50 text-navy-800">
                 <Icon size={19} strokeWidth={1.9} />
               </span>
-              <span className="px-1 text-center text-[10.5px] font-semibold leading-tight text-navy-950">
+              <span className="px-1 text-center text-[calc(11.5px_*_var(--text-scale))] font-semibold leading-tight text-navy-950">
                 {cat.name.replace(' Services', '').replace(' (BOSS)', '')}
               </span>
             </button>
@@ -84,14 +84,14 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-6 flex items-center justify-between">
-        <h2 className="font-display text-[15px] font-bold text-navy-950">{t('home.recentRequests')}</h2>
-        <button onClick={() => push({ name: 'applications' })} className="text-[12.5px] font-semibold text-navy-800">
+        <h2 className="font-display text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">{t('home.recentRequests')}</h2>
+        <button onClick={() => push({ name: 'applications' })} className="text-[calc(13.5px_*_var(--text-scale))] font-semibold text-navy-800">
           {t('common.seeAll')}
         </button>
       </div>
       <div className="mt-3 space-y-2.5">
         {recent.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-[13px] text-slate-400">
+          <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-[calc(14px_*_var(--text-scale))] text-slate-500">
             {t('home.noRequests')}
           </p>
         )}

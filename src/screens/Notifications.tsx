@@ -79,7 +79,7 @@ export default function Notifications() {
               await api.markAllNotificationsRead().catch(() => undefined)
               await load()
             }}
-            className="flex items-center gap-1.5 text-[12.5px] font-semibold text-navy-800"
+            className="flex items-center gap-1.5 text-[calc(13.5px_*_var(--text-scale))] font-semibold text-navy-800"
           >
             <CheckCheck size={14} /> {t('notif.markAll')}
           </button>
@@ -90,8 +90,8 @@ export default function Notifications() {
         {!loading && items.length === 0 && (
           <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 py-14 text-center">
             <BellOff size={26} className="text-slate-300" />
-            <p className="mt-2.5 text-[13px] font-medium text-slate-400">{t('notif.empty')}</p>
-            <p className="mt-1 px-8 text-[12px] leading-snug text-slate-400">
+            <p className="mt-2.5 text-[calc(14px_*_var(--text-scale))] font-medium text-slate-500">{t('notif.empty')}</p>
+            <p className="mt-1 px-8 text-[calc(13px_*_var(--text-scale))] leading-snug text-slate-500">
               {t('notif.emptyBlurb')}
             </p>
           </div>
@@ -106,14 +106,14 @@ export default function Notifications() {
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${TONE[item.kind]}`}>
+              <span className={`rounded-full px-2 py-0.5 text-[calc(11.5px_*_var(--text-scale))] font-semibold ${TONE[item.kind]}`}>
                 {t(LABEL[item.kind])}
               </span>
               {!item.readAt && <span className="h-1.5 w-1.5 rounded-full bg-navy-800" aria-label="Unread" />}
-              <span className="ml-auto text-[11px] text-slate-400">{timeAgo(item.createdAt)}</span>
+              <span className="ml-auto text-[calc(12px_*_var(--text-scale))] text-slate-500">{timeAgo(item.createdAt)}</span>
             </div>
-            <p className="mt-1.5 font-display text-[13.5px] font-bold text-navy-950">{item.title}</p>
-            <p className="mt-0.5 text-[12.5px] leading-snug text-slate-600">{item.body}</p>
+            <p className="mt-1.5 font-display text-[calc(14.5px_*_var(--text-scale))] font-bold text-navy-950">{item.title}</p>
+            <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] leading-snug text-slate-600">{item.body}</p>
           </button>
         ))}
       </div>

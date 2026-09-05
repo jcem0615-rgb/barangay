@@ -27,3 +27,12 @@ export function useResidentProfile(): ResidentProfile | null {
     programs: profile?.programs ?? [],
   }
 }
+
+/**
+ * Joins the parts of an address a resident has actually supplied. Registration
+ * only asks for a barangay, so joining blindly leaves "Poblacion, " with a
+ * dangling comma on every account that stopped there.
+ */
+export function addressLine(...parts: Array<string | null | undefined>): string {
+  return parts.map((p) => p?.trim()).filter(Boolean).join(', ')
+}

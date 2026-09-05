@@ -5,6 +5,7 @@ import { AppDataProvider } from './lib/appData'
 import { AuthProvider, useAuth } from './lib/auth'
 import { CatalogueProvider } from './lib/catalogue'
 import { I18nProvider } from './lib/i18n'
+import { TextScaleProvider } from './lib/textScale'
 import BottomNav from './components/BottomNav'
 import Dashboard from './screens/Dashboard'
 import Services from './screens/Services'
@@ -19,6 +20,8 @@ import NotificationsScreen from './screens/Notifications'
 import SignIn from './screens/SignIn'
 import ResetPassword from './screens/ResetPassword'
 import StaffConsole from './screens/staff/StaffConsole'
+import HelpSupport from './screens/HelpSupport'
+import DataPrivacy from './screens/DataPrivacy'
 
 function ScreenRouter() {
   const { screen } = useNav()
@@ -44,6 +47,10 @@ function ScreenRouter() {
       return <IdCardScreen />
     case 'notifications':
       return <NotificationsScreen />
+    case 'help':
+      return <HelpSupport />
+    case 'privacy':
+      return <DataPrivacy />
     default:
       return <Dashboard />
   }
@@ -107,13 +114,15 @@ function RoleShell() {
 export default function App() {
   return (
     <I18nProvider>
-      <AuthProvider>
-        <CatalogueProvider>
-          <AppDataProvider>
-            <RoleShell />
-          </AppDataProvider>
-        </CatalogueProvider>
-      </AuthProvider>
+      <TextScaleProvider>
+        <AuthProvider>
+          <CatalogueProvider>
+            <AppDataProvider>
+              <RoleShell />
+            </AppDataProvider>
+          </CatalogueProvider>
+        </AuthProvider>
+      </TextScaleProvider>
     </I18nProvider>
   )
 }

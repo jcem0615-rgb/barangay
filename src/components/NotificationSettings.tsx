@@ -47,14 +47,14 @@ export default function NotificationSettings() {
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-[13px] font-bold text-navy-950">{t('profile.reachYou')}</p>
-      <p className="mt-0.5 text-[11.5px] text-slate-500">
+      <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">{t('profile.reachYou')}</p>
+      <p className="mt-0.5 text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
         {t('profile.reachBlurb')}
       </p>
 
       <div className="mt-3 space-y-3">
         <label className="flex items-center justify-between gap-3">
-          <span className="text-[13px] text-navy-950">{t('profile.email')}</span>
+          <span className="text-[calc(14px_*_var(--text-scale))] text-navy-950">{t('profile.email')}</span>
           <input
             type="checkbox"
             checked={prefs.notifyEmail}
@@ -65,7 +65,7 @@ export default function NotificationSettings() {
         </label>
 
         <label className="flex items-center justify-between gap-3">
-          <span className="text-[13px] text-navy-950">{t('profile.sms')}</span>
+          <span className="text-[calc(14px_*_var(--text-scale))] text-navy-950">{t('profile.sms')}</span>
           <input
             type="checkbox"
             checked={prefs.notifySms}
@@ -77,34 +77,34 @@ export default function NotificationSettings() {
 
         <div>
           <label className="block">
-            <span className="mb-1 block text-[12px] font-medium text-navy-950">{t('profile.mobile')}</span>
+            <span className="mb-1 block text-[calc(13px_*_var(--text-scale))] font-medium text-navy-950">{t('profile.mobile')}</span>
             <div className="flex gap-2">
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="09171234567"
                 inputMode="tel"
-                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13.5px] outline-none focus:border-navy-600 focus:bg-white"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[calc(14.5px_*_var(--text-scale))] outline-none focus:border-navy-600 focus:bg-white"
               />
               <button
                 onClick={() => void save({ phone })}
                 disabled={busy || phone === (prefs.phone ?? '')}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-[12.5px] font-semibold text-navy-800 disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-[calc(13.5px_*_var(--text-scale))] font-semibold text-navy-800 disabled:opacity-40"
               >
                 {busy && <Loader2 size={13} className="animate-spin" />} {t('common.save')}
               </button>
             </div>
           </label>
           {!prefs.phone && (
-            <p className="mt-1 text-[11.5px] text-slate-400">{t('profile.addNumber')}</p>
+            <p className="mt-1 text-[calc(12.5px_*_var(--text-scale))] text-slate-500">{t('profile.addNumber')}</p>
           )}
         </div>
 
         {error && (
-          <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700">{error}</p>
+          <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-[calc(13.5px_*_var(--text-scale))] text-rose-700">{error}</p>
         )}
         {saved && !error && (
-          <p role="status" className="text-[12px] text-emerald-700">{t('common.saved')}</p>
+          <p role="status" className="text-[calc(13px_*_var(--text-scale))] text-emerald-700">{t('common.saved')}</p>
         )}
       </div>
     </div>

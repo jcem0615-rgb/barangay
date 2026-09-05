@@ -39,6 +39,7 @@ src/
   i18n/strings.ts        English + Filipino dictionaries (en is the source of truth)
   lib/
     i18n.tsx              I18nProvider + useT(); language persisted in localStorage
+    textScale.tsx         TextScaleProvider + useTextScale(); drives --text-scale
     nav.tsx               Screen stack + useNav()
     appData.tsx            React context wrapping useApplications()
     useApplications.ts     Loads/saves Application records via db.ts, auto-syncs offline drafts
@@ -127,6 +128,27 @@ Two deliberate boundaries:
   requirements, and form field labels are catalogue data too, so they render in whatever
   language the catalogue was authored in.
 
+## Accessibility
+
+The app registers senior citizens and persons with disability, so legibility is a
+requirement rather than a polish item.
+
+**Text size is resident-controlled.** Every font size in the resident app is authored as
+`text-[calc(<base>px_*_var(--text-scale))]`, so the single `--text-scale` custom property
+set in `src/index.css` resizes the whole interface. `TextScaleProvider`
+(`src/lib/textScale.tsx`) writes it from a Normal / Large / Largest control in Profile,
+persisted in localStorage like the language choice. Each option in the control renders at
+the size it selects — and is deliberately *not* scaled itself, so the choice stays legible
+while you are making it.
+
+If you add a screen, write its font sizes the same way. A bare `text-[13px]` will not
+respond to the control, and nothing will tell you.
+
+Body copy sits at 13.5–15px at Normal and 17.5–19.5px at Largest. Secondary text is
+`text-slate-500` (~4.8:1 on white) rather than `slate-400` (~2.9:1), which failed WCAG AA.
+The `.tap-target` class gives a 44px minimum height and is applied to the bottom nav,
+Profile rows, filter chips and the toggles.
+
 ## Sectoral registries and poverty-reduction programmes
 
 The digital ID shows what the municipality has on record for a resident: 4Ps, the
@@ -174,6 +196,9 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
 - **Programme enrolment is reached through a request**, so a resident who has never filed
   one cannot be enrolled from the console. A real deployment would want a resident lookup,
   which is a new authorization surface worth designing deliberately rather than bolting on.
+- **Office addresses, hours and phone numbers** in `SERVICE_CATEGORIES` are placeholders
+  for a sample municipality. Replace them and reseed before a real deployment; the Data
+  Privacy screen's DPO address too.
 - **Drafts** have no API endpoint yet. `ApplicationStatus` still includes `draft` and the
   request list still has a Drafts tab, but nothing writes one; the Save Draft button was
   removed rather than left lying about what it did.
@@ -250,7 +275,9 @@ npm run preview   # serve the production build locally
 
 1. Replace mock icons in `public/icons/` with a real LGU seal / wordmark.
 2. Add a real QR/barcode library if the ID needs to be scannable by counter staff.
-3. Add basic form persistence-on-blur (currently drafts only save on explicit "Save Draft" tap).
+3. Persist a half-filled form as the resident types — `ServiceForm` keeps values in
+   `useState` alone, so a phone call mid-application loses the lot, and the Drafts tab has
+   nothing behind it.
 4. Consider `react-router` if screens need shareable URLs.
 5. Wire a real backend once one exists — the `Application` type and `db.ts` interface are
    already shaped to make that a drop-in swap.

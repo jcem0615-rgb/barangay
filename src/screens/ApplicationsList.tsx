@@ -41,7 +41,7 @@ export default function ApplicationsList() {
           <button
             key={option.key}
             onClick={() => setTab(option.key)}
-            className={`shrink-0 rounded-full px-3.5 py-2 text-[12.5px] font-semibold transition ${
+            className={`tap-target shrink-0 rounded-full px-3.5 text-[calc(13.5px_*_var(--text-scale))] font-semibold transition ${
               tab === option.key ? 'bg-navy-800 text-white' : 'bg-white text-slate-500 border border-slate-200'
             }`}
           >
@@ -54,7 +54,7 @@ export default function ApplicationsList() {
         {filtered.length === 0 && (
           <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 py-12 text-center">
             <Inbox size={26} className="text-slate-300" />
-            <p className="mt-2.5 text-[13px] font-medium text-slate-400">{t('requests.empty')}</p>
+            <p className="mt-2.5 text-[calc(14px_*_var(--text-scale))] font-medium text-slate-500">{t('requests.empty')}</p>
           </div>
         )}
         {filtered.map((app) => (

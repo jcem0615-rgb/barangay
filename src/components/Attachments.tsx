@@ -65,8 +65,8 @@ export default function Attachments({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="mb-1 text-[13px] font-bold text-navy-950">{t('files.title')}</p>
-      <p className="mb-3 text-[11.5px] text-slate-500">
+      <p className="mb-1 text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">{t('files.title')}</p>
+      <p className="mb-3 text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
         {editable
           ? t('files.helpEditable')
           : t('files.helpReadOnly')}
@@ -79,7 +79,7 @@ export default function Attachments({
           const file = attachedFor(requirement)
           return (
             <li key={requirement} className="rounded-xl border border-slate-200 p-3">
-              <p className="text-[12.5px] font-medium text-navy-950">{requirement}</p>
+              <p className="text-[calc(13.5px_*_var(--text-scale))] font-medium text-navy-950">{requirement}</p>
               {file ? (
                 <div className="mt-1.5 flex items-center gap-2">
                   <Paperclip size={13} className="shrink-0 text-emerald-600" />
@@ -88,11 +88,11 @@ export default function Attachments({
                       const { blob, fileName } = await api.attachmentFile(requestId, file.id)
                       saveBlob(blob, fileName)
                     }}
-                    className="min-w-0 flex-1 truncate text-left text-[12px] text-navy-800 underline-offset-2 hover:underline"
+                    className="min-w-0 flex-1 truncate text-left text-[calc(13px_*_var(--text-scale))] text-navy-800 underline-offset-2 hover:underline"
                   >
                     {file.fileName}
                   </button>
-                  <span className="shrink-0 text-[11px] text-slate-400">{formatSize(file.byteSize)}</span>
+                  <span className="shrink-0 text-[calc(12px_*_var(--text-scale))] text-slate-500">{formatSize(file.byteSize)}</span>
                   {editable && (
                     <button
                       aria-label={`Remove ${file.fileName}`}
@@ -100,7 +100,7 @@ export default function Attachments({
                         await api.removeAttachment(requestId, file.id)
                         await load()
                       }}
-                      className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-rose-600"
+                      className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-rose-600"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -110,13 +110,13 @@ export default function Attachments({
                 <button
                   disabled={busy !== null}
                   onClick={() => pick(requirement)}
-                  className="mt-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-navy-800 disabled:opacity-50"
+                  className="mt-1.5 flex items-center gap-1.5 text-[calc(13px_*_var(--text-scale))] font-semibold text-navy-800 disabled:opacity-50"
                 >
                   {busy === requirement ? <Loader2 size={13} className="animate-spin" /> : <FileUp size={13} />}
                   {busy === requirement ? t('files.uploading') : t('files.attach')}
                 </button>
               ) : (
-                <p className="mt-1 text-[11.5px] text-amber-700">{t('files.notSubmitted')}</p>
+                <p className="mt-1 text-[calc(12.5px_*_var(--text-scale))] text-amber-700">{t('files.notSubmitted')}</p>
               )}
             </li>
           )
@@ -127,9 +127,9 @@ export default function Attachments({
         <ul className="mt-2 space-y-1.5">
           {extras.map((file) => (
             <li key={file.id} className="flex items-center gap-2 px-1">
-              <Paperclip size={13} className="shrink-0 text-slate-400" />
-              <span className="min-w-0 flex-1 truncate text-[12px] text-slate-600">{file.fileName}</span>
-              <span className="shrink-0 text-[11px] text-slate-400">{formatSize(file.byteSize)}</span>
+              <Paperclip size={13} className="shrink-0 text-slate-500" />
+              <span className="min-w-0 flex-1 truncate text-[calc(13px_*_var(--text-scale))] text-slate-600">{file.fileName}</span>
+              <span className="shrink-0 text-[calc(12px_*_var(--text-scale))] text-slate-500">{formatSize(file.byteSize)}</span>
             </li>
           ))}
         </ul>
@@ -139,14 +139,14 @@ export default function Attachments({
         <button
           disabled={busy !== null}
           onClick={() => pick(undefined)}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-[12.5px] font-medium text-slate-500 disabled:opacity-50"
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-[calc(13.5px_*_var(--text-scale))] font-medium text-slate-500 disabled:opacity-50"
         >
           <FileUp size={14} /> {t('files.attachAnother')}
         </button>
       )}
 
       {error && (
-        <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700">{error}</p>
+        <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[calc(13.5px_*_var(--text-scale))] text-rose-700">{error}</p>
       )}
     </div>
   )

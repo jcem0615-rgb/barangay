@@ -2,7 +2,7 @@ import { ShieldCheck, Fingerprint } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import QrPattern from '../components/QrPattern'
 import ProgramList from '../components/ProgramList'
-import { useResidentProfile } from '../lib/resident'
+import { addressLine, useResidentProfile } from '../lib/resident'
 import { useT } from '../lib/i18n'
 
 export default function IdCardScreen() {
@@ -21,7 +21,7 @@ export default function IdCardScreen() {
 
           <div className="relative flex items-center gap-2">
             <ShieldCheck size={15} className="text-gold-400" />
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-gold-400">
+            <p className="text-[calc(11.5px_*_var(--text-scale))] font-semibold uppercase tracking-[0.16em] text-gold-400">
               Republic of the Philippines &middot; eLGU Citizen Digital ID
             </p>
           </div>
@@ -31,19 +31,19 @@ export default function IdCardScreen() {
           </div>
 
           <div className="relative mt-5 text-center">
-            <p className="font-display text-[20px] font-bold">{resident.fullName}</p>
-            <p className="mt-1 text-[13px] text-navy-100">{resident.barangay}, {resident.municipality}</p>
-            <p className="text-[12px] text-navy-100/70">{resident.province}</p>
+            <p className="font-display text-[calc(20px_*_var(--text-scale))] font-bold">{resident.fullName}</p>
+            <p className="mt-1 text-[calc(14px_*_var(--text-scale))] text-navy-100">{addressLine(resident.barangay, resident.municipality)}</p>
+            <p className="text-[calc(13px_*_var(--text-scale))] text-navy-100/70">{resident.province}</p>
           </div>
 
           <div className="relative mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-navy-100/60">{t('id.philsysNo')}</p>
-              <p className="mt-0.5 text-[12.5px] font-semibold tracking-wide">{resident.philSysId}</p>
+              <p className="text-[calc(11.5px_*_var(--text-scale))] uppercase tracking-wider text-navy-100/60">{t('id.philsysNo')}</p>
+              <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] font-semibold tracking-wide">{resident.philSysId}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-navy-100/60">{t('id.dateOfBirth')}</p>
-              <p className="mt-0.5 text-[12.5px] font-semibold">
+              <p className="text-[calc(11.5px_*_var(--text-scale))] uppercase tracking-wider text-navy-100/60">{t('id.dateOfBirth')}</p>
+              <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] font-semibold">
                 {resident.birthDate
                   ? new Date(resident.birthDate).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })
                   : '—'}
@@ -57,8 +57,8 @@ export default function IdCardScreen() {
             <Fingerprint size={17} className="text-emerald-700" />
           </span>
           <div>
-            <p className="text-[13px] font-bold text-emerald-800">{t('id.verifiedTitle')}</p>
-            <p className="text-[11.5px] leading-snug text-emerald-700/80">
+            <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-emerald-800">{t('id.verifiedTitle')}</p>
+            <p className="text-[calc(12.5px_*_var(--text-scale))] leading-snug text-emerald-700/80">
               {t('id.verifiedBlurb')}
             </p>
           </div>
@@ -69,9 +69,9 @@ export default function IdCardScreen() {
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="text-[13px] font-bold text-navy-950">{t('id.registeredAddress')}</p>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-slate-600">{resident.address}</p>
-          <p className="text-[13px] text-slate-600">{resident.barangay}, {resident.municipality}, {resident.province}</p>
+          <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">{t('id.registeredAddress')}</p>
+          <p className="mt-1.5 text-[calc(14px_*_var(--text-scale))] leading-relaxed text-slate-600">{resident.address}</p>
+          <p className="text-[calc(14px_*_var(--text-scale))] text-slate-600">{addressLine(resident.barangay, resident.municipality, resident.province)}</p>
         </div>
       </div>
     </div>

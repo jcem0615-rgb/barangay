@@ -3,6 +3,7 @@ import type { ResidentProfile } from '../types'
 import QrPattern from './QrPattern'
 import { useT } from '../lib/i18n'
 import { useCatalogue } from '../lib/catalogue'
+import { addressLine } from '../lib/resident'
 
 /**
  * Three badges fit across the card before the row starts to wrap, and the card
@@ -32,23 +33,23 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
 
       <div className="relative flex items-start justify-between">
         <div>
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-gold-400">
+          <p className="text-[calc(11.5px_*_var(--text-scale))] font-semibold uppercase tracking-[0.16em] text-gold-400">
             eLGU Citizen Digital ID
           </p>
-          <p className="font-display mt-1 text-[19px] font-bold leading-tight text-white">{profile.fullName}</p>
-          <p className="mt-0.5 text-[12.5px] text-navy-100">{profile.barangay}, {profile.municipality}</p>
+          <p className="font-display mt-1 text-[calc(19px_*_var(--text-scale))] font-bold leading-tight text-white">{profile.fullName}</p>
+          <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] text-navy-100">{addressLine(profile.barangay, profile.municipality)}</p>
         </div>
         <QrPattern seed={profile.qrSeed} size={9} dim={54} dark />
       </div>
 
       <div className="relative mt-5 flex items-end justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-navy-100/70">{t('id.philsysNo')}</p>
-          <p className="font-display text-[13.5px] font-semibold tracking-wide text-white">{profile.philSysId}</p>
+          <p className="text-[calc(11.5px_*_var(--text-scale))] uppercase tracking-wider text-navy-100/70">{t('id.philsysNo')}</p>
+          <p className="font-display text-[calc(14.5px_*_var(--text-scale))] font-semibold tracking-wide text-white">{profile.philSysId}</p>
         </div>
         <div className="flex items-center gap-1 rounded-full bg-emerald-400/15 px-2.5 py-1">
           <ShieldCheck size={13} className="text-emerald-400" />
-          <span className="text-[11px] font-semibold text-emerald-300">
+          <span className="text-[calc(12px_*_var(--text-scale))] font-semibold text-emerald-300">
             {profile.philSysSynced ? t('id.synced') : t('id.notSynced')}
           </span>
         </div>
@@ -59,13 +60,13 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
           {shown.map((p) => (
             <span
               key={p.code}
-              className="rounded-full bg-gold-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-gold-400"
+              className="rounded-full bg-gold-500/20 px-2 py-0.5 text-[calc(11.5px_*_var(--text-scale))] font-semibold text-gold-400"
             >
               {findProgram(p.code)?.shortName ?? p.code}
             </span>
           ))}
           {overflow > 0 && (
-            <span className="text-[10.5px] font-medium text-navy-100/70">
+            <span className="text-[calc(11.5px_*_var(--text-scale))] font-medium text-navy-100/70">
               {t('programs.more', { count: overflow })}
             </span>
           )}

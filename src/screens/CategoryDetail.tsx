@@ -21,7 +21,7 @@ export default function CategoryDetail({ categoryId }: { categoryId: Extract<Scr
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-navy-800 text-white">
             <Icon size={19} strokeWidth={1.9} />
           </span>
-          <p className="text-[12.5px] leading-snug text-navy-900">{category.description}</p>
+          <p className="text-[calc(13.5px_*_var(--text-scale))] leading-snug text-navy-900">{category.description}</p>
         </div>
         <div className="space-y-3">
           {services.map((s) => (

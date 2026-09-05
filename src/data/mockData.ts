@@ -1,4 +1,7 @@
 // Catalogue of municipal offices and the services they provide.
+//
+// Office addresses, hours and numbers are seed placeholders for this sample
+// municipality; replace them with the real ones before deploying.
 // The API seeds from this file (server/src/seed.ts), and the app reads the
 // catalogue back from the server at runtime — this is the authoring source.
 import type { SectoralProgram, ServiceCategory, ServiceCategoryId, ServiceDefinition } from '../types'
@@ -10,6 +13,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: 'Business One-Stop Shop',
     description: 'Apply, assess taxes, and pay for your business permit',
     icon: 'store',
+    address: 'Municipal Hall, Poblacion, San Fernando — Ground Floor, BOSS counter',
+    hours: 'Monday to Friday, 8:00 AM – 5:00 PM (no noon break)',
+    phone: '(045) 961-2345',
+    email: 'boss@sanfernando.gov.ph',
   },
   {
     id: 'cswdo',
@@ -17,6 +24,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: 'Municipal Social Welfare & Development Office',
     description: 'Financial aid, Senior Citizen and PWD ID',
     icon: 'hand-heart',
+    address: 'Municipal Hall, Poblacion, San Fernando — Second Floor, CSWDO',
+    hours: 'Monday to Friday, 8:00 AM – 5:00 PM',
+    phone: '(045) 961-2350',
+    email: 'cswdo@sanfernando.gov.ph',
   },
   {
     id: 'lcr',
@@ -24,6 +35,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: 'Office of the Local Civil Registrar',
     description: 'Birth, marriage, and death certificates',
     icon: 'scroll-text',
+    address: 'Municipal Hall, Poblacion, San Fernando — Ground Floor, Civil Registry',
+    hours: 'Monday to Friday, 8:00 AM – 5:00 PM (no noon break)',
+    phone: '(045) 961-2338',
+    email: 'lcr@sanfernando.gov.ph',
   },
   {
     id: 'treasury',
@@ -31,6 +46,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: "Municipal Treasurer's Office",
     description: 'Cedula, real property tax, and tax clearance',
     icon: 'coins',
+    address: 'Municipal Hall, Poblacion, San Fernando — Ground Floor, Treasury',
+    hours: 'Monday to Friday, 8:00 AM – 5:00 PM (no noon break)',
+    phone: '(045) 961-2320',
+    email: 'treasury@sanfernando.gov.ph',
   },
   {
     id: 'obo',
@@ -38,6 +57,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: 'Office of the Building Official',
     description: 'Building, occupancy, and locational clearances',
     icon: 'hard-hat',
+    address: 'Municipal Hall, Poblacion, San Fernando — Third Floor, Engineering',
+    hours: 'Monday to Friday, 8:00 AM – 5:00 PM',
+    phone: '(045) 961-2361',
+    email: 'obo@sanfernando.gov.ph',
   },
   {
     id: 'health',
@@ -45,6 +68,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: 'Municipal Health Office',
     description: 'Health certificates and sanitary permits',
     icon: 'stethoscope',
+    address: 'Rural Health Unit I, Barangay Sto. Niño',
+    hours: 'Monday to Saturday, 7:00 AM – 4:00 PM',
+    phone: '(045) 961-2377',
+    email: 'health@sanfernando.gov.ph',
   },
 ]
 

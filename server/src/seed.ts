@@ -37,13 +37,18 @@ async function main() {
   await transaction(async (client) => {
     for (const [index, dept] of SERVICE_CATEGORIES.entries()) {
       await client.query(
-        `insert into departments (id, name, office_name, description, icon, sort_order)
-         values ($1, $2, $3, $4, $5, $6)
+        `insert into departments (id, name, office_name, description, icon, sort_order,
+                                  address, hours, phone, email)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          on conflict (id) do update set
            name = excluded.name, office_name = excluded.office_name,
            description = excluded.description, icon = excluded.icon,
-           sort_order = excluded.sort_order`,
-        [dept.id, dept.name, dept.officeName, dept.description, dept.icon, index]
+           sort_order = excluded.sort_order, address = excluded.address,
+           hours = excluded.hours, phone = excluded.phone, email = excluded.email`,
+        [
+          dept.id, dept.name, dept.officeName, dept.description, dept.icon, index,
+          dept.address ?? null, dept.hours ?? null, dept.phone ?? null, dept.email ?? null,
+        ]
       )
     }
 

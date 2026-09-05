@@ -22,6 +22,25 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
+
+  /*
+   * Every font size in the resident app is written as
+   * calc(<base>px * var(--text-scale)), so one variable resizes the whole
+   * interface. Set from Profile and persisted; see src/lib/textScale.tsx.
+   *
+   * This app registers senior citizens and persons with disability — the two
+   * groups least served by small type — so the control is not a nicety.
+   */
+  --text-scale: 1;
+}
+
+/*
+ * Anything a finger has to land on gets the 44px minimum both platform
+ * guidelines ask for. Applied by class rather than globally so it cannot
+ * stretch icon-only controls that are already large enough.
+ */
+.tap-target {
+  min-height: 44px;
 }
 
 body {

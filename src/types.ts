@@ -6,6 +6,15 @@ export interface ServiceCategory {
   officeName: string
   description: string
   icon: string // lucide icon name, resolved in ServiceTile
+  /**
+   * Where to find the office in person. Seed placeholders for this sample
+   * municipality — replace them before a real deployment. Null where an office
+   * has not published the detail.
+   */
+  address?: string | null
+  hours?: string | null
+  phone?: string | null
+  email?: string | null
 }
 
 export type FieldType = 'text' | 'select' | 'date' | 'textarea' | 'number'

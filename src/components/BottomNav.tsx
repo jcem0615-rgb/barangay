@@ -32,14 +32,14 @@ export default function BottomNav() {
           <button
             key={key}
             onClick={() => replace({ name: key } as never)}
-            className="flex flex-1 flex-col items-center gap-1 py-2.5 pt-3 transition-colors active:opacity-60"
+            className="tap-target flex flex-1 flex-col items-center justify-center gap-1 py-2.5 pt-3 transition-colors active:opacity-60"
           >
             <Icon
               size={22}
               strokeWidth={active ? 2.4 : 1.9}
-              className={active ? 'text-navy-800' : 'text-slate-400'}
+              className={active ? 'text-navy-800' : 'text-slate-500'}
             />
-            <span className={`text-[11px] ${active ? 'font-semibold text-navy-800' : 'font-medium text-slate-400'}`}>
+            <span className={`text-[calc(12px_*_var(--text-scale))] ${active ? 'font-semibold text-navy-800' : 'font-medium text-slate-500'}`}>
               {t(label)}
             </span>
             <span className={`h-1 w-1 rounded-full ${active ? 'bg-gold-500' : 'bg-transparent'}`} />

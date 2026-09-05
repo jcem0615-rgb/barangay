@@ -36,7 +36,7 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 
 | Method | Path | Who |
 |---|---|---|
-| `GET` | `/api/catalogue` | public — offices, services, programmes, workflow steps |
+| `GET` | `/api/catalogue` | public — offices (with contact details), services, programmes, workflow steps |
 | `POST` | `/api/auth/register` | public — resident sign-up |
 | `POST` | `/api/auth/login` | public |
 | `GET` | `/api/auth/me` | signed in |
@@ -295,6 +295,13 @@ npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
 Covers registration and login, request submission, the full assess → pay →
 release path, rejection, and the access rules: one department cannot read or act
 on another's requests, and one resident cannot read another's.
+
+## Office contact details
+
+`departments` carries `address`, `hours`, `phone` and `email`, seeded from
+`src/data/mockData.ts` and published on `/api/catalogue`. The app's Help & support screen
+is built from them, so an office that moves floors is a reseed rather than a release. The
+seeded values are placeholders for a sample municipality — replace them before deploying.
 
 ## Sectoral programmes
 

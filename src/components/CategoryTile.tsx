@@ -13,8 +13,8 @@ export default function CategoryTile({ category, onTap }: { category: ServiceCat
         <Icon size={21} strokeWidth={1.9} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-display text-[14.5px] font-bold text-navy-950">{category.name}</span>
-        <span className="mt-0.5 block truncate text-[12px] text-slate-500">{category.description}</span>
+        <span className="block truncate font-display text-[calc(15px_*_var(--text-scale))] font-bold text-navy-950">{category.name}</span>
+        <span className="mt-0.5 block truncate text-[calc(13px_*_var(--text-scale))] text-slate-500">{category.description}</span>
       </span>
       <ChevronRight size={18} className="shrink-0 text-slate-300" />
     </button>

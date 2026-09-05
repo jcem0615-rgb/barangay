@@ -8,7 +8,8 @@ export const catalogueRouter = Router()
 // Public: residents browse offices and services before signing in.
 catalogueRouter.get('/', async (_req, res) => {
   const departments = await query(
-    `select id, name, office_name as "officeName", description, icon
+    `select id, name, office_name as "officeName", description, icon,
+            address, hours, phone, email
        from departments order by sort_order, name`
   )
   const serviceRows = await query<{

@@ -6,7 +6,7 @@ export default function OfflineBanner({ compact }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-amber-800">
       <CloudOff size={16} className="shrink-0" />
-      <p className="text-[12.5px] leading-snug">
+      <p className="text-[calc(13.5px_*_var(--text-scale))] leading-snug">
         {compact ? t('common.offlineShort') : t('common.offline')}
       </p>
     </div>

@@ -22,12 +22,12 @@ export default function ApplicationCard({ app, onTap }: { app: Application; onTa
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           {category && (
-            <p className="truncate text-[10.5px] font-semibold uppercase tracking-[0.06em] text-navy-700">
+            <p className="truncate text-[calc(11.5px_*_var(--text-scale))] font-semibold uppercase tracking-[0.06em] text-navy-700">
               {category.name}
             </p>
           )}
-          <p className="mt-0.5 truncate font-display text-[14px] font-bold text-navy-950">{app.serviceName}</p>
-          <p className="mt-0.5 text-[11.5px] text-slate-400">
+          <p className="mt-0.5 truncate font-display text-[calc(15px_*_var(--text-scale))] font-bold text-navy-950">{app.serviceName}</p>
+          <p className="mt-0.5 text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
             {app.isOfflineDraft ? 'Saved offline' : `Ref. ${app.referenceNo}`} &middot; {formatDate(app.dateSubmitted)}
           </p>
         </div>
@@ -36,11 +36,11 @@ export default function ApplicationCard({ app, onTap }: { app: Application; onTa
 
       <div className="mt-3 flex items-center justify-between">
         {app.status === 'draft' ? (
-          <span className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
+          <span className="flex items-center gap-1.5 text-[calc(13px_*_var(--text-scale))] font-medium text-slate-500">
             <FileEdit size={13} /> {t('requests.finishDraft')}
           </span>
         ) : (
-          <span className="text-[12px] font-medium text-navy-800">
+          <span className="text-[calc(13px_*_var(--text-scale))] font-medium text-navy-800">
             {t(`step.${WORKFLOW_STEPS[app.currentStepIndex]}`)}
           </span>
         )}

@@ -30,8 +30,8 @@ export default function TopBar({ title, subtitle, transparent, right }: TopBarPr
         <div className="w-9" />
       )}
       <div className="min-w-0 flex-1">
-        <h1 className="truncate font-display text-[17px] font-bold text-navy-950">{title}</h1>
-        {subtitle && <p className="truncate text-[12px] text-slate-500">{subtitle}</p>}
+        <h1 className="truncate font-display text-[calc(17px_*_var(--text-scale))] font-bold text-navy-950">{title}</h1>
+        {subtitle && <p className="truncate text-[calc(13px_*_var(--text-scale))] text-slate-500">{subtitle}</p>}
       </div>
       {right && <div className="shrink-0">{right}</div>}
     </header>

@@ -40,19 +40,19 @@ export default function ResetPassword({ token, onDone }: { token: string; onDone
           <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-navy-800 text-white">
             <Building2 size={26} strokeWidth={1.9} />
           </span>
-          <h1 className="font-display text-[20px] font-extrabold text-navy-950">{t('auth.choosePassword')}</h1>
+          <h1 className="font-display text-[calc(20px_*_var(--text-scale))] font-extrabold text-navy-950">{t('auth.choosePassword')}</h1>
         </div>
 
         {done ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center">
             <CheckCircle2 size={28} className="mx-auto text-emerald-600" />
-            <p className="mt-3 text-[14px] font-semibold text-navy-950">{t('auth.passwordChanged')}</p>
-            <p className="mt-1 text-[12.5px] text-slate-500">
+            <p className="mt-3 text-[calc(15px_*_var(--text-scale))] font-semibold text-navy-950">{t('auth.passwordChanged')}</p>
+            <p className="mt-1 text-[calc(13.5px_*_var(--text-scale))] text-slate-500">
               {t('auth.signedOutElsewhere')}
             </p>
             <button
               onClick={onDone}
-              className="mt-5 w-full rounded-xl bg-navy-800 py-3 text-[14px] font-semibold text-white active:bg-navy-900"
+              className="mt-5 w-full rounded-xl bg-navy-800 py-3 text-[calc(15px_*_var(--text-scale))] font-semibold text-white active:bg-navy-900"
             >
               {t('auth.signIn')}
             </button>
@@ -60,44 +60,44 @@ export default function ResetPassword({ token, onDone }: { token: string; onDone
         ) : (
           <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
             <label className="block">
-              <span className="mb-1 block text-[12.5px] font-medium text-navy-950">{t('auth.newPassword')}</span>
+              <span className="mb-1 block text-[calc(13.5px_*_var(--text-scale))] font-medium text-navy-950">{t('auth.newPassword')}</span>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="new-password"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[14px] outline-none focus:border-navy-600 focus:bg-white focus:ring-2 focus:ring-navy-600/15"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[calc(15px_*_var(--text-scale))] outline-none focus:border-navy-600 focus:bg-white focus:ring-2 focus:ring-navy-600/15"
               />
-              <span className="mt-1 block text-[11.5px] text-slate-400">{t('auth.passwordHint')}</span>
+              <span className="mt-1 block text-[calc(12.5px_*_var(--text-scale))] text-slate-500">{t('auth.passwordHint')}</span>
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12.5px] font-medium text-navy-950">{t('auth.confirmPassword')}</span>
+              <span className="mb-1 block text-[calc(13.5px_*_var(--text-scale))] font-medium text-navy-950">{t('auth.confirmPassword')}</span>
               <input
                 type="password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 required
                 autoComplete="new-password"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[14px] outline-none focus:border-navy-600 focus:bg-white focus:ring-2 focus:ring-navy-600/15"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[calc(15px_*_var(--text-scale))] outline-none focus:border-navy-600 focus:bg-white focus:ring-2 focus:ring-navy-600/15"
               />
             </label>
 
             {error && (
-              <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2.5 text-[12.5px] text-rose-700">{error}</p>
+              <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2.5 text-[calc(13.5px_*_var(--text-scale))] text-rose-700">{error}</p>
             )}
 
             <button
               type="submit"
               disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[14px] font-semibold text-white active:bg-navy-900 disabled:opacity-70"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-white active:bg-navy-900 disabled:opacity-70"
             >
               {busy && <Loader2 size={16} className="animate-spin" />} {t('auth.changePassword')}
             </button>
             <button
               type="button"
               onClick={onDone}
-              className="w-full py-1 text-[12.5px] font-medium text-slate-500"
+              className="w-full py-1 text-[calc(13.5px_*_var(--text-scale))] font-medium text-slate-500"
             >
               {t('auth.backToSignIn')}
             </button>

@@ -13,7 +13,7 @@ const STYLES: Record<ApplicationStatus, string> = {
 export default function StatusPill({ status }: { status: ApplicationStatus }) {
   const { t } = useT()
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${STYLES[status]}`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[calc(12px_*_var(--text-scale))] font-semibold tracking-wide ${STYLES[status]}`}>
       {t(`status.${status}`)}
     </span>
   )

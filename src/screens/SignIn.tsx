@@ -47,8 +47,8 @@ export default function SignIn() {
           <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-navy-800 text-white">
             <Building2 size={26} strokeWidth={1.9} />
           </span>
-          <h1 className="font-display text-[22px] font-extrabold text-navy-950">eLGU Citizen Portal</h1>
-          <p className="mt-1 text-[13px] text-slate-500">{t('auth.municipalityOf')}</p>
+          <h1 className="font-display text-[calc(22px_*_var(--text-scale))] font-extrabold text-navy-950">eLGU Citizen Portal</h1>
+          <p className="mt-1 text-[calc(14px_*_var(--text-scale))] text-slate-500">{t('auth.municipalityOf')}</p>
         </div>
 
         <div className="mb-3">
@@ -61,7 +61,7 @@ export default function SignIn() {
               key={m}
               type="button"
               onClick={() => { setMode(m); setError(null); setNotice(null) }}
-              className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition ${
+              className={`flex-1 rounded-lg py-2.5 text-[calc(14px_*_var(--text-scale))] font-semibold transition ${
                 mode === m || (m === 'login' && mode === 'forgot')
                   ? 'bg-navy-800 text-white'
                   : 'text-slate-500'
@@ -74,7 +74,7 @@ export default function SignIn() {
 
         <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
           {mode === 'forgot' && (
-            <p className="text-[12.5px] leading-snug text-slate-500">
+            <p className="text-[calc(13.5px_*_var(--text-scale))] leading-snug text-slate-500">
               {t('auth.forgotBlurb')}
             </p>
           )}
@@ -98,12 +98,12 @@ export default function SignIn() {
           )}
 
           {error && (
-            <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2.5 text-[12.5px] text-rose-700">
+            <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2.5 text-[calc(13.5px_*_var(--text-scale))] text-rose-700">
               {error}
             </p>
           )}
           {notice && (
-            <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2.5 text-[12.5px] text-emerald-800">
+            <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2.5 text-[calc(13.5px_*_var(--text-scale))] text-emerald-800">
               {notice}
             </p>
           )}
@@ -111,7 +111,7 @@ export default function SignIn() {
           <button
             type="submit"
             disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[14px] font-semibold text-white transition active:bg-navy-900 disabled:opacity-70"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-white transition active:bg-navy-900 disabled:opacity-70"
           >
             {busy && <Loader2 size={16} className="animate-spin" />}
             {mode === 'login' ? t('auth.signIn') : mode === 'forgot' ? t('auth.sendResetLink') : t('auth.createAccount')}
@@ -121,7 +121,7 @@ export default function SignIn() {
             <button
               type="button"
               onClick={() => { setMode('forgot'); setError(null); setNotice(null) }}
-              className="w-full py-1 text-[12.5px] font-medium text-navy-800"
+              className="w-full py-1 text-[calc(13.5px_*_var(--text-scale))] font-medium text-navy-800"
             >
               {t('auth.forgot')}
             </button>
@@ -130,7 +130,7 @@ export default function SignIn() {
             <button
               type="button"
               onClick={() => { setMode('login'); setError(null); setNotice(null) }}
-              className="w-full py-1 text-[12.5px] font-medium text-slate-500"
+              className="w-full py-1 text-[calc(13.5px_*_var(--text-scale))] font-medium text-slate-500"
             >
               {t('auth.backToSignIn')}
             </button>
@@ -139,8 +139,8 @@ export default function SignIn() {
 
         {IS_DEMO ? (
           <div className="mt-4 rounded-2xl border border-gold-500/40 bg-gold-100/50 p-4">
-            <p className="text-[12px] font-bold text-navy-950">Demo — sign in with any of these</p>
-            <dl className="mt-2 space-y-1 text-[11.5px] text-navy-900">
+            <p className="text-[calc(13px_*_var(--text-scale))] font-bold text-navy-950">Demo — sign in with any of these</p>
+            <dl className="mt-2 space-y-1 text-[calc(12.5px_*_var(--text-scale))] text-navy-900">
               <div className="flex justify-between gap-3">
                 <dt className="text-slate-600">Resident</dt>
                 <dd className="font-medium">maria@example.ph</dd>
@@ -158,7 +158,7 @@ export default function SignIn() {
                 <dd className="font-mono font-medium">elgu-demo-2026</dd>
               </div>
             </dl>
-            <p className="mt-2.5 text-[11px] leading-snug text-slate-600">
+            <p className="mt-2.5 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
               To follow a request through both sides, sign out and switch
               accounts &mdash; the demo keeps its data in <em>this</em> browser, so a
               second window or incognito tab starts over. Email, SMS and virus
@@ -166,7 +166,7 @@ export default function SignIn() {
             </p>
           </div>
         ) : (
-          <p className="mt-4 text-center text-[11.5px] leading-relaxed text-slate-400">
+          <p className="mt-4 text-center text-[calc(12.5px_*_var(--text-scale))] leading-relaxed text-slate-500">
             {t('auth.staffNote')}
           </p>
         )}
@@ -180,12 +180,12 @@ function Field({
 }: { label: string; helper?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[12.5px] font-medium text-navy-950">{label}</span>
+      <span className="mb-1 block text-[calc(13.5px_*_var(--text-scale))] font-medium text-navy-950">{label}</span>
       <input
         {...props}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[14px] text-navy-950 outline-none transition focus:border-navy-600 focus:bg-white focus:ring-2 focus:ring-navy-600/15"
+        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[calc(15px_*_var(--text-scale))] text-navy-950 outline-none transition focus:border-navy-600 focus:bg-white focus:ring-2 focus:ring-navy-600/15"
       />
-      {helper && <span className="mt-1 block text-[11.5px] text-slate-400">{helper}</span>}
+      {helper && <span className="mt-1 block text-[calc(12.5px_*_var(--text-scale))] text-slate-500">{helper}</span>}
     </label>
   )
 }
