@@ -212,6 +212,16 @@ export const en = {
   'programs.entitles': 'What this gives you',
   'programs.more': '+{count} more',
 
+  // expected ready date
+  'ready.title': 'Expected ready',
+  'ready.estimate': 'This is an estimate in working days. Weekends and holidays are already excluded.',
+  'ready.awaiting': 'Waiting for your payment',
+  'ready.awaitingBlurb': 'The clock starts once you pay — the office cannot begin releasing your document until then.',
+  'ready.ifYouApply': 'Apply today and it should be ready by',
+  'ready.sameDay': 'Ready the same day',
+  'ready.byShort': 'Ready by {date}',
+  'ready.today': 'today',
+
   // drafts
   'draft.resumed': 'We kept what you started',
   'draft.resumedBlurb': 'Your answers were saved on this phone. Carry on where you stopped, or start over.',
@@ -459,6 +469,16 @@ export const fil: Record<StringKey, string> = {
   'programs.issuedBy': 'Inilabas ng',
   'programs.entitles': 'Ano ang natatanggap mo',
   'programs.more': '+{count} pa',
+
+  // expected ready date
+  'ready.title': 'Inaasahang handa',
+  'ready.estimate': 'Tantiya ito sa working days. Hindi na kasama ang Sabado, Linggo at pista opisyal.',
+  'ready.awaiting': 'Hinihintay ang bayad mo',
+  'ready.awaitingBlurb': 'Magsisimula ang bilang kapag nakabayad ka na — hindi pa maipoproseso ng tanggapan ang paglabas ng dokumento hangga\u2019t wala nito.',
+  'ready.ifYouApply': 'Kung mag-aapply ka ngayon, handa ito sa',
+  'ready.sameDay': 'Handa sa parehong araw',
+  'ready.byShort': 'Handa sa {date}',
+  'ready.today': 'ngayon',
 
   // drafts
   'draft.resumed': 'Naitago namin ang sinimulan mo',

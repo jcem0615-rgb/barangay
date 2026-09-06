@@ -3,7 +3,7 @@ import multer from 'multer'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { authenticate, requireRole } from '../auth.ts'
-import { REQUEST_SELECT, serializeRequest, type RequestRow } from '../serialize.ts'
+import { REQUEST_SELECT, serializeWithReady, withReadyDates, type RequestRow } from '../serialize.ts'
 import { DEPARTMENT_PREFIX, STEP_ASSESSMENT, STEP_RELEASE, makeReferenceNo } from '../workflow.ts'
 import { putFile, removeFile } from '../storage.ts'
 import { sendAttachment } from '../attachments.ts'
@@ -125,7 +125,7 @@ requestsRouter.post('/', async (req, res) => {
     `select ${REQUEST_SELECT} from requests r join services s on s.id = r.service_id where r.id = $1`,
     [created.id]
   )
-  res.status(201).json(serializeRequest(withName!))
+  res.status(201).json(await serializeWithReady(withName!))
 })
 
 requestsRouter.get('/', async (req, res) => {
@@ -140,7 +140,7 @@ requestsRouter.get('/', async (req, res) => {
       limit $2`,
     [req.user!.id, limit]
   )
-  res.json(rows.map(serializeRequest))
+  res.json(await withReadyDates(rows))
 })
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ requestsRouter.get('/:id', async (req, res) => {
        from request_events where request_id = $1 order by created_at`,
     [row.id]
   )
-  res.json({ ...serializeRequest(row), events })
+  res.json({ ...(await serializeWithReady(row)), events })
 })
 
 const paySchema = z.object({ method: z.enum(['GCash', 'Maya', 'Landbank Online']) })
@@ -254,7 +254,10 @@ requestsRouter.post('/:id/pay', async (req, res) => {
     const result = await client.query<RequestRow>(
       `update requests
           set paid = true, payment_method = $2, status = 'in_progress',
-              current_step_index = $3, updated_at = now()
+              current_step_index = $3, updated_at = now(),
+              -- The office's clock starts here, not at submission: it has only
+              -- now been handed work it can act on.
+              paid_at = coalesce(paid_at, now())
         where id = $1
         returning *`,
       [row.id, parsed.data.method, STEP_RELEASE]
@@ -271,7 +274,7 @@ requestsRouter.post('/:id/pay', async (req, res) => {
     `select ${REQUEST_SELECT} from requests r join services s on s.id = r.service_id where r.id = $1`,
     [updated.id]
   )
-  res.json(serializeRequest(withName!))
+  res.json(await serializeWithReady(withName!))
 })
 
 /** The released document, downloadable only by the resident who filed it. */

@@ -1,6 +1,7 @@
 import { CloudOff, Download, FileEdit, Wallet2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import StatusPill from '../components/StatusPill'
+import ReadyDate from '../components/ReadyDate'
 import WorkflowTracker from '../components/WorkflowTracker'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
@@ -55,6 +56,8 @@ export default function ApplicationDetail({ id }: { id: string }) {
           </div>
           <StatusPill status={app.status} />
         </div>
+
+        <ReadyDate app={app} />
 
         {category && (
           <div className="flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4">

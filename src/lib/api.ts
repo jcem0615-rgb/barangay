@@ -213,6 +213,7 @@ export const api = {
       departments: ServiceCategory[]
       services: ServiceDefinition[]
       programs: SectoralProgram[]
+      holidays: Array<{ date: string; name: string; isLocal: boolean }>
       workflowSteps: string[]
     }>('/catalogue'),
 

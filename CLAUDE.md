@@ -44,6 +44,7 @@ src/
     appData.tsx            React context wrapping useApplications()
     useApplications.ts     Loads requests and drafts from the API, syncs the offline outbox
     useDraft.ts            Autosaves a half-filled form: device first, server debounced
+    schedule.ts            Working-day arithmetic for the "apply today" quote only
     db.ts                  idb-keyval wrapper (IndexedDB, store name "elgu-citizen-portal")
     useOnlineStatus.ts      navigator.onLine + online/offline listeners
     icons.ts                lucide icon name -> component lookup
@@ -102,7 +103,8 @@ that release step renders and stores the PDF (`server/src/documents.ts`).
 ## Adding a new service
 
 Everything about a service (fields, requirements, fee, processing time) is data, not code.
-Add an entry to `SERVICES` in `src/data/mockData.ts` with a `ServiceField[]` — `ServiceForm.tsx`
+Add an entry to `SERVICES` in `src/data/mockData.ts` with a `ServiceField[]` (and a
+`processingDaysMin`/`Max` matching its `processingTime` prose) — `ServiceForm.tsx`
 renders any combination of `text` / `select` / `date` / `textarea` / `number` fields
 automatically, no new screen needed. If a category needs an icon not already in
 `src/lib/icons.ts`, import it from `lucide-react` and register it there.
@@ -128,6 +130,32 @@ Two deliberate boundaries:
   from the service catalogue (the server), not from the dictionaries. Service descriptions,
   requirements, and form field labels are catalogue data too, so they render in whatever
   language the catalogue was authored in.
+
+## Expected ready dates
+
+`processingTime` is prose for the counter ("3–5 working days"); `processingDaysMin` and
+`processingDaysMax` are the same promise as numbers, so a date can be worked out instead
+of asking a resident to count weekends. Both are authored in `src/data/mockData.ts`.
+
+Two things make this more than adding days to a date.
+
+**Working days.** `server/src/schedule.ts` steps over Saturdays, Sundays and anything in
+the `holidays` table. National holidays move each year by proclamation and a municipality
+declares its own — a founding anniversary closes the hall as surely as Christmas — so both
+are rows (`HOLIDAYS` in `mockData.ts`, seeded), and a wrong date is a row to fix rather
+than a release to cut. **The seeded dates are 2026 placeholders: check them against the
+year's proclamation and replace the local ones before deploying.**
+
+**The clock is the office's, not the calendar's.** It runs while the office holds the
+request and stops while the request waits on the resident to pay, so `expectedReady` is
+null and `awaitingResident` true until the fee is settled — an office is not late because
+a permit sat unpaid for a week. `requests.paid_at` records when the clock restarts. A
+completed or rejected request has no estimate at all.
+
+Every estimate on a real request comes from the server. `src/lib/schedule.ts` duplicates
+only the arithmetic, for the one thing the server cannot answer: what a resident would be
+quoted if they applied *right now*, on the form, before a request exists. The holiday
+calendar is not duplicated — it rides along on `/api/catalogue`.
 
 ## Drafts
 
@@ -225,6 +253,10 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
 - **Programme enrolment is reached through a request**, so a resident who has never filed
   one cannot be enrolled from the console. A real deployment would want a resident lookup,
   which is a new authorization surface worth designing deliberately rather than bolting on.
+- **The holiday calendar** is seeded with 2026 Philippine dates and two invented local
+  ones. National holidays move each year by proclamation, so this needs checking annually
+  and the local rows replacing — an out-of-date calendar quietly promises dates on which
+  the hall is shut. There is no admin screen for it yet; it is a reseed.
 - **Office addresses, hours and phone numbers** in `SERVICE_CATEGORIES` are placeholders
   for a sample municipality. Replace them and reseed before a real deployment; the Data
   Privacy screen's DPO address too.
@@ -301,8 +333,8 @@ npm run preview   # serve the production build locally
 
 1. Replace mock icons in `public/icons/` with a real LGU seal / wordmark.
 2. Add a real QR/barcode library if the ID needs to be scannable by counter staff.
-3. Tell residents when a document will be ready — `processingTime` is a static string
-   shown in one place, with no expected date and no "what happens next" per step.
+3. Say what happens next per workflow step, and what to bring to the counter on release —
+   the expected date is there now, but the steps are still bare labels.
 4. Consider `react-router` if screens need shareable URLs.
 5. Wire a real backend once one exists — the `Application` type and `db.ts` interface are
    already shaped to make that a drop-in swap.

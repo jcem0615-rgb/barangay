@@ -36,7 +36,7 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 
 | Method | Path | Who |
 |---|---|---|
-| `GET` | `/api/catalogue` | public — offices (with contact details), services, programmes, workflow steps |
+| `GET` | `/api/catalogue` | public — offices (with contact details), services, programmes, holidays, workflow steps |
 | `POST` | `/api/auth/register` | public — resident sign-up |
 | `POST` | `/api/auth/login` | public |
 | `GET` | `/api/auth/me` | signed in |
@@ -292,6 +292,7 @@ npm run test:notifications  # recording, delivery, preferences, and isolation
 npm run test:pagination   # paging boundaries, cursor stability, and search
 npm run test:programs     # sectoral registries: who may write, expiry, and isolation
 npm run test:drafts       # drafts stay out of every queue, and clear on submit
+npm run test:ready-dates  # working-day arithmetic, holidays, and the paused clock
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```
@@ -299,6 +300,24 @@ npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
 Covers registration and login, request submission, the full assess → pay →
 release path, rejection, and the access rules: one department cannot read or act
 on another's requests, and one resident cannot read another's.
+
+## Expected ready dates
+
+`src/schedule.ts` counts working days, skipping weekends and every row in `holidays`.
+`estimateReady` returns `{ expectedReady, awaitingResident }` and every serialized request
+carries them (`withReadyDates` in `serialize.ts`, which fetches the cached holiday set once
+per list rather than once per row).
+
+The clock starts when the office took the work on — `submitted_at` for a free service,
+`paid_at` for one the resident had to settle — and there is no estimate at all while a fee
+is unpaid (`awaitingResident: true` instead) or once the request is closed. Quoting a date
+the office cannot be held to would read as the office being slow when the delay is the
+resident's.
+
+`holidays` is seeded from `HOLIDAYS` in `src/data/mockData.ts` with 2026 Philippine dates
+plus two sample local ones. Check them against the year's proclamation and replace the
+local ones before deploying; `clearHolidayCache()` drops the 10-minute in-process cache if
+you change them without a restart.
 
 ## Drafts
 

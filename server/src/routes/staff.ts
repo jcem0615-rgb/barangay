@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { authenticate, canActOnDepartment, requireRole } from '../auth.ts'
-import { REQUEST_SELECT, serializeRequest, toCentavos, type RequestRow } from '../serialize.ts'
+import { REQUEST_SELECT, serializeWithReady, toCentavos, withReadyDates, type RequestRow } from '../serialize.ts'
 import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
 import { documentFileName, makeVerificationCode, renderDocument } from '../documents.ts'
 import { sendAttachment } from '../attachments.ts'
@@ -137,7 +137,7 @@ staffRouter.get('/queue', async (req, res) => {
   )
 
   res.json({
-    items: page.map(serializeRequest),
+    items: await withReadyDates(page),
     // Null when this is the last page, so the client stops asking.
     nextCursor: hasMore && page.length > 0 ? encodeCursor(page[page.length - 1]!) : null,
     total: totals?.count ?? page.length,
@@ -171,7 +171,7 @@ staffRouter.get('/requests/:id', async (req, res) => {
       where e.request_id = $1 order by e.created_at`,
     [row.id]
   )
-  res.json({ ...serializeRequest(row), events })
+  res.json({ ...(await serializeWithReady(row)), events })
 })
 
 /** Treasury sets the amount due and moves the request to For Payment. */
@@ -228,7 +228,7 @@ staffRouter.post('/requests/:id/assess', async (req, res) => {
   void deliverNotification(notice)
 
   const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
-  res.json(serializeRequest(withName!))
+  res.json(await serializeWithReady(withName!))
 })
 
 /** Moves the request one step forward; the last step completes it. */
@@ -342,7 +342,7 @@ staffRouter.post('/requests/:id/advance', async (req, res) => {
   void deliverNotification(notice)
 
   const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
-  res.json(serializeRequest(withName!))
+  res.json(await serializeWithReady(withName!))
 })
 
 const rejectSchema = z.object({ reason: z.string().min(3, 'Tell the resident why.').max(500) })
@@ -389,7 +389,7 @@ staffRouter.post('/requests/:id/reject', async (req, res) => {
   void deliverNotification(notice)
 
   const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
-  res.json(serializeRequest(withName!))
+  res.json(await serializeWithReady(withName!))
 })
 
 staffRouter.get('/requests/:id/document', async (req, res) => {

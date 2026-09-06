@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, CheckCircle2, ClipboardList, CloudOff, Loader2, Send, Trash2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import FormField from '../components/FormField'
@@ -12,15 +12,28 @@ import type { Application } from '../types'
 import { formatPeso } from '../lib/money'
 import { useT } from '../lib/i18n'
 import { useDraft } from '../lib/useDraft'
+import { addWorkingDays, formatReadyRange } from '../lib/schedule'
 
 export default function ServiceForm({ serviceId }: { serviceId: string }) {
   const { replace } = useNav()
   const { submit, refreshDrafts } = useAppData()
-  const { findService } = useCatalogue()
+  const { findService, holidays } = useCatalogue()
   const isOnline = useOnlineStatus()
   const { t } = useT()
   const service = findService(serviceId)
   const draft = useDraft(serviceId)
+
+  // What the office would quote for an application filed right now. The server
+  // owns every estimate on a real request; this one exists before there is one.
+  const quoted = useMemo(() => {
+    if (!service) return ''
+    if (service.processingDaysMax === 0) return t('ready.sameDay')
+    const now = new Date()
+    return formatReadyRange(
+      addWorkingDays(now, service.processingDaysMin, holidays),
+      addWorkingDays(now, service.processingDaysMax, holidays)
+    )
+  }, [service, holidays, t])
 
   const [values, setValues] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -167,7 +180,16 @@ export default function ServiceForm({ serviceId }: { serviceId: string }) {
               </li>
             ))}
           </ul>
-          <div className="mt-3 flex items-center justify-between border-t border-dashed border-slate-200 pt-3">
+          <div className="mt-3 flex items-start justify-between gap-3 border-t border-dashed border-slate-200 pt-3">
+            <span className="text-[calc(13px_*_var(--text-scale))] font-medium text-slate-500">
+              {t('ready.ifYouApply')}
+            </span>
+            <span className="shrink-0 text-right text-[calc(13.5px_*_var(--text-scale))] font-bold text-navy-950">
+              {quoted}
+            </span>
+          </div>
+
+          <div className="mt-2 flex items-center justify-between border-t border-dashed border-slate-200 pt-2.5">
             <span className="text-[calc(13px_*_var(--text-scale))] font-medium text-slate-500">{t('form.applicableFee')}</span>
             <span className="text-[calc(14.5px_*_var(--text-scale))] font-bold text-navy-950">
               {service.requiresPayment ? formatPeso(service.fee) : t('form.free')}

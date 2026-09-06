@@ -9,13 +9,14 @@
  * Everything lives in this browser's localStorage, tokens are not verified, and
  * nothing here is used by the production build.
  */
-import { SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES } from '../data/mockData'
+import { HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES } from '../data/mockData'
+import { addWorkingDays } from './schedule'
 import { WORKFLOW_STEPS } from '../types'
 
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v3'
+const STORE_KEY = 'elgu-demo-state-v4'
 
 interface DemoUser {
   id: string
@@ -59,6 +60,7 @@ interface DemoRequest {
   fee: number
   paid: boolean
   paymentMethod?: string
+  paidAt?: string
   formValues: Record<string, string>
   rejectionReason?: string
   dateSubmitted: string
@@ -149,6 +151,7 @@ function seed(): DemoState {
   done.fee = 155
   done.paid = true
   done.paymentMethod = 'GCash'
+  done.paidAt = new Date(now - 86400000 * 27).toISOString()
   done.document = { fileName: `birth-certificate-psa-${done.referenceNo}.pdf`, verificationCode: 'K4TR-9WQ2-JH5N-P0CX' }
   done.events.push(
     { eventType: 'assessed', note: null, createdAt: new Date(now - 86400000 * 28).toISOString(), actorName: 'Carmen S. Reyes' },
@@ -279,6 +282,31 @@ const mayAdministerPrograms = (user: DemoUser) =>
 const officeName = (categoryId: string) =>
   SERVICE_CATEGORIES.find((c) => c.id === categoryId)?.officeName ?? 'The municipal office'
 
+const HOLIDAY_DAYS = new Set(HOLIDAYS.map((h) => h.date))
+
+/**
+ * The same rules as server/src/schedule.ts: working days only, no date while a
+ * fee is unpaid, and none once the request is closed.
+ */
+function readyFor(r: DemoRequest) {
+  const service = SERVICES.find((s) => s.id === r.serviceId)
+  if (!service) return { expectedReady: null, awaitingResident: false }
+  if (r.status === 'completed' || r.status === 'rejected') {
+    return { expectedReady: null, awaitingResident: false }
+  }
+  if (service.requiresPayment && !r.paid) {
+    return { expectedReady: null, awaitingResident: true }
+  }
+  const start = new Date(r.paidAt ?? r.dateSubmitted)
+  return {
+    expectedReady: {
+      from: addWorkingDays(start, service.processingDaysMin, HOLIDAY_DAYS),
+      to: addWorkingDays(start, service.processingDaysMax, HOLIDAY_DAYS),
+    },
+    awaitingResident: false,
+  }
+}
+
 const serialize = (r: DemoRequest) => ({
   id: r.id, referenceNo: r.referenceNo, serviceId: r.serviceId, serviceName: r.serviceName,
   categoryId: r.categoryId, status: r.status, currentStepIndex: r.currentStepIndex,
@@ -286,6 +314,7 @@ const serialize = (r: DemoRequest) => ({
   rejectionReason: r.rejectionReason, dateSubmitted: r.dateSubmitted,
   updatedAt: r.dateSubmitted,
   residentName: state.users.find((u) => u.id === r.residentId)?.fullName,
+  ...readyFor(r),
 })
 
 /** A minimal but valid PDF, so the download in the demo is a real file. */
@@ -376,6 +405,7 @@ async function route(
       body: {
         departments: SERVICE_CATEGORIES, services: SERVICES,
         programs: SECTORAL_PROGRAMS, workflowSteps: WORKFLOW_STEPS,
+        holidays: HOLIDAYS.map((h) => ({ date: h.date, name: h.name, isLocal: h.local ?? false })),
       },
     }
   }
@@ -506,6 +536,8 @@ async function route(
       if (target.currentStepIndex < 1) throw new DemoError(409, 'Wait for the treasury assessment before paying.')
       target.paid = true
       target.paymentMethod = body.method
+      // The office's clock starts here, as on the real server.
+      target.paidAt = new Date().toISOString()
       target.status = 'in_progress'
       target.currentStepIndex = WORKFLOW_STEPS.length - 1
       target.events.push({ eventType: 'paid', note: `Paid via ${body.method}`, createdAt: new Date().toISOString(), actorName: user.fullName })

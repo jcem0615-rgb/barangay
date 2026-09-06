@@ -3,7 +3,7 @@
  * database and the frontend never drift apart on what the LGU offers.
  * Safe to re-run: catalogue rows are upserted, demo accounts are skipped if present.
  */
-import { SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES } from '../../src/data/mockData.ts'
+import { HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES } from '../../src/data/mockData.ts'
 import { hashPassword } from './auth.ts'
 import { one, pool, query, transaction } from './db.ts'
 import { toCentavos } from './serialize.ts'
@@ -55,18 +55,22 @@ async function main() {
     for (const service of SERVICES) {
       await client.query(
         `insert into services (id, department_id, name, short_description, processing_time,
+                               processing_days_min, processing_days_max,
                                fee_centavos, requires_payment, requirements, fields, active)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)
          on conflict (id) do update set
            department_id = excluded.department_id, name = excluded.name,
            short_description = excluded.short_description,
            processing_time = excluded.processing_time,
+           processing_days_min = excluded.processing_days_min,
+           processing_days_max = excluded.processing_days_max,
            fee_centavos = excluded.fee_centavos,
            requires_payment = excluded.requires_payment,
            requirements = excluded.requirements, fields = excluded.fields, active = true`,
         [
           service.id, service.categoryId, service.name, service.shortDescription,
-          service.processingTime, toCentavos(service.fee), service.requiresPayment,
+          service.processingTime, service.processingDaysMin, service.processingDaysMax,
+          toCentavos(service.fee), service.requiresPayment,
           JSON.stringify(service.requirements), JSON.stringify(service.fields),
         ]
       )
@@ -88,10 +92,18 @@ async function main() {
         ]
       )
     }
+    for (const holiday of HOLIDAYS) {
+      await client.query(
+        `insert into holidays (observed_on, name, is_local) values ($1, $2, $3)
+         on conflict (observed_on) do update set
+           name = excluded.name, is_local = excluded.is_local`,
+        [holiday.date, holiday.name, holiday.local ?? false]
+      )
+    }
   })
   console.log(
     `catalogue: ${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services, ` +
-      `${SECTORAL_PROGRAMS.length} programmes`
+      `${SECTORAL_PROGRAMS.length} programmes, ${HOLIDAYS.length} holidays`
   )
 
   const passwordHash = await hashPassword(DEMO_PASSWORD)

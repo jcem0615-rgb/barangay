@@ -1,9 +1,10 @@
-import { ChevronRight, FileEdit } from 'lucide-react'
+import { CalendarClock, ChevronRight, FileEdit } from 'lucide-react'
 import type { Application } from '../types'
 import StatusPill from './StatusPill'
 import { WORKFLOW_STEPS } from '../types'
 import { useCatalogue } from '../lib/catalogue'
 import { useT } from '../lib/i18n'
+import { formatReadyRange } from '../lib/schedule'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -46,6 +47,15 @@ export default function ApplicationCard({ app, onTap }: { app: Application; onTa
         )}
         <ChevronRight size={16} className="text-slate-300" />
       </div>
+
+      {app.expectedReady && (
+        <p className="mt-2 flex items-center gap-1.5 border-t border-dashed border-slate-200 pt-2 text-[calc(12.5px_*_var(--text-scale))] text-slate-600">
+          <CalendarClock size={13} className="shrink-0 text-navy-700" />
+          {t('ready.byShort', {
+            date: formatReadyRange(app.expectedReady.from, app.expectedReady.to),
+          })}
+        </p>
+      )}
     </button>
   )
 }

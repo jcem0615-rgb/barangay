@@ -35,6 +35,12 @@ export interface ServiceDefinition {
   name: string
   shortDescription: string
   processingTime: string
+  /**
+   * The same promise as `processingTime`, in working days, so an expected date
+   * can be computed rather than parsed out of a sentence. 0 means same day.
+   */
+  processingDaysMin: number
+  processingDaysMax: number
   fee: number // in PHP, 0 = free
   requiresPayment: boolean
   requirements: string[]
@@ -68,6 +74,14 @@ export interface Application {
   formValues: Record<string, string>
   isOfflineDraft?: boolean
   rejectionReason?: string
+  /**
+   * When the office expects to have this ready, computed server-side over
+   * working days. Absent while the request is waiting on the resident to pay,
+   * because the office is not working on it then, and once it is closed.
+   */
+  expectedReady?: { from: string; to: string } | null
+  /** True when the estimate is paused because the resident still owes a fee. */
+  awaitingResident?: boolean
 }
 
 /**
