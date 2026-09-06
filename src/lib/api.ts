@@ -97,6 +97,16 @@ export interface ResidentProfileData {
   programs: ResidentProgram[]
 }
 
+export interface DraftRecord {
+  id: string
+  serviceId: string
+  serviceName?: string
+  categoryId?: string
+  formValues: Record<string, string>
+  createdAt: string
+  updatedAt: string
+}
+
 export interface RequestEvent {
   eventType: string
   fromStep: number | null
@@ -220,6 +230,17 @@ export const api = {
 
   me: () => request<{ user: AuthUser; profile: ResidentProfileData | null }>('/auth/me'),
 
+  listDrafts: () => request<DraftRecord[]>('/requests/drafts'),
+
+  saveDraft: (serviceId: string, formValues: Record<string, string>) =>
+    request<DraftRecord>(`/requests/drafts/${encodeURIComponent(serviceId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ formValues }),
+    }),
+
+  discardDraft: (id: string) =>
+    request<void>(`/requests/drafts/${id}`, { method: 'DELETE' }),
+
   forgotPassword: (email: string) =>
     request<{ message: string }>('/auth/forgot', {
       method: 'POST',
@@ -236,10 +257,15 @@ export const api = {
 
   myRequest: (id: string) => request<Application & { events: RequestEvent[] }>(`/requests/${id}`),
 
-  submitRequest: (serviceId: string, formValues: Record<string, string>, submittedOfflineAt?: string) =>
+  submitRequest: (
+    serviceId: string,
+    formValues: Record<string, string>,
+    submittedOfflineAt?: string,
+    draftId?: string
+  ) =>
     request<Application>('/requests', {
       method: 'POST',
-      body: JSON.stringify({ serviceId, formValues, submittedOfflineAt }),
+      body: JSON.stringify({ serviceId, formValues, submittedOfflineAt, draftId }),
     }),
 
   document: (id: string) => downloadPdf(`/requests/${id}/document`),

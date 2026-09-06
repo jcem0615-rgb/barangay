@@ -15,7 +15,7 @@ import { WORKFLOW_STEPS } from '../types'
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v2'
+const STORE_KEY = 'elgu-demo-state-v3'
 
 interface DemoUser {
   id: string
@@ -36,6 +36,15 @@ interface DemoUser {
   programs: Array<{
     code: string; referenceNo: string | null; enrolledOn: string; validUntil: string | null
   }>
+}
+
+interface DemoDraft {
+  id: string
+  residentId: string
+  serviceId: string
+  formValues: Record<string, string>
+  createdAt: string
+  updatedAt: string
 }
 
 interface DemoRequest {
@@ -66,6 +75,7 @@ interface DemoNotification {
 interface DemoState {
   users: DemoUser[]
   requests: DemoRequest[]
+  drafts: DemoDraft[]
   notifications: DemoNotification[]
   counters: Record<string, number>
 }
@@ -120,7 +130,7 @@ function seed(): DemoState {
   }
   users.push(resident)
 
-  const state: DemoState = { users, requests: [], notifications: [], counters: {} }
+  const state: DemoState = { users, requests: [], drafts: [], notifications: [], counters: {} }
 
   const boss = SERVICES.find((s) => s.id === 'boss-application')!
   const birth = SERVICES.find((s) => s.id === 'birth-certificate')!
@@ -428,8 +438,62 @@ async function route(
       const unknown = Object.keys(body.formValues ?? {}).find((k) => !declared.has(k))
       if (unknown) throw new DemoError(400, `Unexpected field: ${unknown}`)
       const created = makeRequest(state, user, service, body.formValues ?? {})
-      state.requests.push(created); persist()
+      state.requests.push(created)
+      state.drafts = state.drafts.filter(
+        (d) => !(d.residentId === user.id && (d.id === body.draftId || d.serviceId === service.id))
+      )
+      persist()
       return { status: 201, body: serialize(created) }
+    }
+
+    // ---- drafts ----
+    // Matched before the id fallthrough, and held to the same field rules as a
+    // submission, exactly as the real API does.
+    if (parts[1] === 'drafts') {
+      const mineDrafts = () =>
+        state.drafts
+          .filter((d) => d.residentId === user.id)
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+          .map((d) => {
+            const service = SERVICES.find((s) => s.id === d.serviceId)
+            return {
+              id: d.id, serviceId: d.serviceId, serviceName: service?.name ?? d.serviceId,
+              categoryId: service?.categoryId, formValues: d.formValues,
+              createdAt: d.createdAt, updatedAt: d.updatedAt,
+            }
+          })
+
+      if (!parts[2] && method === 'GET') return { status: 200, body: mineDrafts() }
+
+      if (parts[2] && method === 'PUT') {
+        const service = SERVICES.find((s) => s.id === parts[2])
+        if (!service) throw new DemoError(404, 'That service is no longer offered.')
+        const declared = new Set(service.fields.map((f) => f.id))
+        const unknown = Object.keys(body.formValues ?? {}).find((k) => !declared.has(k))
+        if (unknown) throw new DemoError(400, `Unexpected field: ${unknown}`)
+
+        const now = new Date().toISOString()
+        const existing = state.drafts.find((d) => d.residentId === user.id && d.serviceId === service.id)
+        if (existing) {
+          existing.formValues = body.formValues ?? {}
+          existing.updatedAt = now
+        } else {
+          state.drafts.push({
+            id: uid(), residentId: user.id, serviceId: service.id,
+            formValues: body.formValues ?? {}, createdAt: now, updatedAt: now,
+          })
+        }
+        persist()
+        const saved = state.drafts.find((d) => d.residentId === user.id && d.serviceId === service.id)!
+        return { status: 200, body: { ...saved } }
+      }
+
+      if (parts[2] && method === 'DELETE') {
+        const at = state.drafts.findIndex((d) => d.id === parts[2] && d.residentId === user.id)
+        if (at < 0) throw new DemoError(404, 'Draft not found.')
+        state.drafts.splice(at, 1); persist()
+        return { status: 204, body: null }
+      }
     }
 
     const target = state.requests.find((r) => r.id === parts[1] && r.residentId === user.id)

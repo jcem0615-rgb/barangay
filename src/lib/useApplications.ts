@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Application } from '../types'
-import { api, ApiError } from './api'
+import { api, ApiError, type DraftRecord } from './api'
 import { getOutbox, queueSubmission, removeFromOutbox, type PendingSubmission } from './db'
 import { useOnlineStatus } from './useOnlineStatus'
 
@@ -24,6 +24,7 @@ function pendingAsApplication(p: PendingSubmission): Application {
 
 export function useApplications(enabled: boolean) {
   const [applications, setApplications] = useState<Application[]>([])
+  const [drafts, setDrafts] = useState<DraftRecord[]>([])
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isOnline = useOnlineStatus()
@@ -45,14 +46,29 @@ export function useApplications(enabled: boolean) {
     }
   }, [enabled])
 
+  /**
+   * Drafts are loaded separately from requests: they are a different kind of
+   * thing on a different table, and a failure to reach them must not empty the
+   * request list a resident came to check.
+   */
+  const refreshDrafts = useCallback(async () => {
+    if (!enabled) return
+    try {
+      setDrafts(await api.listDrafts())
+    } catch {
+      // Offline. Whatever is on this device is still in the form itself.
+    }
+  }, [enabled])
+
   useEffect(() => {
     if (!enabled) {
       setApplications([])
+      setDrafts([])
       setLoaded(false)
       return
     }
-    void refresh().then(() => setLoaded(true))
-  }, [enabled, refresh])
+    void Promise.all([refresh(), refreshDrafts()]).then(() => setLoaded(true))
+  }, [enabled, refresh, refreshDrafts])
 
   /** POSTs everything in the outbox, oldest first, then reloads from the server. */
   const flushOutbox = useCallback(async () => {
@@ -85,7 +101,11 @@ export function useApplications(enabled: boolean) {
   }, [isOnline, loaded, enabled, flushOutbox])
 
   const submit = useCallback(
-    async (service: { id: string; name: string; categoryId: string; fee: number }, formValues: Record<string, string>) => {
+    async (
+      service: { id: string; name: string; categoryId: string; fee: number },
+      formValues: Record<string, string>,
+      draftId?: string
+    ) => {
       if (!navigator.onLine) {
         const pending: PendingSubmission = {
           localId: `pending-${crypto.randomUUID()}`,
@@ -100,7 +120,7 @@ export function useApplications(enabled: boolean) {
         await refresh()
         return pendingAsApplication(pending)
       }
-      const created = await api.submitRequest(service.id, formValues)
+      const created = await api.submitRequest(service.id, formValues, undefined, draftId)
       await refresh()
       return created
     },
@@ -116,5 +136,8 @@ export function useApplications(enabled: boolean) {
     [refresh]
   )
 
-  return { applications, loaded, isOnline, error, refresh, submit, pay, flushOutbox }
+  return {
+    applications, drafts, loaded, isOnline, error,
+    refresh, refreshDrafts, submit, pay, flushOutbox,
+  }
 }

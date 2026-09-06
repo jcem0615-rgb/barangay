@@ -81,7 +81,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
 
         {app.status === 'draft' ? (
           <button
-            onClick={() => replace({ name: 'service-form', serviceId: app.serviceId, draftId: app.id })}
+            onClick={() => replace({ name: 'service-form', serviceId: app.serviceId })}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-white active:bg-navy-900"
           >
             <FileEdit size={16} /> {t('detail.continueApplication')}

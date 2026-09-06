@@ -42,7 +42,8 @@ src/
     textScale.tsx         TextScaleProvider + useTextScale(); drives --text-scale
     nav.tsx               Screen stack + useNav()
     appData.tsx            React context wrapping useApplications()
-    useApplications.ts     Loads/saves Application records via db.ts, auto-syncs offline drafts
+    useApplications.ts     Loads requests and drafts from the API, syncs the offline outbox
+    useDraft.ts            Autosaves a half-filled form: device first, server debounced
     db.ts                  idb-keyval wrapper (IndexedDB, store name "elgu-citizen-portal")
     useOnlineStatus.ts      navigator.onLine + online/offline listeners
     icons.ts                lucide icon name -> component lookup
@@ -128,6 +129,34 @@ Two deliberate boundaries:
   requirements, and form field labels are catalogue data too, so they render in whatever
   language the catalogue was authored in.
 
+## Drafts
+
+A half-filled form is kept in two places, because they solve different problems.
+
+**IndexedDB, on every keystroke** (`saveLocalDraft` in `src/lib/db.ts`). Free, local, and
+works with no connection — this is what stops a phone call or a back-swipe from costing
+someone a five-field business-permit form.
+
+**The server, debounced 1.2s** (`PUT /api/requests/drafts/:serviceId`). Durable, reaches
+the resident's other devices, and is what the Drafts tab lists.
+
+`src/lib/useDraft.ts` runs both. The local copy is deleted only once the server confirms
+it, so a copy still sitting there means the server has not got that version — which makes
+it the newer of the two and the one to restore on return. The status label reads
+"Saved on this device" until the server acknowledges, then "Saved".
+
+**Drafts are their own table, not a `draft` row in `requests`.** A draft is something no
+office has been asked to look at, and `request_drafts` cannot appear in a department queue
+through a query that forgot to exclude it — the separation is the guarantee, rather than a
+`status <> 'draft'` clause every future query has to remember. It also keeps reference
+numbers honest: a number is drawn from `request_counters` at submit, so a draft never
+consumes one.
+
+One draft per resident per service, so tapping a service resumes what you had rather than
+leaving a pile of near-identical copies. Submitting deletes the draft inside the same
+transaction as the insert, so a lost response cannot leave a resident with both a filed
+request and the draft of it.
+
 ## Accessibility
 
 The app registers senior citizens and persons with disability, so legibility is a
@@ -199,9 +228,6 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
 - **Office addresses, hours and phone numbers** in `SERVICE_CATEGORIES` are placeholders
   for a sample municipality. Replace them and reseed before a real deployment; the Data
   Privacy screen's DPO address too.
-- **Drafts** have no API endpoint yet. `ApplicationStatus` still includes `draft` and the
-  request list still has a Drafts tab, but nothing writes one; the Save Draft button was
-  removed rather than left lying about what it did.
 - **Sessions** are 12-hour JWTs with no refresh or general revocation list. Signing out
   clears the token client-side; it stays valid until it expires. The one exception is a
   password change, which `users.password_changed_at` enforces on every request.
@@ -275,9 +301,8 @@ npm run preview   # serve the production build locally
 
 1. Replace mock icons in `public/icons/` with a real LGU seal / wordmark.
 2. Add a real QR/barcode library if the ID needs to be scannable by counter staff.
-3. Persist a half-filled form as the resident types — `ServiceForm` keeps values in
-   `useState` alone, so a phone call mid-application loses the lot, and the Drafts tab has
-   nothing behind it.
+3. Tell residents when a document will be ready — `processingTime` is a static string
+   shown in one place, with no expected date and no "what happens next" per step.
 4. Consider `react-router` if screens need shareable URLs.
 5. Wire a real backend once one exists — the `Application` type and `db.ts` interface are
    already shaped to make that a drop-in swap.

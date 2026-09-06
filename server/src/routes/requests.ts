@@ -23,35 +23,55 @@ const createSchema = z.object({
   formValues: z.record(z.string(), z.string()).default({}),
   /** Set when the resident filled this in offline and it synced later. */
   submittedOfflineAt: z.iso.datetime().optional(),
+  /** The draft this submission finishes, cleared as part of the same commit. */
+  draftId: z.uuid().optional(),
 })
 
-requestsRouter.post('/', async (req, res) => {
-  const parsed = createSchema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
-  const { serviceId, formValues, submittedOfflineAt } = parsed.data
+interface ServiceRow {
+  id: string
+  department_id: string
+  fee_centavos: number
+  fields: Array<{ id: string }>
+}
 
-  const service = await one<{
-    id: string; department_id: string; fee_centavos: number
-    fields: Array<{ id: string }>
-  }>(
+const loadService = (serviceId: string) =>
+  one<ServiceRow>(
     `select id, department_id, fee_centavos, fields
        from services where id = $1 and active = true`,
     [serviceId]
   )
+
+/**
+ * Only the fields this service declares are stored, and none of them oversized.
+ * Applied to drafts as well as submissions: a draft is written by the same
+ * client and read back into the same form, so letting one hold what the other
+ * would refuse just moves the rejection to a worse moment.
+ *
+ * Returns an error message, or null when the values are acceptable.
+ */
+function checkFormValues(service: ServiceRow, formValues: Record<string, string>): string | null {
+  // Without this a caller could attach arbitrary keys, which staff would then
+  // be shown as if the resident had filled them in.
+  const declared = new Set(service.fields.map((f) => f.id))
+  const unknown = Object.keys(formValues).find((k) => !declared.has(k))
+  if (unknown) return `Unexpected field: ${unknown}`
+
+  const tooLong = Object.entries(formValues).find(([, v]) => v.length > MAX_FIELD_LENGTH)
+  if (tooLong) return `${tooLong[0]} is too long (max ${MAX_FIELD_LENGTH} characters).`
+
+  return null
+}
+
+requestsRouter.post('/', async (req, res) => {
+  const parsed = createSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  const { serviceId, formValues, submittedOfflineAt, draftId } = parsed.data
+
+  const service = await loadService(serviceId)
   if (!service) return res.status(404).json({ error: 'That service is no longer offered.' })
 
-  // Only the fields this service actually declares are stored. Without this a
-  // caller could attach arbitrary keys, which staff would then be shown as if
-  // the resident had filled them in.
-  const declared = new Set(service.fields.map((f) => f.id))
-  const unknown = Object.keys(formValues).filter((k) => !declared.has(k))
-  if (unknown.length > 0) {
-    return res.status(400).json({ error: `Unexpected field: ${unknown[0]}` })
-  }
-  const tooLong = Object.entries(formValues).find(([, v]) => v.length > MAX_FIELD_LENGTH)
-  if (tooLong) {
-    return res.status(400).json({ error: `${tooLong[0]} is too long (max ${MAX_FIELD_LENGTH} characters).` })
-  }
+  const invalid = checkFormValues(service, formValues)
+  if (invalid) return res.status(400).json({ error: invalid })
 
   const created = await transaction(async (client) => {
     // Atomic increment: the upsert takes a row lock, so simultaneous
@@ -89,6 +109,15 @@ requestsRouter.post('/', async (req, res) => {
        values ($1, $2, 'submitted', 0, $3)`,
       [row.id, req.user!.id, submittedOfflineAt ? 'Submitted offline, synced on reconnect' : null]
     )
+
+    // Cleared in the same commit as the insert, so a lost response can never
+    // leave the resident with both a filed request and the draft of it.
+    // Scoped by resident so a draft id guessed from elsewhere deletes nothing.
+    await client.query(
+      `delete from request_drafts
+        where resident_id = $1 and (id = $2::uuid or service_id = $3)`,
+      [req.user!.id, draftId ?? null, service.id]
+    )
     return row
   })
 
@@ -112,6 +141,77 @@ requestsRouter.get('/', async (req, res) => {
     [req.user!.id, limit]
   )
   res.json(rows.map(serializeRequest))
+})
+
+// ---------------------------------------------------------------------------
+// Drafts
+//
+// Declared before `/:id` so Express does not read "drafts" as a request id.
+// Every query is scoped to req.user.id: a draft is the resident's own scratch
+// space and no office ever sees one.
+// ---------------------------------------------------------------------------
+
+const DRAFT_SELECT = `
+  d.id, d.service_id as "serviceId", s.name as "serviceName",
+  s.department_id as "categoryId", d.form_values as "formValues",
+  d.created_at as "createdAt", d.updated_at as "updatedAt"`
+
+requestsRouter.get('/drafts', async (req, res) => {
+  const rows = await query(
+    `select ${DRAFT_SELECT}
+       from request_drafts d join services s on s.id = d.service_id
+      where d.resident_id = $1
+      order by d.updated_at desc
+      limit 50`,
+    [req.user!.id]
+  )
+  res.json(rows)
+})
+
+const draftSchema = z.object({
+  formValues: z.record(z.string(), z.string()).default({}),
+})
+
+/**
+ * Save, or overwrite, the draft for one service. A PUT keyed on the service
+ * rather than a POST returning an id: autosave fires repeatedly from a form
+ * that may not have reached the server yet, and retrying a PUT is harmless.
+ */
+requestsRouter.put('/drafts/:serviceId', async (req, res) => {
+  const parsed = draftSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+
+  const service = await loadService(req.params.serviceId)
+  if (!service) return res.status(404).json({ error: 'That service is no longer offered.' })
+
+  const invalid = checkFormValues(service, parsed.data.formValues)
+  if (invalid) return res.status(400).json({ error: invalid })
+
+  const saved = await one(
+    `insert into request_drafts (resident_id, service_id, form_values)
+     values ($1, $2, $3)
+     on conflict (resident_id, service_id) do update set
+       form_values = excluded.form_values, updated_at = now()
+     returning id, service_id as "serviceId", form_values as "formValues",
+               created_at as "createdAt", updated_at as "updatedAt"`,
+    [req.user!.id, service.id, parsed.data.formValues]
+  )
+  res.json(saved)
+})
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+requestsRouter.delete('/drafts/:id', async (req, res) => {
+  // Postgres raises on a malformed uuid, which would surface as a 500 for what
+  // is really just a request for something that does not exist.
+  if (!UUID.test(req.params.id)) return res.status(404).json({ error: 'Draft not found.' })
+
+  const removed = await query(
+    `delete from request_drafts where id = $1 and resident_id = $2 returning id`,
+    [req.params.id, req.user!.id]
+  )
+  if (removed.length === 0) return res.status(404).json({ error: 'Draft not found.' })
+  res.status(204).end()
 })
 
 requestsRouter.get('/:id', async (req, res) => {

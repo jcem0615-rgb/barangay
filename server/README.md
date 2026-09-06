@@ -42,7 +42,10 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `GET` | `/api/auth/me` | signed in |
 | `POST` | `/api/auth/forgot` | public — request a reset link |
 | `POST` | `/api/auth/reset` | public — set a new password with a link's token |
-| `POST` | `/api/requests` | resident — submit |
+| `POST` | `/api/requests` | resident — submit (optional `draftId` clears the draft) |
+| `GET` | `/api/requests/drafts` | resident — their own half-filled forms |
+| `PUT` | `/api/requests/drafts/:serviceId` | resident — save or overwrite one |
+| `DELETE` | `/api/requests/drafts/:id` | resident — discard one |
 | `GET` | `/api/requests` | resident — own requests |
 | `GET` | `/api/requests/:id` | resident — own request + history |
 | `POST` | `/api/requests/:id/pay` | resident — settle an assessed fee |
@@ -288,6 +291,7 @@ npm run test:admin        # staff account management and its access boundaries
 npm run test:notifications  # recording, delivery, preferences, and isolation
 npm run test:pagination   # paging boundaries, cursor stability, and search
 npm run test:programs     # sectoral registries: who may write, expiry, and isolation
+npm run test:drafts       # drafts stay out of every queue, and clear on submit
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```
@@ -295,6 +299,26 @@ npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
 Covers registration and login, request submission, the full assess → pay →
 release path, rejection, and the access rules: one department cannot read or act
 on another's requests, and one resident cannot read another's.
+
+## Drafts
+
+`request_drafts` is deliberately not a `draft` row in `requests`. A draft is something the
+resident has not submitted and no office has been asked to look at; keeping it in its own
+table means it cannot surface in a department queue through a query that forgot to exclude
+it. That structural separation is the guarantee, not a `status <> 'draft'` clause every
+future query has to remember — and the test suite asserts it against the real queue,
+summary and admin endpoints.
+
+It also keeps reference numbers honest: a number is drawn from `request_counters` when the
+resident actually submits, so a draft never consumes one or shows a number that means
+nothing yet.
+
+`unique (resident_id, service_id)` gives one draft per service, so the save endpoint is an
+idempotent PUT — autosave fires repeatedly and retrying is harmless. Drafts are held to the
+same field rules as submissions (`checkFormValues`): a draft that could hold what a
+submission would refuse just moves the rejection to a worse moment. Submitting deletes the
+draft inside the insert's transaction, matched on `draftId` or the service, so a lost
+response cannot leave both a request and its draft behind.
 
 ## Office contact details
 

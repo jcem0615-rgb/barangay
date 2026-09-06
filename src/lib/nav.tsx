@@ -5,7 +5,7 @@ export type Screen =
   | { name: 'dashboard' }
   | { name: 'services' }
   | { name: 'category'; categoryId: ServiceCategoryId }
-  | { name: 'service-form'; serviceId: string; draftId?: string }
+  | { name: 'service-form'; serviceId: string }
   | { name: 'applications' }
   | { name: 'application-detail'; id: string }
   | { name: 'payment'; id: string }

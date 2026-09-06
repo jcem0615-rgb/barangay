@@ -131,6 +131,12 @@ export const en = {
   'form.submitting': 'Submitting…',
   'form.required': 'This field is required.',
   'form.failed': 'Could not submit. Please try again.',
+  'form.savedOffline': 'Saved offline',
+  'form.savedOfflineBlurb': "This will be sent to the office automatically once you're back online. You can track it anytime in My Requests.",
+  'form.submittedTitle': 'Application submitted',
+  'form.submittedBlurb': 'Your reference number is {ref}. Track its progress anytime in My Requests.',
+  'form.trackThis': 'Track this request',
+  'form.backToServices': 'Back to Services',
   'form.unavailable': 'Service unavailable',
   'form.noLongerOffered': 'This service is no longer offered.',
 
@@ -205,6 +211,20 @@ export const en = {
   'programs.issuedBy': 'Issued by',
   'programs.entitles': 'What this gives you',
   'programs.more': '+{count} more',
+
+  // drafts
+  'draft.resumed': 'We kept what you started',
+  'draft.resumedBlurb': 'Your answers were saved on this phone. Carry on where you stopped, or start over.',
+  'draft.discard': 'Start over',
+  'draft.saving': 'Saving…',
+  'draft.saved': 'Saved',
+  'draft.onDevice': 'Saved on this device',
+  'draft.tabEmpty': 'Nothing half-finished. Anything you start filling in is kept here automatically.',
+  'draft.continue': 'Continue',
+  'draft.lastEdited': 'Last edited {when}',
+  'draft.notSubmitted': 'Not yet submitted',
+  'draft.answered': '{count} answer filled in',
+  'draft.answeredPlural': '{count} answers filled in',
 
   // help & support
   'help.title': 'Help & support',
@@ -362,6 +382,12 @@ export const fil: Record<StringKey, string> = {
   'form.submitting': 'Isinusumite…',
   'form.required': 'Kailangan ang impormasyong ito.',
   'form.failed': 'Hindi naisumite. Pakisubukan muli.',
+  'form.savedOffline': 'Naka-save offline',
+  'form.savedOfflineBlurb': 'Awtomatiko itong ipapadala sa tanggapan kapag may internet ka na. Masusubaybayan mo ito anumang oras sa Mga Kahilingan Ko.',
+  'form.submittedTitle': 'Naisumite ang aplikasyon',
+  'form.submittedBlurb': 'Ang reference number mo ay {ref}. Masusubaybayan mo ang takbo nito anumang oras sa Mga Kahilingan Ko.',
+  'form.trackThis': 'Subaybayan ang kahilingang ito',
+  'form.backToServices': 'Bumalik sa Mga Serbisyo',
   'form.unavailable': 'Hindi available ang serbisyo',
   'form.noLongerOffered': 'Hindi na inaalok ang serbisyong ito.',
 
@@ -433,6 +459,20 @@ export const fil: Record<StringKey, string> = {
   'programs.issuedBy': 'Inilabas ng',
   'programs.entitles': 'Ano ang natatanggap mo',
   'programs.more': '+{count} pa',
+
+  // drafts
+  'draft.resumed': 'Naitago namin ang sinimulan mo',
+  'draft.resumedBlurb': 'Nakasave sa telepono mong ito ang mga sagot mo. Ituloy mo kung saan ka huminto, o magsimula ulit.',
+  'draft.discard': 'Magsimula ulit',
+  'draft.saving': 'Sine-save…',
+  'draft.saved': 'Naka-save',
+  'draft.onDevice': 'Naka-save sa device na ito',
+  'draft.tabEmpty': 'Walang kalahating natapos. Awtomatikong itinatago dito ang anumang sinimulan mong sagutan.',
+  'draft.continue': 'Ituloy',
+  'draft.lastEdited': 'Huling binago {when}',
+  'draft.notSubmitted': 'Hindi pa naisusumite',
+  'draft.answered': '{count} sagot ang nailagay',
+  'draft.answeredPlural': '{count} na sagot ang nailagay',
 
   // help & support
   'help.title': 'Tulong at Suporta',

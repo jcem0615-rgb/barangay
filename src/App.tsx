@@ -34,7 +34,7 @@ function ScreenRouter() {
     case 'category':
       return <CategoryDetail categoryId={screen.categoryId} />
     case 'service-form':
-      return <ServiceForm serviceId={screen.serviceId} draftId={screen.draftId} />
+      return <ServiceForm serviceId={screen.serviceId} />
     case 'applications':
       return <ApplicationsList />
     case 'application-detail':

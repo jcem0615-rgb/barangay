@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { CheckCircle2, ClipboardList, Loader2, Send } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, CheckCircle2, ClipboardList, CloudOff, Loader2, Send, Trash2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import FormField from '../components/FormField'
 import OfflineBanner from '../components/OfflineBanner'
@@ -11,21 +11,28 @@ import { ApiError } from '../lib/api'
 import type { Application } from '../types'
 import { formatPeso } from '../lib/money'
 import { useT } from '../lib/i18n'
+import { useDraft } from '../lib/useDraft'
 
-export default function ServiceForm({ serviceId, draftId }: { serviceId: string; draftId?: string }) {
+export default function ServiceForm({ serviceId }: { serviceId: string }) {
   const { replace } = useNav()
-  const { submit, applications } = useAppData()
+  const { submit, refreshDrafts } = useAppData()
   const { findService } = useCatalogue()
   const isOnline = useOnlineStatus()
   const { t } = useT()
   const service = findService(serviceId)
-  const draft = draftId ? applications.find((a) => a.id === draftId) : undefined
+  const draft = useDraft(serviceId)
 
-  const [values, setValues] = useState<Record<string, string>>(draft?.formValues ?? {})
+  const [values, setValues] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState<Application | null>(null)
+
+  // Filled in once the draft lookup finishes. The form renders empty for that
+  // moment rather than blocking, so it never feels slower than it did before.
+  useEffect(() => {
+    if (draft.ready && draft.initialValues) setValues(draft.initialValues)
+  }, [draft.ready, draft.initialValues])
 
   if (!service) {
     return (
@@ -37,8 +44,19 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
   }
 
   const setValue = (id: string, v: string) => {
-    setValues((prev) => ({ ...prev, [id]: v }))
+    setValues((prev) => {
+      const next = { ...prev, [id]: v }
+      draft.record(next)
+      return next
+    })
     setErrors((prev) => ({ ...prev, [id]: '' }))
+  }
+
+  const handleDiscard = async () => {
+    await draft.discard()
+    setValues({})
+    setErrors({})
+    refreshDrafts()
   }
 
   const validate = () => {
@@ -59,11 +77,17 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
     try {
       // The server issues the reference number and decides the starting step;
       // offline, this lands in the outbox and syncs on reconnect.
+      // Stop the autosave before the request goes out: the server clears the
+      // draft as part of the same commit, and a debounced save landing after
+      // that would put it straight back.
+      await draft.forget()
       const created = await submit(
         { id: service.id, name: service.name, categoryId: service.categoryId, fee: service.fee },
-        values
+        values,
+        draft.draftId ?? undefined
       )
       setSubmitted(created)
+      refreshDrafts()
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : t('form.failed'))
     } finally {
@@ -78,25 +102,25 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
           <CheckCircle2 size={32} className="text-emerald-600" />
         </div>
         <h1 className="font-display mt-5 text-[calc(19px_*_var(--text-scale))] font-extrabold text-navy-950">
-          {submitted.isOfflineDraft ? 'Saved offline' : 'Application submitted'}
+          {submitted.isOfflineDraft ? t('form.savedOffline') : t('form.submittedTitle')}
         </h1>
         <p className="mt-2 max-w-xs text-[calc(14.5px_*_var(--text-scale))] leading-relaxed text-slate-500">
           {submitted.isOfflineDraft
-            ? "This will be sent to the office automatically once you're back online. You can track it anytime in My Requests."
-            : `Your reference number is ${submitted.referenceNo}. Track its progress anytime in My Requests.`}
+            ? t('form.savedOfflineBlurb')
+            : t('form.submittedBlurb', { ref: submitted.referenceNo })}
         </p>
         <div className="mt-7 flex w-full max-w-xs flex-col gap-2.5">
           <button
             onClick={() => replace({ name: 'application-detail', id: submitted.id })}
             className="rounded-xl bg-navy-800 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-white active:bg-navy-900"
           >
-            Track this request
+            {t('form.trackThis')}
           </button>
           <button
             onClick={() => replace({ name: 'services' })}
             className="rounded-xl border border-slate-200 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-navy-900 active:bg-slate-50"
           >
-            Back to Services
+            {t('form.backToServices')}
           </button>
         </div>
       </div>
@@ -109,6 +133,26 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
 
       <div className="space-y-4 px-4 pt-4">
         {!isOnline && <OfflineBanner />}
+
+        {draft.restored && (
+          <div className="flex items-start gap-2.5 rounded-2xl border border-gold-500/40 bg-gold-100/60 p-3.5">
+            <ClipboardList size={16} className="mt-0.5 shrink-0 text-gold-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[calc(13.5px_*_var(--text-scale))] font-bold text-navy-950">
+                {t('draft.resumed')}
+              </p>
+              <p className="mt-0.5 text-[calc(13px_*_var(--text-scale))] leading-snug text-navy-900/70">
+                {t('draft.resumedBlurb')}
+              </p>
+              <button
+                onClick={handleDiscard}
+                className="mt-1.5 flex items-center gap-1.5 text-[calc(13px_*_var(--text-scale))] font-semibold text-rose-600 hover:underline"
+              >
+                <Trash2 size={13} /> {t('draft.discard')}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-2">
@@ -132,7 +176,10 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
         </div>
 
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">{t('form.details')}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">{t('form.details')}</p>
+            <DraftStatusLabel status={draft.status} />
+          </div>
           {service.fields.map((field) => (
             <FormField
               key={field.id}
@@ -170,5 +217,35 @@ export default function ServiceForm({ serviceId, draftId }: { serviceId: string;
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Quiet by design. "Saved" is worth a word because it is the reassurance this
+ * whole feature exists to give; the rest of the time the form should not be
+ * talking about itself.
+ */
+function DraftStatusLabel({ status }: { status: ReturnType<typeof useDraft>['status'] }) {
+  const { t } = useT()
+  if (status === 'clean') return null
+
+  if (status === 'saving') {
+    return (
+      <span className="flex shrink-0 items-center gap-1 text-[calc(12px_*_var(--text-scale))] text-slate-500">
+        <Loader2 size={12} className="animate-spin" /> {t('draft.saving')}
+      </span>
+    )
+  }
+  if (status === 'saved') {
+    return (
+      <span className="flex shrink-0 items-center gap-1 text-[calc(12px_*_var(--text-scale))] font-medium text-emerald-700">
+        <Check size={12} strokeWidth={3} /> {t('draft.saved')}
+      </span>
+    )
+  }
+  return (
+    <span className="flex shrink-0 items-center gap-1 text-[calc(12px_*_var(--text-scale))] text-slate-500">
+      <CloudOff size={12} /> {t('draft.onDevice')}
+    </span>
   )
 }

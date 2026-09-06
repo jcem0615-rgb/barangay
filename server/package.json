@@ -19,7 +19,8 @@
     "test:admin": "node test/admin.mjs",
     "test:notifications": "node test/notifications.mjs",
     "test:pagination": "node test/pagination.mjs",
-    "test:programs": "node test/programs.mjs"
+    "test:programs": "node test/programs.mjs",
+    "test:drafts": "node test/drafts.mjs"
   },
   "dependencies": {
     "@types/compression": "^1.8.1",
