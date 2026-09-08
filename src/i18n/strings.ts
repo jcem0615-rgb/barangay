@@ -270,6 +270,14 @@ export const en = {
   'privacy.contactTitle': 'Data Protection Officer',
   'privacy.contactBody': 'Questions about your information, or a request to see or correct it, go to the municipality\u2019s Data Protection Officer.',
 
+  // emergency hotlines
+  'sos.title': 'Emergency hotlines',
+  'sos.blurb': 'Tap any number to call. These are the offices for this municipality.',
+  'sos.offlineBlurb': "You're offline, but these numbers still work — tap any of them to call.",
+  'sos.municipal': 'Municipal',
+  'sos.national': 'Nationwide',
+  'sos.call': 'Call {agency} at {phone}',
+
   // id card
   'id.title': 'Digital ID',
   'id.photoTitle': 'ID photo',
@@ -541,6 +549,14 @@ export const fil: Record<StringKey, string> = {
   'privacy.rightsBody': 'Maaari mong itanong kung ano ang hawak namin tungkol sa iyo, ipawasto ang mali, tutulan kung paano ito ginagamit, at magreklamo sa National Privacy Commission. Ang pag-urong ng pahintulot ay maaaring mangahulugang hindi na maproseso ang isang kahilingan.',
   'privacy.contactTitle': 'Data Protection Officer',
   'privacy.contactBody': 'Ang mga tanong tungkol sa impormasyon mo, o kahilingang makita o maiwasto ito, ay ipadala sa Data Protection Officer ng munisipyo.',
+
+  // emergency hotlines
+  'sos.title': 'Mga hotline sa emergency',
+  'sos.blurb': 'Pindutin ang numero para tumawag. Ito ang mga tanggapan ng munisipyong ito.',
+  'sos.offlineBlurb': 'Wala kang koneksyon, pero gumagana pa rin ang mga numerong ito — pindutin ang alinman para tumawag.',
+  'sos.municipal': 'Munisipyo',
+  'sos.national': 'Buong bansa',
+  'sos.call': 'Tawagan ang {agency} sa {phone}',
 
   'id.title': 'Digital ID',
   'id.photoTitle': 'Larawan sa ID',

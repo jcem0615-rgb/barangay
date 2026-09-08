@@ -36,7 +36,7 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 
 | Method | Path | Who |
 |---|---|---|
-| `GET` | `/api/catalogue` | public — offices (with contact details), services, programmes, holidays, workflow steps |
+| `GET` | `/api/catalogue` | public — offices, services, programmes, emergency hotlines, holidays, workflow steps |
 | `POST` | `/api/auth/register` | public — resident sign-up |
 | `POST` | `/api/auth/login` | public |
 | `GET` | `/api/auth/me` | signed in |
@@ -298,6 +298,7 @@ npm run test:drafts       # drafts stay out of every queue, and clear on submit
 npm run test:ready-dates  # working-day arithmetic, holidays, and the paused clock
 npm run test:field-rules  # required fields, select/number/date types, draft exemption
 npm run test:portrait     # ID photo: images only, own-photo scoping, replace and remove
+npm run test:hotlines     # emergency numbers: published, dialable, grouped, unique
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```
@@ -317,6 +318,20 @@ upload 11 MB before being told, but the server is what makes the limit true.
 Content type comes from magic bytes (`detectType`), never the filename or the declared
 MIME type, and the stored name is rewritten to the detected extension. A photo taken with
 the phone camera arrives as an ordinary multipart JPEG and needs no special handling.
+
+## Emergency hotlines
+
+`emergency_contacts` is seeded from `EMERGENCY_CONTACTS` in `src/data/mockData.ts` and
+served on the public catalogue — a hotline should not require a session. Rows carry
+`is_national` so the app can group municipal numbers apart from nationwide ones, and
+`sort_order` for display; ids are stable strings so a reseed updates rather than
+duplicates.
+
+The client caches the whole catalogue in localStorage and renders from it when the API is
+unreachable, which is the case these numbers exist for. Nothing server-side depends on
+that, but it is why the payload is kept small enough to store.
+
+The seeded municipal numbers are placeholders. Replace them before deploying.
 
 ## The ID portrait
 

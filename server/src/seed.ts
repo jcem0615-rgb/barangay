@@ -3,7 +3,9 @@
  * database and the frontend never drift apart on what the LGU offers.
  * Safe to re-run: catalogue rows are upserted, demo accounts are skipped if present.
  */
-import { HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES } from '../../src/data/mockData.ts'
+import {
+  EMERGENCY_CONTACTS, HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
+} from '../../src/data/mockData.ts'
 import { hashPassword } from './auth.ts'
 import { one, pool, query, transaction } from './db.ts'
 import { toCentavos } from './serialize.ts'
@@ -92,6 +94,17 @@ async function main() {
         ]
       )
     }
+    for (const [index, contact] of EMERGENCY_CONTACTS.entries()) {
+      await client.query(
+        `insert into emergency_contacts (id, label, agency, phone, is_national, sort_order)
+         values ($1, $2, $3, $4, $5, $6)
+         on conflict (id) do update set
+           label = excluded.label, agency = excluded.agency, phone = excluded.phone,
+           is_national = excluded.is_national, sort_order = excluded.sort_order`,
+        [contact.id, contact.label, contact.agency, contact.phone, contact.isNational, index]
+      )
+    }
+
     for (const holiday of HOLIDAYS) {
       await client.query(
         `insert into holidays (observed_on, name, is_local) values ($1, $2, $3)
@@ -103,7 +116,8 @@ async function main() {
   })
   console.log(
     `catalogue: ${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services, ` +
-      `${SECTORAL_PROGRAMS.length} programmes, ${HOLIDAYS.length} holidays`
+      `${SECTORAL_PROGRAMS.length} programmes, ${HOLIDAYS.length} holidays, ` +
+      `${EMERGENCY_CONTACTS.length} hotlines`
   )
 
   const passwordHash = await hashPassword(DEMO_PASSWORD)

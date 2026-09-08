@@ -160,6 +160,29 @@ A service with requirements says so on the submit-success screen and offers to g
 to the list, because the office cannot act until the files are in and nothing else in the
 flow would tell the resident that.
 
+## Emergency hotlines
+
+The digital ID carries the numbers to ring when something goes wrong, because a physical
+government ID does and because a resident in trouble should not have to work out which
+level of government answers which emergency. They are authored in `EMERGENCY_CONTACTS`
+(`src/data/mockData.ts`), seeded into `emergency_contacts`, and published on
+`/api/catalogue` — public, since a hotline is not something to sign in for.
+
+Municipal numbers are listed first and the nationwide ones grouped below, so a resident
+can see what still answers if the municipal line is down. Every row is a real `tel:` link.
+
+**The catalogue is cached on the device** (`elgu-catalogue-v1` in localStorage) and the
+provider hydrates from it before the network answers. Everything reads better from cache
+than from nothing, but the hotlines are why it exists: someone needing one is very often
+somewhere with no signal, and a number that only works online is not a number to put on an
+ID. The network copy still wins the moment it arrives.
+
+**911 and 143 are real and correct nationwide** — the National Emergency Hotline and the
+Philippine Red Cross. **Every municipal number is a placeholder** for this sample LGU;
+replace them all before deploying and re-check them whenever the offices reorganise. A
+hotline that rings nowhere is worse than none at all, because a resident will trust it in
+the moment they can least afford to.
+
 ## The ID portrait
 
 The digital ID carries the resident's face, because a card a counter clerk cannot check
@@ -332,6 +355,9 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
 - **Office addresses, hours and phone numbers** in `SERVICE_CATEGORIES` are placeholders
   for a sample municipality. Replace them and reseed before a real deployment; the Data
   Privacy screen's DPO address too.
+- **The municipal emergency hotlines** in `EMERGENCY_CONTACTS` are placeholders as well,
+  and matter more than the rest: verify every one against the LGU before launch. The
+  national numbers (911, 143) are correct as published.
 - **Sessions** are 12-hour JWTs with no refresh or general revocation list. Signing out
   clears the token client-side; it stays valid until it expires. The one exception is a
   password change, which `users.password_changed_at` enforces on every request.

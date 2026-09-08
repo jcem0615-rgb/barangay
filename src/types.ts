@@ -85,6 +85,22 @@ export interface Application {
 }
 
 /**
+ * A number to ring when something goes wrong, shown on the digital ID.
+ * Authored here, seeded, and read back from the catalogue like everything else
+ * the municipality publishes.
+ */
+export interface EmergencyContact {
+  id: string
+  /** What the resident is looking for: "Fire", "Ambulance". */
+  label: string
+  /** Who answers, spelled out rather than left as an acronym. */
+  agency: string
+  phone: string
+  /** Nationwide numbers, grouped apart from the municipal ones. */
+  isNational: boolean
+}
+
+/**
  * A sectoral registry or poverty-reduction programme the municipality keeps.
  * Authored in src/data/mockData.ts, seeded into the database, and read back
  * from the server as part of the catalogue.

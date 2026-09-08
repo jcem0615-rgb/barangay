@@ -9,7 +9,9 @@
  * Everything lives in this browser's localStorage, tokens are not verified, and
  * nothing here is used by the production build.
  */
-import { HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES } from '../data/mockData'
+import {
+  EMERGENCY_CONTACTS, HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
+} from '../data/mockData'
 import { addWorkingDays } from './schedule'
 import { WORKFLOW_STEPS, type ServiceDefinition } from '../types'
 
@@ -452,6 +454,7 @@ async function route(
       body: {
         departments: SERVICE_CATEGORIES, services: SERVICES,
         programs: SECTORAL_PROGRAMS, workflowSteps: WORKFLOW_STEPS,
+        emergencyContacts: EMERGENCY_CONTACTS,
         holidays: HOLIDAYS.map((h) => ({ date: h.date, name: h.name, isLocal: h.local ?? false })),
       },
     }

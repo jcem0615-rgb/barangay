@@ -1,5 +1,6 @@
 import type {
-  Application, ResidentProgram, SectoralProgram, ServiceCategory, ServiceDefinition,
+  Application, EmergencyContact, ResidentProgram, SectoralProgram, ServiceCategory,
+  ServiceDefinition,
 } from '../types'
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'
@@ -243,6 +244,7 @@ export const api = {
       departments: ServiceCategory[]
       services: ServiceDefinition[]
       programs: SectoralProgram[]
+      emergencyContacts: EmergencyContact[]
       holidays: Array<{ date: string; name: string; isLocal: boolean }>
       workflowSteps: string[]
     }>('/catalogue'),

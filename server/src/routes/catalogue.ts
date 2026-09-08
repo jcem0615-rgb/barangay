@@ -30,8 +30,15 @@ catalogueRouter.get('/', async (_req, res) => {
        from sectoral_programs order by sort_order, name`
   )
 
+  // Public, and deliberately so: a hotline is not something to sign in for.
+  const emergencyContacts = await query(
+    `select id, label, agency, phone, is_national as "isNational"
+       from emergency_contacts order by is_national, sort_order, label`
+  )
+
   res.json({
     departments,
+    emergencyContacts,
     programs,
     services: serviceRows.map((s) => ({
       id: s.id,

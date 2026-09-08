@@ -4,7 +4,9 @@
 // municipality; replace them with the real ones before deploying.
 // The API seeds from this file (server/src/seed.ts), and the app reads the
 // catalogue back from the server at runtime — this is the authoring source.
-import type { SectoralProgram, ServiceCategory, ServiceCategoryId, ServiceDefinition } from '../types'
+import type {
+  EmergencyContact, SectoralProgram, ServiceCategory, ServiceCategoryId, ServiceDefinition,
+} from '../types'
 
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
@@ -526,4 +528,59 @@ export const HOLIDAYS: Array<{ date: string; name: string; local?: boolean }> = 
   // Declared by the municipality — replace with the real ones.
   { date: '2026-05-15', name: 'Municipal Founding Anniversary', local: true },
   { date: '2026-10-12', name: 'Fiesta ng Bayan', local: true },
+]
+
+/**
+ * Emergency hotlines shown on the digital ID.
+ *
+ * The national numbers are real and correct nationwide: 911 is the National
+ * Emergency Hotline and 143 reaches the Philippine Red Cross. **The municipal
+ * numbers below are placeholders for this sample LGU** — replace every one of
+ * them with the real ones before deploying, and check them again whenever the
+ * offices reorganise. A hotline that rings nowhere is worse than none at all,
+ * because a resident will trust it in the moment they can least afford to.
+ */
+export const EMERGENCY_CONTACTS: EmergencyContact[] = [
+  {
+    id: 'mdrrmo',
+    label: 'Disaster & rescue',
+    agency: 'Municipal Disaster Risk Reduction and Management Office (MDRRMO)',
+    phone: '(045) 961-2400',
+    isNational: false,
+  },
+  {
+    id: 'police',
+    label: 'Police',
+    agency: 'San Fernando Municipal Police Station (PNP)',
+    phone: '(045) 961-2911',
+    isNational: false,
+  },
+  {
+    id: 'fire',
+    label: 'Fire',
+    agency: 'Bureau of Fire Protection — San Fernando',
+    phone: '(045) 961-2410',
+    isNational: false,
+  },
+  {
+    id: 'ambulance',
+    label: 'Ambulance',
+    agency: 'Municipal Health Office — emergency dispatch',
+    phone: '(045) 961-2377',
+    isNational: false,
+  },
+  {
+    id: 'national-911',
+    label: 'Any emergency, nationwide',
+    agency: 'National Emergency Hotline',
+    phone: '911',
+    isNational: true,
+  },
+  {
+    id: 'red-cross',
+    label: 'Ambulance & blood services',
+    agency: 'Philippine Red Cross',
+    phone: '143',
+    isNational: true,
+  },
 ]
