@@ -16,6 +16,9 @@ import {
 } from '../uploads.ts'
 import { getFile, putFile, removeFile } from '../storage.ts'
 import { scanBuffer } from '../antivirus.ts'
+import {
+  issueVerificationCode, purgeStaleCodes, VERIFICATION_TTL_SECONDS,
+} from '../idVerification.ts'
 
 export const authRouter = Router()
 
@@ -355,4 +358,14 @@ authRouter.delete('/me/photo', authenticate, requireRole('resident'), async (req
   )
   await removeFile(row.photo_key)
   res.status(204).end()
+})
+
+/**
+ * A fresh verification code for the ID screen. Issued to the resident only:
+ * the whole point is that holding the phone is what proves the ID is yours.
+ */
+authRouter.post('/me/verification', authenticate, requireRole('resident'), async (req, res) => {
+  const issued = await issueVerificationCode(req.user!.id)
+  void purgeStaleCodes().catch(() => undefined)
+  res.json({ ...issued, ttlSeconds: VERIFICATION_TTL_SECONDS })
 })

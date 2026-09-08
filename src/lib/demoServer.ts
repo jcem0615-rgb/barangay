@@ -18,7 +18,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition } from '../types'
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v5'
+const STORE_KEY = 'elgu-demo-state-v6'
 
 interface DemoUser {
   id: string
@@ -79,10 +79,19 @@ interface DemoNotification {
   title: string; body: string; createdAt: string; readAt: string | null
 }
 
+interface DemoVerification {
+  code: string
+  userId: string
+  expiresAt: number
+  consumedAt: number | null
+  verifiedBy: string | null
+}
+
 interface DemoState {
   users: DemoUser[]
   requests: DemoRequest[]
   drafts: DemoDraft[]
+  verifications: DemoVerification[]
   notifications: DemoNotification[]
   counters: Record<string, number>
 }
@@ -141,7 +150,7 @@ function seed(): DemoState {
   }
   users.push(resident)
 
-  const state: DemoState = { users, requests: [], drafts: [], notifications: [], counters: {} }
+  const state: DemoState = { users, requests: [], drafts: [], verifications: [], notifications: [], counters: {} }
 
   const boss = SERVICES.find((s) => s.id === 'boss-application')!
   const birth = SERVICES.find((s) => s.id === 'birth-certificate')!
@@ -292,6 +301,21 @@ const officeName = (categoryId: string) =>
   SERVICE_CATEGORIES.find((c) => c.id === categoryId)?.officeName ?? 'The municipal office'
 
 const HOLIDAY_DAYS = new Set(HOLIDAYS.map((h) => h.date))
+
+/** The same shape and rules as server/src/idVerification.ts. */
+const VERIFY_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+const VERIFY_TTL_SECONDS = 90
+
+function makeVerifyCode(): string {
+  let code = ''
+  for (let i = 0; i < 12; i++) {
+    code += VERIFY_ALPHABET[Math.floor(Math.random() * VERIFY_ALPHABET.length)]
+    if (i % 4 === 3 && i !== 11) code += '-'
+  }
+  return code
+}
+
+const normaliseCode = (raw: string) => String(raw ?? '').toUpperCase().replace(/-/g, '')
 
 /**
  * The same field rules as the real API: a submission must be complete, a draft
@@ -504,6 +528,23 @@ async function route(
         },
       }
     }
+    // ---- ID verification code ----
+    if (parts[1] === 'me' && parts[2] === 'verification' && method === 'POST') {
+      const user = need('resident')
+      // Issuing retires anything still outstanding, as the server does.
+      for (const v of state.verifications) {
+        if (v.userId === user.id && !v.consumedAt && v.expiresAt > Date.now()) v.consumedAt = Date.now()
+      }
+      const code = makeVerifyCode()
+      const expiresAt = Date.now() + VERIFY_TTL_SECONDS * 1000
+      state.verifications.push({ code: normaliseCode(code), userId: user.id, expiresAt, consumedAt: null, verifiedBy: null })
+      persist()
+      return {
+        status: 200,
+        body: { code, expiresAt: new Date(expiresAt).toISOString(), ttlSeconds: VERIFY_TTL_SECONDS },
+      }
+    }
+
     // ---- ID portrait ----
     // Residents only, images only, and always the caller's own.
     if (parts[1] === 'me' && parts[2] === 'photo') {
@@ -724,6 +765,61 @@ async function route(
           nextCursor: hasMore && page.length ? btoa(page[page.length - 1]!.id) : null,
           total,
         },
+      }
+    }
+
+    if (parts[1] === 'verify-id') {
+      if (method === 'POST') {
+        const entered = normaliseCode(body?.code)
+        if (entered.length < 4 || entered.length > 40) {
+          throw new DemoError(400, "Enter the code shown on the resident's ID.")
+        }
+        const found = state.verifications.find((v) => v.code === entered)
+        if (!found) {
+          throw new DemoError(404, 'That code is not valid. Ask the resident to read it again from their ID.')
+        }
+        if (found.consumedAt) {
+          throw new DemoError(409, 'That code has already been checked. Ask the resident for a fresh one.')
+        }
+        if (found.expiresAt <= Date.now()) {
+          throw new DemoError(409, 'That code has expired. Ask the resident to show the current one.')
+        }
+        found.consumedAt = Date.now()
+        found.verifiedBy = user.id
+        persist()
+
+        const resident = state.users.find((u) => u.id === found.userId)
+        if (!resident) throw new DemoError(404, 'That account is no longer active.')
+        return {
+          status: 200,
+          body: {
+            outcome: 'valid',
+            residentId: resident.id,
+            fullName: resident.fullName,
+            barangay: resident.profile.barangay,
+            municipality: resident.profile.municipality,
+            province: resident.profile.province,
+            philSysLast4: resident.profile.philSysId
+              ? resident.profile.philSysId.replace(/\D/g, '').slice(-4)
+              : null,
+            hasPhoto: Boolean(resident.photo),
+            programs: serializePrograms(resident),
+            checkedAt: new Date().toISOString(),
+          },
+        }
+      }
+
+      // The face, only for a check this staff member just performed.
+      if (method === 'GET' && parts[2] && parts[3] === 'photo') {
+        const recent = state.verifications.find(
+          (v) => v.userId === parts[2] && v.verifiedBy === user.id
+            && v.consumedAt !== null && Date.now() - v.consumedAt < 5 * 60 * 1000
+        )
+        if (!recent) throw new DemoError(404, 'No recent verification for that resident.')
+        const resident = state.users.find((u) => u.id === parts[2])
+        if (!resident?.photo) throw new DemoError(404, 'No photo on file.')
+        const [, mime] = /^data:([^;]+);/.exec(resident.photo) ?? []
+        return { status: 200, blob: dataUrlToBlob(resident.photo, mime ?? 'image/jpeg') }
       }
     }
 

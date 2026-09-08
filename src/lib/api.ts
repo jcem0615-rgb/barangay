@@ -101,6 +101,20 @@ export interface ResidentProfileData {
   photoUpdatedAt?: string | null
 }
 
+/** What a counter clerk gets back, and no more. */
+export interface IdCheck {
+  outcome: 'valid'
+  residentId: string
+  fullName: string
+  barangay: string | null
+  municipality: string | null
+  province: string | null
+  philSysLast4: string | null
+  hasPhoto: boolean
+  programs: ResidentProgram[]
+  checkedAt: string
+}
+
 export interface DraftRecord {
   id: string
   serviceId: string
@@ -270,6 +284,18 @@ export const api = {
     uploadFile<{ hasPhoto: boolean }>('/auth/me/photo', file, undefined, 'PUT'),
 
   removeMyPhoto: () => request<void>('/auth/me/photo', { method: 'DELETE' }),
+
+  /** A fresh short-lived code for the resident's own ID. */
+  issueVerification: () =>
+    request<{ code: string; expiresAt: string; ttlSeconds: number }>('/auth/me/verification', {
+      method: 'POST',
+    }),
+
+  /** Staff: check a code a resident is showing. Consumes it. */
+  verifyId: (code: string) =>
+    request<IdCheck>('/staff/verify-id', { method: 'POST', body: JSON.stringify({ code }) }),
+
+  verifiedPhoto: (residentId: string) => fetchBlob(`/staff/verify-id/${residentId}/photo`),
 
   listDrafts: () => request<DraftRecord[]>('/requests/drafts'),
 

@@ -12,6 +12,8 @@ import {
 import {
   listResidentPrograms, listResidentProgramsIn, mayAdministerPrograms, programNoticeFor,
 } from '../programs.ts'
+import { consumeVerificationCode } from '../idVerification.ts'
+import { getFile } from '../storage.ts'
 
 export const staffRouter = Router()
 staffRouter.use(authenticate, requireRole('staff', 'admin'))
@@ -565,4 +567,104 @@ staffRouter.delete('/requests/:id/programs/:code', async (req, res) => {
   if (!result) return res.status(404).json({ error: 'That resident is not on this programme.' })
   void deliverNotification(notice)
   res.json({ programs: result })
+})
+
+// ---------------------------------------------------------------------------
+// Checking a digital ID at the counter
+//
+// Any office can check one — a clerk anywhere needs to know whether the senior
+// citizen discount in front of them is real. What comes back is scoped to that
+// question and no wider: a face to compare, a name, where they live, and the
+// entitlements that are live right now. Not an email, not a phone number, not
+// a request history, and not a PhilSys number in full.
+//
+// This is not a directory. The only way in is a code the resident chose to
+// show, which dies in ninety seconds and works once — so a check is something
+// the resident initiated, not something staff can go browsing for.
+// ---------------------------------------------------------------------------
+
+const verifyIdSchema = z.object({ code: z.string().min(4).max(40) })
+
+staffRouter.post('/verify-id', async (req, res) => {
+  const parsed = verifyIdSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'Enter the code shown on the resident\'s ID.' })
+
+  const outcome = await consumeVerificationCode(parsed.data.code, req.user!.id)
+
+  if (outcome.status !== 'valid') {
+    // Logged because a clerk working through guesses is worth seeing.
+    console.warn(`id verification ${outcome.status} by staff ${req.user!.id}`)
+    const message = {
+      unknown: 'That code is not valid. Ask the resident to read it again from their ID.',
+      expired: 'That code has expired. Ask the resident to show the current one.',
+      used: 'That code has already been checked. Ask the resident for a fresh one.',
+    }[outcome.status]
+    return res.status(outcome.status === 'unknown' ? 404 : 409).json({
+      error: message,
+      outcome: outcome.status,
+    })
+  }
+
+  const resident = await one<{
+    full_name: string; barangay: string | null; municipality: string | null
+    province: string | null; philsys_id: string | null; has_photo: boolean
+  }>(
+    `select u.full_name, rp.barangay, rp.municipality, rp.province, rp.philsys_id,
+            rp.photo_key is not null as has_photo
+       from users u
+       left join resident_profiles rp on rp.user_id = u.id
+      where u.id = $1 and u.deactivated_at is null`,
+    [outcome.userId]
+  )
+  if (!resident) return res.status(404).json({ error: 'That account is no longer active.' })
+
+  res.json({
+    outcome: 'valid',
+    residentId: outcome.userId,
+    fullName: resident.full_name,
+    barangay: resident.barangay,
+    municipality: resident.municipality,
+    province: resident.province,
+    // Last four only: enough to match against a physical card, useless to copy.
+    philSysLast4: resident.philsys_id ? resident.philsys_id.replace(/\D/g, '').slice(-4) : null,
+    hasPhoto: resident.has_photo,
+    // The live record, not whatever the card was showing when it was screenshotted.
+    programs: await listResidentPrograms(outcome.userId),
+    checkedAt: new Date().toISOString(),
+  })
+})
+
+/**
+ * The face, for the one check just performed. Reachable only with a
+ * verification the caller themselves consumed in the last few minutes, so a
+ * staff member cannot browse portraits — they can only look at the person who
+ * just showed them a code.
+ */
+staffRouter.get('/verify-id/:residentId/photo', async (req, res) => {
+  const allowed = await one<{ id: string }>(
+    `select id from id_verifications
+      where user_id = $1 and verified_by = $2
+        and consumed_at > now() - interval '5 minutes'
+      limit 1`,
+    [req.params.residentId, req.user!.id]
+  )
+  if (!allowed) return res.status(404).json({ error: 'No recent verification for that resident.' })
+
+  const row = await one<{ photo_key: string | null; photo_type: string | null }>(
+    `select photo_key, photo_type from resident_profiles where user_id = $1`,
+    [req.params.residentId]
+  )
+  if (!row?.photo_key) return res.status(404).json({ error: 'No photo on file.' })
+
+  let content: Buffer
+  try {
+    content = await getFile(row.photo_key)
+  } catch {
+    return res.status(410).json({ error: 'That photo is no longer available.' })
+  }
+  res.setHeader('Content-Type', row.photo_type ?? 'image/jpeg')
+  res.setHeader('Content-Disposition', 'inline')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Cache-Control', 'private, no-store')
+  res.send(content)
 })

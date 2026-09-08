@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Building2, Inbox, LogOut, RefreshCw, Search, Users } from 'lucide-react'
+import { Building2, Inbox, LogOut, RefreshCw, ScanLine, Search, Users } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { Application, ServiceCategory } from '../../types'
 import StaffRequestPanel from './StaffRequestPanel'
 import StaffAccounts from './StaffAccounts'
+import StaffVerifyId from './StaffVerifyId'
 import { formatPeso } from '../../lib/money'
 
 const STATUS_TABS = [
@@ -23,7 +24,7 @@ export default function StaffConsole() {
   const [status, setStatus] = useState<string>('')
   const [departmentId, setDepartmentId] = useState<string>('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [view, setView] = useState<'queue' | 'accounts'>('queue')
+  const [view, setView] = useState<'queue' | 'verify' | 'accounts'>('queue')
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -112,21 +113,28 @@ export default function StaffConsole() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {user?.role === 'admin' && (
-              <div className="flex rounded-xl bg-slate-100 p-1">
-                {([['queue', 'Queue'], ['accounts', 'Accounts']] as const).map(([key, label]) => (
-                  <button
-                    key={key}
-                    onClick={() => setView(key)}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition ${
-                      view === key ? 'bg-white text-navy-950 shadow-sm' : 'text-slate-500'
-                    }`}
-                  >
-                    {key === 'accounts' ? <Users size={13} /> : <Inbox size={13} />} {label}
-                  </button>
-                ))}
-              </div>
-            )}
+{/*
+              Verifying an ID is counter work, so every office gets it — a clerk
+              anywhere may be handed a senior-citizen discount to check.
+              Accounts stays with administrators.
+            */}
+            <div className="flex rounded-xl bg-slate-100 p-1">
+              {([
+                ['queue', 'Queue', Inbox],
+                ['verify', 'Verify ID', ScanLine],
+                ...(user?.role === 'admin' ? [['accounts', 'Accounts', Users] as const] : []),
+              ] as const).map(([key, label, Icon]) => (
+                <button
+                  key={key}
+                  onClick={() => setView(key)}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition ${
+                    view === key ? 'bg-white text-navy-950 shadow-sm' : 'text-slate-500'
+                  }`}
+                >
+                  <Icon size={13} /> {label}
+                </button>
+              ))}
+            </div>
             <button
               onClick={logout}
               className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50"
@@ -138,7 +146,9 @@ export default function StaffConsole() {
       </header>
 
       <div className="mx-auto max-w-6xl px-6 py-6">
-        {view === 'accounts' ? (
+        {view === 'verify' ? (
+          <StaffVerifyId />
+        ) : view === 'accounts' ? (
           <StaffAccounts departments={departments} />
         ) : (
         <>

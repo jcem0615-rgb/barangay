@@ -160,6 +160,34 @@ A service with requirements says so on the submit-success screen and offers to g
 to the list, because the office cannot act until the files are in and nothing else in the
 flow would tell the resident that.
 
+## Verifying an ID at the counter
+
+The card proves nothing on its own. It can be screenshotted, and the programme badges on it
+are worth real money — a senior-citizen record is a 20% statutory discount, a 4Ps record is
+a cash grant — so it is exactly the thing worth faking.
+
+So the ID shows a code the resident reads out. It lives **ninety seconds** and is **consumed
+the first time a clerk checks it**: a screenshot is stale before it reaches a window, and a
+code passed along buys nothing. Issuing a new one retires any still outstanding, so a code
+left open in another tab is not a second key. Only the hash is stored
+(`server/src/idVerification.ts`), like reset tokens.
+
+The three failure modes are reported apart because they mean different things at a counter:
+**unknown** is a typo or a forgery, **expired** just needs the resident to look again, and
+**used** means somebody already checked it.
+
+**Every office can check** — a clerk anywhere may be handed a senior-citizen discount to
+verify — but what comes back is scoped to that question: a face, a name, where they live,
+the PhilSys number's last four digits, and the entitlements **live on the record right now**,
+not whatever the card was showing when it was screenshotted. No email, no phone, no request
+history, never the whole PhilSys number.
+
+This is not a directory. The only way in is a code the resident chose to show, so every
+check is one the resident started. The portrait is reachable for five minutes and only by
+the clerk who performed that check — `GET /api/staff/verify-id/:id/photo` returns 404 to
+anyone else, which keeps the "only the resident sees their face" rule intact everywhere a
+resident has not just presented themselves. Each check records who ran it.
+
 ## Emergency hotlines
 
 The digital ID carries the numbers to ring when something goes wrong, because a physical
@@ -330,8 +358,10 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
 ## Known simplifications (intentional, flag if scope grows)
 
 - **PhilSys sync** and the **QR code** are visual only — `qrPattern.ts` renders a
-  deterministic but non-scannable pattern. A production build would call a real PhilSys
-  verification API and render a scannable QR.
+  deterministic but non-scannable pattern. Verification is done with the typed code
+  instead, which works today; adding a real QR encoder would let a clerk scan it rather
+  than type it, and is the natural next step. A production build would also call a real
+  PhilSys verification API.
 - **Payment** records that a resident chose a method and marks the request paid. There is no
   gateway integration: no redirect, no webhook, no settlement. Wiring a real one means
   server-side webhook verification — never mark a request paid from the client.
@@ -428,7 +458,8 @@ npm run preview   # serve the production build locally
 ## Suggested next steps
 
 1. Replace mock icons in `public/icons/` with a real LGU seal / wordmark.
-2. Add a real QR/barcode library if the ID needs to be scannable by counter staff.
+2. Add a real QR encoder so the verification code can be scanned rather than typed — the
+   code itself already works, this only removes the typing.
 3. Say what happens next per workflow step, and what to bring to the counter on release —
    the expected date is there now, but the steps are still bare labels.
 4. Consider `react-router` if screens need shareable URLs.

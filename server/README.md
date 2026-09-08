@@ -43,6 +43,9 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `PUT` | `/api/auth/me/photo` | resident — set their ID portrait (multipart) |
 | `GET` | `/api/auth/me/photo` | resident — their own portrait, served inline |
 | `DELETE` | `/api/auth/me/photo` | resident — remove it |
+| `POST` | `/api/auth/me/verification` | resident — a 90-second, single-use ID code |
+| `POST` | `/api/staff/verify-id` | staff — check a code a resident is showing |
+| `GET` | `/api/staff/verify-id/:id/photo` | staff — the face, for a check they just ran |
 | `POST` | `/api/auth/forgot` | public — request a reset link |
 | `POST` | `/api/auth/reset` | public — set a new password with a link's token |
 | `POST` | `/api/requests` | resident — submit (optional `draftId` clears the draft) |
@@ -299,6 +302,7 @@ npm run test:ready-dates  # working-day arithmetic, holidays, and the paused clo
 npm run test:field-rules  # required fields, select/number/date types, draft exemption
 npm run test:portrait     # ID photo: images only, own-photo scoping, replace and remove
 npm run test:hotlines     # emergency numbers: published, dialable, grouped, unique
+npm run test:id-verification  # single use, expiry, scoping, and what staff may see
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```
@@ -332,6 +336,19 @@ unreachable, which is the case these numbers exist for. Nothing server-side depe
 that, but it is why the payload is kept small enough to store.
 
 The seeded municipal numbers are placeholders. Replace them before deploying.
+
+## Verifying an ID
+
+`id_verifications` holds hashed, 90-second, single-use codes. `consumeVerificationCode`
+claims one in a single UPDATE, so two clerks racing the same code cannot both be told it is
+valid; the outcome distinguishes unknown / expired / used because those mean different
+things at a counter. Issuing retires anything the resident still has outstanding.
+
+Reachable by any staff or admin — counter work is not department-scoped — but the response
+carries only what a counter check needs: name, residency, the PhilSys number's last four,
+and the *current* programme record. The portrait is a separate route, gated on the caller
+having consumed a verification for that resident in the last five minutes, so staff cannot
+browse faces. Every check records `verified_by`.
 
 ## The ID portrait
 

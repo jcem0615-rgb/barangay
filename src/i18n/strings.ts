@@ -270,6 +270,13 @@ export const en = {
   'privacy.contactTitle': 'Data Protection Officer',
   'privacy.contactBody': 'Questions about your information, or a request to see or correct it, go to the municipality\u2019s Data Protection Officer.',
 
+  // id verification at a counter
+  'verify.title': 'Verification code',
+  'verify.blurb': 'Read this out to the counter staff. It changes every minute and a half and works once, so a screenshot of your ID is no use to anyone else.',
+  'verify.expiresIn': 'Changes in {seconds}s',
+  'verify.newCode': 'Get a new code',
+  'verify.unavailable': 'A code needs a connection. Your ID still shows your details offline.',
+
   // emergency hotlines
   'sos.title': 'Emergency hotlines',
   'sos.blurb': 'Tap any number to call. These are the offices for this municipality.',
@@ -296,7 +303,7 @@ export const en = {
   'id.address': 'Address',
   'id.cardLabel': 'ELGU CITIZEN DIGITAL ID',
   'id.verifiedTitle': 'PhilSys verified identity',
-  'id.verifiedBlurb': 'Synced with the Philippine Identification System. This QR refreshes automatically for secure, one-time verification at LGU counters.',
+  'id.verifiedBlurb': 'Synced with the Philippine Identification System. Show the verification code below at an LGU counter to prove this ID is yours.',
   'id.registeredAddress': 'Registered address',
 } as const
 
@@ -550,6 +557,13 @@ export const fil: Record<StringKey, string> = {
   'privacy.contactTitle': 'Data Protection Officer',
   'privacy.contactBody': 'Ang mga tanong tungkol sa impormasyon mo, o kahilingang makita o maiwasto ito, ay ipadala sa Data Protection Officer ng munisipyo.',
 
+  // id verification at a counter
+  'verify.title': 'Verification code',
+  'verify.blurb': 'Basahin ito sa kawani sa counter. Nagpapalit ito kada isa\u2019t kalahating minuto at isang beses lang gumagana, kaya walang silbi kaninuman ang screenshot ng ID mo.',
+  'verify.expiresIn': 'Magpapalit sa {seconds}s',
+  'verify.newCode': 'Kumuha ng bagong code',
+  'verify.unavailable': 'Kailangan ng koneksyon para sa code. Makikita pa rin ang detalye mo sa ID kahit offline.',
+
   // emergency hotlines
   'sos.title': 'Mga hotline sa emergency',
   'sos.blurb': 'Pindutin ang numero para tumawag. Ito ang mga tanggapan ng munisipyong ito.',
@@ -575,6 +589,6 @@ export const fil: Record<StringKey, string> = {
   'id.address': 'Tirahan',
   'id.cardLabel': 'ELGU CITIZEN DIGITAL ID',
   'id.verifiedTitle': 'Beripikadong pagkakakilanlan sa PhilSys',
-  'id.verifiedBlurb': 'Naka-sync sa Philippine Identification System. Awtomatikong nagba-bago ang QR na ito para sa ligtas at isahang beripikasyon sa mga counter ng LGU.',
+  'id.verifiedBlurb': 'Naka-sync sa Philippine Identification System. Ipakita ang verification code sa ibaba sa counter ng LGU para patunayang sa iyo ang ID na ito.',
   'id.registeredAddress': 'Nakarehistrong tirahan',
 }

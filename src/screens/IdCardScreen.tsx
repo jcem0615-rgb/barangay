@@ -3,6 +3,7 @@ import TopBar from '../components/TopBar'
 import QrPattern from '../components/QrPattern'
 import ProgramList from '../components/ProgramList'
 import EmergencyContacts from '../components/EmergencyContacts'
+import IdVerificationCode from '../components/IdVerificationCode'
 import IdPortrait, { IdPortraitFrame } from '../components/IdPortrait'
 import { useResidentPhoto } from '../lib/useResidentPhoto'
 import { addressLine, useResidentProfile } from '../lib/resident'
@@ -67,6 +68,10 @@ export default function IdCardScreen() {
               {t('id.verifiedBlurb')}
             </p>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <IdVerificationCode />
         </div>
 
         <div className="mt-4">
