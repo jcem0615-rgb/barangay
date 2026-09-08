@@ -145,6 +145,12 @@ when `enumerateDevices` reports no `videoinput`, falling back to "this is a touc
 where the API is unavailable (an insecure context), so a phone never loses the feature to
 a failed capability check.
 
+Photos are shrunk in the browser first (`src/lib/imageCompress.ts`): a document is scaled
+to a 2000px long edge and re-encoded as JPEG, which turns a 6 MB phone photo into a few
+hundred KB with no loss a clerk would notice. It is deliberately conservative — anything
+canvas cannot decode (HEIC) passes through untouched, EXIF rotation is applied rather than
+baked in, and a result that came out larger than the original is discarded.
+
 **10 MB per file, at most 10 files per request**, enforced in `server/src/uploads.ts` and
 checked again in the browser before the upload starts — the server's limit is the real one,
 but discovering it after pushing 11 MB over a mobile connection is not a usable answer.
@@ -153,6 +159,28 @@ Type is decided by magic bytes, never the filename or the declared MIME type.
 A service with requirements says so on the submit-success screen and offers to go straight
 to the list, because the office cannot act until the files are in and nothing else in the
 flow would tell the resident that.
+
+## The ID portrait
+
+The digital ID carries the resident's face, because a card a counter clerk cannot check
+against the person holding it is not doing the job. It is set from the ID screen, either
+with **Take a selfie** (`capture="user"` — the front camera) or by choosing an existing
+photo, and can be removed.
+
+`resident_profiles.photo_key` points into the same object store as request attachments, so
+one storage implementation covers both. The type is decided by magic bytes and must be an
+image: PDF sniffs cleanly but is not a picture, and SVG is refused outright because the ID
+renders the file inline in an `<img>`. 4 MB cap, well above what a compressed portrait
+needs.
+
+The portrait is cropped to a centred square and scaled to 900px before upload — it renders
+at about 80px, and a 6 MB selfie is pure waiting.
+
+**Only the resident sees it.** Every route is scoped to `req.user.id` and there is no
+endpoint for reading another resident's; staff check identity against the physical ID at
+the counter, so the console has no reason to hold a face for everyone it has served. The
+image is fetched as a blob and handed to the DOM as an object URL, because `<img src>`
+cannot carry the bearer token.
 
 ## Form validation
 

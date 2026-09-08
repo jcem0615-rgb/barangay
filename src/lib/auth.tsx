@@ -7,6 +7,8 @@ interface AuthValue {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (body: Record<string, string>) => Promise<void>
+  /** Re-reads the profile after something changed it, such as the ID portrait. */
+  refresh: () => Promise<void>
   logout: () => void
 }
 
@@ -52,6 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(me?.profile ?? null)
   }, [])
 
+  const refresh = useCallback(async () => {
+    const me = await api.me().catch(() => null)
+    if (me) {
+      setUser(me.user)
+      setProfile(me.profile)
+    }
+  }, [])
+
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
@@ -59,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, login, register, refresh, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -3,6 +3,7 @@ import { Camera, FileUp, Loader2, Paperclip, Trash2 } from 'lucide-react'
 import { api, ApiError, type Attachment } from '../lib/api'
 import { saveBlob } from '../lib/download'
 import { useT } from '../lib/i18n'
+import { compressImage } from '../lib/imageCompress'
 
 /** Mirrors MAX_FILE_BYTES in server/src/uploads.ts. */
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -81,18 +82,22 @@ export default function Attachments({
     e.target.value = '' // let the same file be re-picked after an error
     if (!file) return
 
-    // The server refuses this too, but only after the whole file has crossed a
-    // mobile connection. Checking here costs nothing and saves the upload.
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      pending.current = undefined
-      setError(t('files.tooLarge', { size: formatSize(file.size) }))
-      return
-    }
-
     setBusy(pending.current ?? 'file')
     setError(null)
     try {
-      await api.attach(requestId, file, pending.current)
+      // A phone photo of a document is several megabytes of detail no clerk
+      // needs. Shrinking it first is the difference between a moment and a
+      // minute on a mobile connection; a PDF or a HEIC passes through as-is.
+      const upload = await compressImage(file)
+
+      // The server refuses this too, but only after the whole file has crossed
+      // the connection. Checking here costs nothing and saves the upload.
+      if (upload.size > MAX_ATTACHMENT_BYTES) {
+        setError(t('files.tooLarge', { size: formatSize(upload.size) }))
+        return
+      }
+
+      await api.attach(requestId, upload, pending.current)
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('files.failed'))

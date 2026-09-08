@@ -2,12 +2,15 @@ import { ShieldCheck, Fingerprint } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import QrPattern from '../components/QrPattern'
 import ProgramList from '../components/ProgramList'
+import IdPortrait, { IdPortraitFrame } from '../components/IdPortrait'
+import { useResidentPhoto } from '../lib/useResidentPhoto'
 import { addressLine, useResidentProfile } from '../lib/resident'
 import { useT } from '../lib/i18n'
 
 export default function IdCardScreen() {
   const resident = useResidentProfile()
   const { t } = useT()
+  const { url: photoUrl } = useResidentPhoto()
   if (!resident) return null
 
   return (
@@ -26,8 +29,9 @@ export default function IdCardScreen() {
             </p>
           </div>
 
-          <div className="relative mt-5 flex justify-center">
-            <QrPattern seed={resident.qrSeed} size={11} dim={190} dark />
+          <div className="relative mt-5 flex items-center justify-center gap-4">
+            <IdPortraitFrame url={photoUrl} name={resident.fullName} size={104} onDark />
+            <QrPattern seed={resident.qrSeed} size={9} dim={150} dark />
           </div>
 
           <div className="relative mt-5 text-center">
@@ -62,6 +66,10 @@ export default function IdCardScreen() {
               {t('id.verifiedBlurb')}
             </p>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <IdPortrait name={resident.fullName} />
         </div>
 
         <div className="mt-4">

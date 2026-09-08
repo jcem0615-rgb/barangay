@@ -40,6 +40,9 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `POST` | `/api/auth/register` | public — resident sign-up |
 | `POST` | `/api/auth/login` | public |
 | `GET` | `/api/auth/me` | signed in |
+| `PUT` | `/api/auth/me/photo` | resident — set their ID portrait (multipart) |
+| `GET` | `/api/auth/me/photo` | resident — their own portrait, served inline |
+| `DELETE` | `/api/auth/me/photo` | resident — remove it |
 | `POST` | `/api/auth/forgot` | public — request a reset link |
 | `POST` | `/api/auth/reset` | public — set a new password with a link's token |
 | `POST` | `/api/requests` | resident — submit (optional `draftId` clears the draft) |
@@ -294,6 +297,7 @@ npm run test:programs     # sectoral registries: who may write, expiry, and isol
 npm run test:drafts       # drafts stay out of every queue, and clear on submit
 npm run test:ready-dates  # working-day arithmetic, holidays, and the paused clock
 npm run test:field-rules  # required fields, select/number/date types, draft exemption
+npm run test:portrait     # ID photo: images only, own-photo scoping, replace and remove
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```
@@ -313,6 +317,19 @@ upload 11 MB before being told, but the server is what makes the limit true.
 Content type comes from magic bytes (`detectType`), never the filename or the declared
 MIME type, and the stored name is rewritten to the detected extension. A photo taken with
 the phone camera arrives as an ordinary multipart JPEG and needs no special handling.
+
+## The ID portrait
+
+`resident_profiles.photo_key` points into the same object store as attachments.
+`MAX_PORTRAIT_BYTES` is 4 MB and `PORTRAIT_TYPES` accepts only JPEG, PNG and HEIC, decided
+by magic bytes: PDF sniffs cleanly but is not a picture, and SVG must never be served from
+this origin because the portrait is sent `Content-Disposition: inline` for the ID to
+render. Uploads are virus-scanned and fail closed exactly as attachments do, and the
+previous file is deleted only after the new row commits.
+
+Scoped to the caller throughout — there is no route for reading another resident's
+portrait, and staff have none of their own (403). Responses carry `no-store`, so a shared
+proxy never keeps a resident's face.
 
 ## Form validation
 

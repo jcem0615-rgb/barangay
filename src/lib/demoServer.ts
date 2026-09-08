@@ -16,7 +16,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition } from '../types'
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v4'
+const STORE_KEY = 'elgu-demo-state-v5'
 
 interface DemoUser {
   id: string
@@ -33,6 +33,9 @@ interface DemoUser {
     philSysId: string | null; barangay: string | null; municipality: string | null
     province: string | null; birthDate: string | null; address: string | null; phone: string | null
   }
+  /** The ID portrait, as a data URL. Null until the resident sets one. */
+  photo: string | null
+  photoUpdatedAt: string | null
   /** Sectoral and poverty-reduction memberships, as the office recorded them. */
   programs: Array<{
     code: string; referenceNo: string | null; enrolledOn: string; validUntil: string | null
@@ -102,6 +105,7 @@ function seed(): DemoState {
       fullName: 'Office of the Mayor — Administrator', role: 'admin', departments: [],
       position: null, active: true, notifyEmail: true, notifySms: false,
       profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
+      photo: null, photoUpdatedAt: null,
       programs: [],
     },
     ...STAFF_SEED.map((s) => ({
@@ -109,6 +113,7 @@ function seed(): DemoState {
       role: 'staff' as const, departments: [s.dept], position: s.position, active: true,
       notifyEmail: true, notifySms: false,
       profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
+      photo: null, photoUpdatedAt: null,
       programs: [],
     })),
   ]
@@ -123,6 +128,8 @@ function seed(): DemoState {
       municipality: 'Municipality of San Fernando', province: 'Cebu',
       birthDate: '1994-03-18', address: 'Blk 4 Lot 12, Purok 3', phone: null,
     },
+    photo: null,
+    photoUpdatedAt: null,
     // Seeded so the demo ID card shows a real record rather than an empty one.
     programs: [
       { code: '4ps', referenceNo: 'HH-2019-88214', enrolledOn: '2024-06-11', validUntil: null },
@@ -466,6 +473,7 @@ async function route(
           municipality: body.municipality ?? 'Municipality of San Fernando',
           province: body.province ?? 'Cebu', birthDate: null, address: body.address ?? null, phone: null,
         },
+        photo: null, photoUpdatedAt: null,
         programs: [],
       }
       state.users.push(user); persist()
@@ -478,13 +486,58 @@ async function route(
       if (!user) throw new DemoError(401, 'Email or password is incorrect.')
       return { status: 200, body: { token: user.id, user: publicUser(user) } }
     }
-    if (parts[1] === 'me') {
+    if (parts[1] === 'me' && !parts[2]) {
       const user = need('resident', 'staff', 'admin')
       return {
         status: 200,
-        body: { user: publicUser(user), profile: { ...user.profile, programs: serializePrograms(user) } },
+        body: {
+          user: publicUser(user),
+          profile: {
+            ...user.profile,
+            programs: serializePrograms(user),
+            hasPhoto: Boolean(user.photo),
+            photoUpdatedAt: user.photoUpdatedAt,
+          },
+        },
       }
     }
+    // ---- ID portrait ----
+    // Residents only, images only, and always the caller's own.
+    if (parts[1] === 'me' && parts[2] === 'photo') {
+      const user = need('resident')
+
+      if (method === 'GET') {
+        if (!user.photo) throw new DemoError(404, 'No photo on file.')
+        const [, mime] = /^data:([^;]+);/.exec(user.photo) ?? []
+        return { status: 200, blob: dataUrlToBlob(user.photo, mime ?? 'image/jpeg') }
+      }
+
+      if (method === 'PUT') {
+        if (!file) throw new DemoError(400, 'Choose a photo to upload.')
+        if (file.size > 4 * 1024 * 1024) {
+          throw new DemoError(413, 'That file is too large. The limit is 4 MB.')
+        }
+        const head = new Uint8Array(await file.slice(0, 12).arrayBuffer())
+        const type = sniff(head)
+        // PDF sniffs fine but is not a picture, and the ID renders this inline.
+        if (!type || !type.mime.startsWith('image/')) {
+          throw new DemoError(415, "That file isn't a photo. Use a JPEG, PNG, or HEIC image.")
+        }
+        user.photo = await asDataUrl(file)
+        user.photoUpdatedAt = new Date().toISOString()
+        persist()
+        return { status: 200, body: { hasPhoto: true, photoUpdatedAt: user.photoUpdatedAt } }
+      }
+
+      if (method === 'DELETE') {
+        if (!user.photo) throw new DemoError(404, 'No photo on file.')
+        user.photo = null
+        user.photoUpdatedAt = null
+        persist()
+        return { status: 204, body: null }
+      }
+    }
+
     if (parts[1] === 'forgot' && method === 'POST') {
       return { status: 202, body: { message: 'Password reset needs a mail server, so it is not part of this demo.' } }
     }
@@ -854,6 +907,7 @@ async function route(
         role: 'staff', departments: body.departments, position: body.position ?? null,
         active: true, notifyEmail: true, notifySms: false,
         profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
+        photo: null, photoUpdatedAt: null,
         programs: [],
       }
       state.users.push(created); persist()

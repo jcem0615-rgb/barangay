@@ -1,7 +1,8 @@
 import { Router } from 'express'
+import multer from 'multer'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
-import { authenticate, hashPassword, signToken, verifyPassword } from '../auth.ts'
+import { authenticate, hashPassword, requireRole, signToken, verifyPassword } from '../auth.ts'
 import {
   checkLoginThrottle, clearLoginFailures, clientIp, LOGIN_LIMITS,
   purgeOldAttempts, recordLoginAttempt,
@@ -10,6 +11,11 @@ import { resetEmail, sendMail } from '../mailer.ts'
 import { env } from '../env.ts'
 import { hashToken, issueResetToken, RESET_TTL_MINUTES } from '../resetTokens.ts'
 import { listResidentPrograms } from '../programs.ts'
+import {
+  detectType, MAX_PORTRAIT_BYTES, PORTRAIT_DESCRIPTION, PORTRAIT_TYPES,
+} from '../uploads.ts'
+import { getFile, putFile, removeFile } from '../storage.ts'
+import { scanBuffer } from '../antivirus.ts'
 
 export const authRouter = Router()
 
@@ -142,7 +148,9 @@ authRouter.post('/login', async (req, res) => {
 authRouter.get('/me', authenticate, async (req, res) => {
   const profile = await one(
     `select philsys_id as "philSysId", barangay, municipality, province,
-            birth_date as "birthDate", address
+            birth_date as "birthDate", address,
+            photo_key is not null as "hasPhoto",
+            photo_updated_at as "photoUpdatedAt"
        from resident_profiles where user_id = $1`,
     [req.user!.id]
   )
@@ -241,5 +249,110 @@ authRouter.post('/reset', async (req, res) => {
   const account = await one<{ email: string }>(`select email from users where id = $1`, [row.user_id])
   if (account) await clearLoginFailures(account.email)
 
+  res.status(204).end()
+})
+
+// ---------------------------------------------------------------------------
+// The portrait on the digital ID
+//
+// The resident's own photo, and nobody else's business: every route below is
+// scoped to req.user.id, and there is no endpoint for reading another
+// resident's. Staff verify identity at the counter against the physical ID, so
+// the console has no reason to hold a face for every resident it has served.
+// ---------------------------------------------------------------------------
+
+const portraitUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_PORTRAIT_BYTES, files: 1 },
+})
+
+authRouter.put('/me/photo', authenticate, requireRole('resident'), portraitUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choose a photo to upload.' })
+
+  // The declared type is the caller's claim; the bytes are the fact.
+  const detected = detectType(req.file.buffer)
+  if (!detected || !PORTRAIT_TYPES.has(detected.contentType)) {
+    return res.status(415).json({
+      error: `That file isn't a photo. Use a ${PORTRAIT_DESCRIPTION} image.`,
+    })
+  }
+
+  // Scanned while still in memory, so an infected file never reaches disk.
+  const scan = await scanBuffer(req.file.buffer)
+  if (scan.status === 'infected') {
+    console.warn(`rejected portrait from user ${req.user!.id}: ${scan.signature}`)
+    return res.status(422).json({
+      error: 'That file was rejected by our virus scan. Try a different photo.',
+    })
+  }
+  if (scan.status === 'unavailable') {
+    // Fail closed, exactly as an attachment does.
+    console.error(`virus scan unavailable: ${scan.reason}`)
+    return res.status(503).json({
+      error: "We can't check files for viruses right now. Please try again shortly.",
+    })
+  }
+
+  const previous = await one<{ photo_key: string | null }>(
+    `select photo_key from resident_profiles where user_id = $1`,
+    [req.user!.id]
+  )
+
+  const stored = await putFile(req.file.buffer)
+  const saved = await one<{ photo_updated_at: Date }>(
+    `insert into resident_profiles (user_id, photo_key, photo_type, photo_updated_at)
+     values ($1, $2, $3, now())
+     on conflict (user_id) do update set
+       photo_key = excluded.photo_key,
+       photo_type = excluded.photo_type,
+       photo_updated_at = now()
+     returning photo_updated_at`,
+    [req.user!.id, stored.storageKey, detected.contentType]
+  )
+
+  // Only once the new one is safely recorded, so a failed write cannot leave
+  // the resident with no photo at all.
+  if (previous?.photo_key) await removeFile(previous.photo_key)
+
+  res.json({ hasPhoto: true, photoUpdatedAt: saved!.photo_updated_at.toISOString() })
+})
+
+authRouter.get('/me/photo', authenticate, requireRole('resident'), async (req, res) => {
+  const row = await one<{ photo_key: string | null; photo_type: string | null }>(
+    `select photo_key, photo_type from resident_profiles where user_id = $1`,
+    [req.user!.id]
+  )
+  if (!row?.photo_key) return res.status(404).json({ error: 'No photo on file.' })
+
+  let content: Buffer
+  try {
+    content = await getFile(row.photo_key)
+  } catch {
+    return res.status(410).json({ error: 'That photo is no longer available.' })
+  }
+
+  // Served inline because the ID card renders it. Safe only because the type
+  // came from the magic bytes and SVG is not among the accepted ones.
+  res.setHeader('Content-Type', row.photo_type ?? 'image/jpeg')
+  res.setHeader('Content-Disposition', 'inline')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Cache-Control', 'private, no-store')
+  res.send(content)
+})
+
+authRouter.delete('/me/photo', authenticate, requireRole('resident'), async (req, res) => {
+  const row = await one<{ photo_key: string | null }>(
+    `select photo_key from resident_profiles where user_id = $1`,
+    [req.user!.id]
+  )
+  if (!row?.photo_key) return res.status(404).json({ error: 'No photo on file.' })
+
+  await query(
+    `update resident_profiles
+        set photo_key = null, photo_type = null, photo_updated_at = null
+      where user_id = $1`,
+    [req.user!.id]
+  )
+  await removeFile(row.photo_key)
   res.status(204).end()
 })

@@ -95,6 +95,9 @@ export interface ResidentProfileData {
   birthDate: string | null
   address: string | null
   programs: ResidentProgram[]
+  /** Whether a portrait is on file; the bytes come from /auth/me/photo. */
+  hasPhoto?: boolean
+  photoUpdatedAt?: string | null
 }
 
 export interface DraftRecord {
@@ -154,14 +157,19 @@ export interface Attachment {
 }
 
 /** Uploads go as multipart; the browser sets its own Content-Type boundary. */
-async function uploadFile(path: string, file: File, requirement?: string) {
+async function uploadFile<T = Attachment>(
+  path: string,
+  file: File,
+  requirement?: string,
+  method: 'POST' | 'PUT' = 'POST'
+): Promise<T> {
   if (DEMO) {
     const { handleDemoRequest } = await import('./demoServer')
-    const out = await handleDemoRequest('POST', path, getToken(), undefined, file, requirement)
+    const out = await handleDemoRequest(method, path, getToken(), undefined, file, requirement)
     if (out.status >= 400) {
       throw new ApiError((out.body as { error?: string })?.error ?? 'Could not attach that file.', out.status)
     }
-    return out.body as Attachment
+    return out.body as T
   }
 
   const form = new FormData()
@@ -169,13 +177,35 @@ async function uploadFile(path: string, file: File, requirement?: string) {
   if (requirement) form.append('requirement', requirement)
   const token = getToken()
   const res = await fetch(BASE + path, {
-    method: 'POST',
+    method,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
   })
   const body = await res.json().catch(() => null)
   if (!res.ok) throw new ApiError(body?.error ?? 'Could not attach that file.', res.status)
-  return body as Attachment
+  return body as T
+}
+
+/**
+ * Fetches an image the page will render. An <img src> cannot carry the bearer
+ * token, so the bytes are pulled here and handed to the DOM as an object URL.
+ */
+async function fetchBlob(path: string): Promise<Blob | null> {
+  if (DEMO) {
+    const { handleDemoRequest } = await import('./demoServer')
+    const out = await handleDemoRequest('GET', path, getToken(), undefined)
+    if (out.status === 404) return null
+    if (out.status >= 400) throw new ApiError('Could not load that image.', out.status)
+    return out.blob ?? null
+  }
+
+  const token = getToken()
+  const res = await fetch(BASE + path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (res.status === 404) return null
+  if (!res.ok) throw new ApiError('Could not load that image.', res.status)
+  return res.blob()
 }
 
 export interface StaffAccount {
@@ -230,6 +260,14 @@ export const api = {
     }),
 
   me: () => request<{ user: AuthUser; profile: ResidentProfileData | null }>('/auth/me'),
+
+  /** The resident's own ID portrait, as a blob the ID card can render. */
+  myPhoto: () => fetchBlob('/auth/me/photo'),
+
+  setMyPhoto: (file: File) =>
+    uploadFile<{ hasPhoto: boolean }>('/auth/me/photo', file, undefined, 'PUT'),
+
+  removeMyPhoto: () => request<void>('/auth/me/photo', { method: 'DELETE' }),
 
   listDrafts: () => request<DraftRecord[]>('/requests/drafts'),
 

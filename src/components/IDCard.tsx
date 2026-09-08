@@ -3,6 +3,8 @@ import type { ResidentProfile } from '../types'
 import QrPattern from './QrPattern'
 import { useT } from '../lib/i18n'
 import { useCatalogue } from '../lib/catalogue'
+import { IdPortraitFrame } from './IdPortrait'
+import { useResidentPhoto } from '../lib/useResidentPhoto'
 import { addressLine } from '../lib/resident'
 
 /**
@@ -15,6 +17,7 @@ const BADGES_ON_CARD = 3
 export default function IDCard({ profile, onTap }: { profile: ResidentProfile; onTap?: () => void }) {
   const { t } = useT()
   const { findProgram } = useCatalogue()
+  const { url: photoUrl } = useResidentPhoto()
 
   // A lapsed record is not a badge: it should not read as a live entitlement at
   // a counter. It still shows, marked as expired, on the ID screen.
@@ -31,13 +34,16 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
       <div className="seal-ring pointer-events-none absolute -right-16 -top-16 h-56 w-56 opacity-90" />
       <div className="id-texture pointer-events-none absolute inset-0" />
 
-      <div className="relative flex items-start justify-between">
-        <div>
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <IdPortraitFrame url={photoUrl} name={profile.fullName} size={52} onDark />
+          <div className="min-w-0">
           <p className="text-[calc(11.5px_*_var(--text-scale))] font-semibold uppercase tracking-[0.16em] text-gold-400">
             eLGU Citizen Digital ID
           </p>
           <p className="font-display mt-1 text-[calc(19px_*_var(--text-scale))] font-bold leading-tight text-white">{profile.fullName}</p>
           <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] text-navy-100">{addressLine(profile.barangay, profile.municipality)}</p>
+          </div>
         </div>
         <QrPattern seed={profile.qrSeed} size={9} dim={54} dark />
       </div>

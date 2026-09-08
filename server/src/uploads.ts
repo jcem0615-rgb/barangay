@@ -31,6 +31,16 @@ const SIGNATURES: Signature[] = [
 
 export const ACCEPTED_DESCRIPTION = 'PDF, JPEG, PNG, or HEIC'
 
+/**
+ * A portrait must be a picture. Rejecting PDF here is not fussiness: the ID
+ * renders the file inline in an <img>, and only image bytes belong there.
+ */
+export const PORTRAIT_TYPES = new Set(['image/jpeg', 'image/png', 'image/heic'])
+export const PORTRAIT_DESCRIPTION = 'JPEG, PNG, or HEIC'
+
+/** A portrait is one small picture; the 10 MB request limit is far too loose. */
+export const MAX_PORTRAIT_BYTES = 4 * 1024 * 1024
+
 export interface DetectedType {
   contentType: string
   extension: string
