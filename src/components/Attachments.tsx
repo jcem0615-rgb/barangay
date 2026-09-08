@@ -1,13 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FileUp, Loader2, Paperclip, Trash2 } from 'lucide-react'
+import { Camera, FileUp, Loader2, Paperclip, Trash2 } from 'lucide-react'
 import { api, ApiError, type Attachment } from '../lib/api'
 import { saveBlob } from '../lib/download'
 import { useT } from '../lib/i18n'
+
+/** Mirrors MAX_FILE_BYTES in server/src/uploads.ts. */
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/**
+ * Whether to offer the camera at all.
+ *
+ * `enumerateDevices` reports the kind of each device without needing permission
+ * first, so this asks nothing of the resident. It is unavailable outside a
+ * secure context, and there a phone is still overwhelmingly likely to have a
+ * camera — so a touch device gets the button rather than losing the feature to
+ * a failed capability check.
+ */
+function useHasCamera(): boolean {
+  const [hasCamera, setHasCamera] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const devices = navigator.mediaDevices
+    if (!devices?.enumerateDevices) {
+      setHasCamera(navigator.maxTouchPoints > 0)
+      return
+    }
+    devices
+      .enumerateDevices()
+      .then((list) => {
+        if (!cancelled) setHasCamera(list.some((d) => d.kind === 'videoinput'))
+      })
+      .catch(() => {
+        if (!cancelled) setHasCamera(navigator.maxTouchPoints > 0)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  return hasCamera
 }
 
 /**
@@ -25,7 +61,9 @@ export default function Attachments({
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const pending = useRef<string | undefined>(undefined)
-  const input = useRef<HTMLInputElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const cameraInput = useRef<HTMLInputElement>(null)
+  const hasCamera = useHasCamera()
   const { t } = useT()
 
   const load = useCallback(async () => {
@@ -42,22 +80,32 @@ export default function Attachments({
     const file = e.target.files?.[0]
     e.target.value = '' // let the same file be re-picked after an error
     if (!file) return
+
+    // The server refuses this too, but only after the whole file has crossed a
+    // mobile connection. Checking here costs nothing and saves the upload.
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      pending.current = undefined
+      setError(t('files.tooLarge', { size: formatSize(file.size) }))
+      return
+    }
+
     setBusy(pending.current ?? 'file')
     setError(null)
     try {
       await api.attach(requestId, file, pending.current)
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not attach that file.')
+      setError(err instanceof ApiError ? err.message : t('files.failed'))
     } finally {
       setBusy(null)
       pending.current = undefined
     }
   }
 
-  function pick(requirement?: string) {
+  /** `source` decides which input opens: the file picker or the camera. */
+  function pick(requirement: string | undefined, source: 'file' | 'camera') {
     pending.current = requirement
-    input.current?.click()
+    ;(source === 'camera' ? cameraInput : fileInput).current?.click()
   }
 
   const attachedFor = (requirement: string) => files.find((f) => f.requirement === requirement)
@@ -72,7 +120,26 @@ export default function Attachments({
           : t('files.helpReadOnly')}
       </p>
 
-      <input ref={input} type="file" accept=".pdf,.jpg,.jpeg,.png,.heic" onChange={onPicked} className="hidden" />
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png,.heic"
+        onChange={onPicked}
+        className="hidden"
+      />
+      {/*
+        `capture` hands the phone's own camera app the job rather than a
+        getUserMedia preview in the page: it focuses, uses the flash, and
+        produces a document photo an office can actually read.
+      */}
+      <input
+        ref={cameraInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={onPicked}
+        className="hidden"
+      />
 
       <ul className="space-y-2">
         {requirements.map((requirement) => {
@@ -107,14 +174,32 @@ export default function Attachments({
                   )}
                 </div>
               ) : editable ? (
-                <button
-                  disabled={busy !== null}
-                  onClick={() => pick(requirement)}
-                  className="mt-1.5 flex items-center gap-1.5 text-[calc(13px_*_var(--text-scale))] font-semibold text-navy-800 disabled:opacity-50"
-                >
-                  {busy === requirement ? <Loader2 size={13} className="animate-spin" /> : <FileUp size={13} />}
-                  {busy === requirement ? t('files.uploading') : t('files.attach')}
-                </button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {busy === requirement ? (
+                    <span className="flex items-center gap-1.5 text-[calc(13px_*_var(--text-scale))] font-semibold text-slate-600">
+                      <Loader2 size={14} className="animate-spin" /> {t('files.uploading')}
+                    </span>
+                  ) : (
+                    <>
+                      {hasCamera && (
+                        <button
+                          disabled={busy !== null}
+                          onClick={() => pick(requirement, 'camera')}
+                          className="tap-target flex items-center gap-1.5 rounded-xl bg-navy-800 px-3.5 text-[calc(13px_*_var(--text-scale))] font-semibold text-white active:bg-navy-900 disabled:opacity-50"
+                        >
+                          <Camera size={14} /> {t('files.takePhoto')}
+                        </button>
+                      )}
+                      <button
+                        disabled={busy !== null}
+                        onClick={() => pick(requirement, 'file')}
+                        className="tap-target flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 text-[calc(13px_*_var(--text-scale))] font-semibold text-navy-800 active:bg-slate-50 disabled:opacity-50"
+                      >
+                        <FileUp size={14} /> {t('files.attach')}
+                      </button>
+                    </>
+                  )}
+                </div>
               ) : (
                 <p className="mt-1 text-[calc(12.5px_*_var(--text-scale))] text-amber-700">{t('files.notSubmitted')}</p>
               )}
@@ -136,13 +221,24 @@ export default function Attachments({
       )}
 
       {editable && (
-        <button
-          disabled={busy !== null}
-          onClick={() => pick(undefined)}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-[calc(13.5px_*_var(--text-scale))] font-medium text-slate-500 disabled:opacity-50"
-        >
-          <FileUp size={14} /> {t('files.attachAnother')}
-        </button>
+        <div className="mt-3 flex gap-2">
+          {hasCamera && (
+            <button
+              disabled={busy !== null}
+              onClick={() => pick(undefined, 'camera')}
+              className="tap-target flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 text-[calc(13.5px_*_var(--text-scale))] font-medium text-slate-600 disabled:opacity-50"
+            >
+              <Camera size={14} /> {t('files.takePhoto')}
+            </button>
+          )}
+          <button
+            disabled={busy !== null}
+            onClick={() => pick(undefined, 'file')}
+            className="tap-target flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 text-[calc(13.5px_*_var(--text-scale))] font-medium text-slate-600 disabled:opacity-50"
+          >
+            <FileUp size={14} /> {t('files.attachAnother')}
+          </button>
+        </div>
       )}
 
       {error && (

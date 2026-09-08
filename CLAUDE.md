@@ -131,6 +131,29 @@ Two deliberate boundaries:
   requirements, and form field labels are catalogue data too, so they render in whatever
   language the catalogue was authored in.
 
+## Attaching requirements
+
+A service's `requirements` are a checklist on the request, and the resident supplies each
+one two ways: **Take photo**, which hands the job to the phone's own camera app, or
+**Attach file** for a PDF or picture they already have.
+
+The camera is `<input type="file" accept="image/*" capture="environment">` rather than a
+`getUserMedia` preview in the page. The native camera focuses, uses the flash and applies
+the phone's processing, so the office gets a document photo it can actually read; an
+in-page preview would be a worse picture and more code. `useHasCamera` hides the option
+when `enumerateDevices` reports no `videoinput`, falling back to "this is a touch device"
+where the API is unavailable (an insecure context), so a phone never loses the feature to
+a failed capability check.
+
+**10 MB per file, at most 10 files per request**, enforced in `server/src/uploads.ts` and
+checked again in the browser before the upload starts — the server's limit is the real one,
+but discovering it after pushing 11 MB over a mobile connection is not a usable answer.
+Type is decided by magic bytes, never the filename or the declared MIME type.
+
+A service with requirements says so on the submit-success screen and offers to go straight
+to the list, because the office cannot act until the files are in and nothing else in the
+flow would tell the resident that.
+
 ## Form validation
 
 A service's fields are catalogue data, so the rules they imply are enforced from the same

@@ -88,7 +88,10 @@ check('and got a real reference number', /^BOSS-\d{4}-\d{5}$/.test(submitted.jso
 const after = (await j('/requests/drafts', { token: resident })).json
 check('the draft is gone', !after.some((d) => d.id === draftId), JSON.stringify(after.map((d) => d.serviceId)))
 check('the other draft is untouched', after.length === 1 && after[0].serviceId === 'cedula')
-check('now it shows in the office queue', JSON.stringify((await j('/staff/queue', { token: bpls })).json.items).includes(MARKER))
+// Searched rather than scanned: the queue is paged oldest-first, so a request
+// filed just now sits past the first page on any long-lived database.
+const found = await j(`/staff/queue?q=${encodeURIComponent(submitted.json.referenceNo)}`, { token: bpls })
+check('now it shows in the office queue', found.json.items.some((i) => i.referenceNo === submitted.json.referenceNo), JSON.stringify(found.json.items?.length))
 
 console.log('\n== submitting without naming the draft still clears it ==')
 await j('/requests/drafts/cedula', { method: 'PUT', token: resident, body: { formValues: { purpose: 'Employment' } } })

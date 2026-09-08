@@ -302,6 +302,18 @@ Covers registration and login, request submission, the full assess → pay →
 release path, rejection, and the access rules: one department cannot read or act
 on another's requests, and one resident cannot read another's.
 
+## Attachment limits
+
+`MAX_FILE_BYTES` is 10 MB and `MAX_FILES_PER_REQUEST` is 10, both in `src/uploads.ts`.
+Multer enforces the byte cap at the transport layer and the error handler in `index.ts`
+turns its `LIMIT_FILE_SIZE` into a 413 naming the limit; the file count is checked in the
+route and returns 409. The browser checks the size first so a resident is not made to
+upload 11 MB before being told, but the server is what makes the limit true.
+
+Content type comes from magic bytes (`detectType`), never the filename or the declared
+MIME type, and the stored name is rewritten to the detected extension. A photo taken with
+the phone camera arrives as an ordinary multipart JPEG and needs no special handling.
+
 ## Form validation
 
 `checkFormValues` in `routes/requests.ts` takes a `complete` flag. Submissions pass

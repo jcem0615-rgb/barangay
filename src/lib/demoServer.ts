@@ -593,6 +593,14 @@ async function route(
           throw new DemoError(409, 'This request is closed and no longer accepts files.')
         }
         if (!file) throw new DemoError(400, 'Choose a file to attach.')
+        // The same caps as server/src/uploads.ts, so the demo cannot accept
+        // what the real API would turn away.
+        if (file.size > 10 * 1024 * 1024) {
+          throw new DemoError(413, 'That file is too large. The limit is 10 MB.')
+        }
+        if (target.attachments.length >= 10) {
+          throw new DemoError(409, 'You can attach up to 10 files to a request.')
+        }
         const head = new Uint8Array(await file.slice(0, 12).arrayBuffer())
         const type = sniff(head)
         if (!type) throw new DemoError(415, "That file type isn't accepted. Attach a PDF, JPEG, PNG, or HEIC file.")

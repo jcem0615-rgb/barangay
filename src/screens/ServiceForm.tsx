@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, CheckCircle2, ClipboardList, CloudOff, Loader2, Send, Trash2 } from 'lucide-react'
+import { Check, CheckCircle2, ClipboardList, CloudOff, Loader2, Paperclip, Send, Trash2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import FormField from '../components/FormField'
 import OfflineBanner from '../components/OfflineBanner'
@@ -108,6 +108,10 @@ export default function ServiceForm({ serviceId }: { serviceId: string }) {
     }
   }
 
+  // Offline submissions have no request to attach to yet, so the prompt waits
+  // until the outbox has synced and the resident opens the real request.
+  const needsFiles = service.requirements.length > 0 && !submitted?.isOfflineDraft
+
   if (submitted) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center px-6 pb-24 pt-[env(safe-area-inset-top)] text-center">
@@ -122,12 +126,32 @@ export default function ServiceForm({ serviceId }: { serviceId: string }) {
             ? t('form.savedOfflineBlurb')
             : t('form.submittedBlurb', { ref: submitted.referenceNo })}
         </p>
+        {/*
+          A service with requirements is not finished at submit: the office
+          cannot act until the files are in. Say so here and go straight there,
+          rather than leaving the resident to discover the list on their own.
+        */}
+        {needsFiles && (
+          <div className="mt-6 w-full max-w-xs rounded-2xl border border-gold-500/40 bg-gold-100/60 p-4 text-left">
+            <p className="flex items-start gap-2 text-[calc(13.5px_*_var(--text-scale))] font-bold text-navy-950">
+              <Paperclip size={15} className="mt-0.5 shrink-0 text-gold-600" />
+              {t(
+                service.requirements.length === 1 ? 'files.needed' : 'files.neededPlural',
+                { count: service.requirements.length }
+              )}
+            </p>
+            <p className="mt-1 text-[calc(13px_*_var(--text-scale))] leading-snug text-navy-900/70">
+              {t('files.attachLater')}
+            </p>
+          </div>
+        )}
+
         <div className="mt-7 flex w-full max-w-xs flex-col gap-2.5">
           <button
             onClick={() => replace({ name: 'application-detail', id: submitted.id })}
             className="rounded-xl bg-navy-800 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-white active:bg-navy-900"
           >
-            {t('form.trackThis')}
+            {needsFiles ? t('files.attachNow') : t('form.trackThis')}
           </button>
           <button
             onClick={() => replace({ name: 'services' })}
