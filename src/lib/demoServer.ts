@@ -11,7 +11,7 @@
  */
 import { HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES } from '../data/mockData'
 import { addWorkingDays } from './schedule'
-import { WORKFLOW_STEPS } from '../types'
+import { WORKFLOW_STEPS, type ServiceDefinition } from '../types'
 
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
@@ -285,6 +285,46 @@ const officeName = (categoryId: string) =>
 const HOLIDAY_DAYS = new Set(HOLIDAYS.map((h) => h.date))
 
 /**
+ * The same field rules as the real API: a submission must be complete, a draft
+ * need only stay inside the shape the service declares. Throws a DemoError so
+ * the app sees exactly the message the server would have sent.
+ */
+function checkFormValues(
+  service: ServiceDefinition,
+  formValues: Record<string, string>,
+  complete: boolean
+) {
+  const declared = new Map(service.fields.map((f) => [f.id, f]))
+  const unknown = Object.keys(formValues).find((k) => !declared.has(k))
+  if (unknown) throw new DemoError(400, `Unexpected field: ${unknown}`)
+
+  if (!complete) return
+
+  for (const field of service.fields) {
+    const name = field.label ?? field.id
+    const value = (formValues[field.id] ?? '').trim()
+    if (field.required && value === '') throw new DemoError(400, `${name} is required.`)
+    if (value === '') continue
+    if (field.type === 'select' && field.options?.length && !field.options.includes(value)) {
+      throw new DemoError(400, `${name} must be one of the listed choices.`)
+    }
+    if (field.type === 'number' && !Number.isFinite(Number(value))) {
+      throw new DemoError(400, `${name} must be a number.`)
+    }
+    if (field.type === 'date' && !isCalendarDate(value)) {
+      throw new DemoError(400, `${name} must be a valid date.`)
+    }
+  }
+}
+
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [y, m, d] = value.split('-').map(Number)
+  const asDate = new Date(Date.UTC(y!, m! - 1, d!))
+  return asDate.getUTCFullYear() === y && asDate.getUTCMonth() === m! - 1 && asDate.getUTCDate() === d
+}
+
+/**
  * The same rules as server/src/schedule.ts: working days only, no date while a
  * fee is unpaid, and none once the request is closed.
  */
@@ -464,9 +504,7 @@ async function route(
     if (!parts[1] && method === 'POST') {
       const service = SERVICES.find((s) => s.id === body.serviceId)
       if (!service) throw new DemoError(404, 'That service is no longer offered.')
-      const declared = new Set(service.fields.map((f) => f.id))
-      const unknown = Object.keys(body.formValues ?? {}).find((k) => !declared.has(k))
-      if (unknown) throw new DemoError(400, `Unexpected field: ${unknown}`)
+      checkFormValues(service, body.formValues ?? {}, true)
       const created = makeRequest(state, user, service, body.formValues ?? {})
       state.requests.push(created)
       state.drafts = state.drafts.filter(
@@ -498,9 +536,7 @@ async function route(
       if (parts[2] && method === 'PUT') {
         const service = SERVICES.find((s) => s.id === parts[2])
         if (!service) throw new DemoError(404, 'That service is no longer offered.')
-        const declared = new Set(service.fields.map((f) => f.id))
-        const unknown = Object.keys(body.formValues ?? {}).find((k) => !declared.has(k))
-        if (unknown) throw new DemoError(400, `Unexpected field: ${unknown}`)
+        checkFormValues(service, body.formValues ?? {}, false)
 
         const now = new Date().toISOString()
         const existing = state.drafts.find((d) => d.residentId === user.id && d.serviceId === service.id)

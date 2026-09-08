@@ -1,6 +1,7 @@
 // Drafts: the resident's own scratch space. Never visible to an office, never
 // consuming a reference number, and cleared the moment it becomes a request.
 import { spawn } from 'node:child_process'
+import { formFiller } from './fixtures.mjs'
 
 const API_PORT = 4112
 const API = `http://127.0.0.1:${API_PORT}/api`
@@ -16,6 +17,7 @@ for (let i = 0; i < 40; i++) {
   try { if ((await fetch(`${API}/health`)).ok) break } catch {}
   await new Promise((r) => setTimeout(r, 250))
 }
+const formFor = await formFiller(API)
 const j = async (p, o = {}) => {
   const res = await fetch(API + p, { method: o.method ?? 'GET', headers: { 'Content-Type': 'application/json', ...(o.token ? { Authorization: `Bearer ${o.token}` } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined })
   const text = await res.text()
@@ -80,7 +82,7 @@ const before = (await j('/requests', { token: resident })).json.length
 check('no request was created by drafting', before === 0, `${before}`)
 
 console.log('\n== submitting consumes the draft ==')
-const submitted = await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'boss-application', formValues: { businessName: `${MARKER} & Supply`, businessType: 'New Business' }, draftId } })
+const submitted = await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'boss-application', formValues: formFor('boss-application', { businessName: `${MARKER} & Supply` }), draftId } })
 check('the request was filed', submitted.status === 201, JSON.stringify(submitted.json)?.slice(0, 120))
 check('and got a real reference number', /^BOSS-\d{4}-\d{5}$/.test(submitted.json.referenceNo), submitted.json.referenceNo)
 const after = (await j('/requests/drafts', { token: resident })).json
@@ -90,7 +92,7 @@ check('now it shows in the office queue', JSON.stringify((await j('/staff/queue'
 
 console.log('\n== submitting without naming the draft still clears it ==')
 await j('/requests/drafts/cedula', { method: 'PUT', token: resident, body: { formValues: { purpose: 'Employment' } } })
-await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: { purpose: 'Employment' } } })
+await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })
 check('matched on the service instead', (await j('/requests/drafts', { token: resident })).json.length === 0)
 
 console.log('\n== discarding ==')

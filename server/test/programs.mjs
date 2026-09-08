@@ -2,6 +2,7 @@
 // welfare office, readable by the resident they belong to, and never
 // self-declared.
 import { spawn } from 'node:child_process'
+import { formFiller } from './fixtures.mjs'
 
 const API_PORT = 4111
 const API = `http://127.0.0.1:${API_PORT}/api`
@@ -17,6 +18,7 @@ for (let i = 0; i < 40; i++) {
   try { if ((await fetch(`${API}/health`)).ok) break } catch {}
   await new Promise((r) => setTimeout(r, 250))
 }
+const formFor = await formFiller(API)
 const j = async (p, o = {}) => {
   const res = await fetch(API + p, { method: o.method ?? 'GET', headers: { 'Content-Type': 'application/json', ...(o.token ? { Authorization: `Bearer ${o.token}` } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined })
   return { status: res.status, json: await res.json().catch(() => null) }
@@ -51,7 +53,7 @@ const me0 = (await j('/auth/me', { token: resident })).json
 check('profile carries an empty list', Array.isArray(me0.profile.programs) && me0.profile.programs.length === 0, JSON.stringify(me0.profile.programs))
 
 // The resident files something with the social welfare office.
-const reqId = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'solo-parent-id', formValues: {} } })).json?.id
+const reqId = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'solo-parent-id', formValues: formFor('solo-parent-id') } })).json?.id
 check('a CSWDO request was filed', typeof reqId === 'string', JSON.stringify(reqId))
 
 console.log('\n== only the registering office may enrol ==')

@@ -1,6 +1,7 @@
 // Expected ready dates: working-day arithmetic that skips weekends and
 // holidays, and a clock that stops while a request waits on the resident.
 import { spawn } from 'node:child_process'
+import { formFiller } from './fixtures.mjs'
 import { addWorkingDays } from '../src/schedule.ts'
 
 const API_PORT = 4113
@@ -41,6 +42,7 @@ for (let i = 0; i < 40; i++) {
   try { if ((await fetch(`${API}/health`)).ok) break } catch {}
   await new Promise((r) => setTimeout(r, 250))
 }
+const formFor = await formFiller(API)
 const j = async (p, o = {}) => {
   const res = await fetch(API + p, { method: o.method ?? 'GET', headers: { 'Content-Type': 'application/json', ...(o.token ? { Authorization: `Bearer ${o.token}` } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined })
   const text = await res.text()
@@ -60,7 +62,7 @@ check('including the local ones', cat.holidays.some((h) => h.isLocal === true))
 console.log('\n== a free service is estimated from submission ==')
 // Birth certificate: 3-5 days, no fee up front in this catalogue? Use whichever is free.
 const free = cat.services.find((s) => !s.requiresPayment)
-const freeReq = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: free.id, formValues: {} } })).json
+const freeReq = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: free.id, formValues: formFor(free.id) } })).json
 check('an estimate comes back', Boolean(freeReq.expectedReady), JSON.stringify(freeReq.expectedReady))
 check('it is a range', freeReq.expectedReady.from <= freeReq.expectedReady.to)
 check('not waiting on the resident', freeReq.awaitingResident === false)
@@ -70,7 +72,7 @@ check('never a holiday', !holidaySet.has(freeReq.expectedReady.from) && !holiday
 
 console.log('\n== a payable service quotes no date until it is paid ==')
 const payable = cat.services.find((s) => s.requiresPayment && s.id === 'cedula') ?? cat.services.find((s) => s.requiresPayment)
-const pid = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: payable.id, formValues: {} } })).json.id
+const pid = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: payable.id, formValues: formFor(payable.id) } })).json.id
 await j(`/staff/requests/${pid}/assess`, { method: 'POST', token: treasury, body: { fee: 130 } })
 const assessed = (await j(`/requests/${pid}`, { token: resident })).json
 check('no date while the fee is unpaid', assessed.expectedReady === null, JSON.stringify(assessed.expectedReady))
@@ -94,7 +96,7 @@ const queue = (await j('/staff/queue', { token: treasury })).json
 check('and the queue carries them', queue.items.every((i) => 'expectedReady' in i))
 
 console.log('\n== rejected requests too ==')
-const rid = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: payable.id, formValues: {} } })).json.id
+const rid = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: payable.id, formValues: formFor(payable.id) } })).json.id
 await j(`/staff/requests/${rid}/reject`, { method: 'POST', token: treasury, body: { reason: 'Incomplete requirements' } })
 const rejected = (await j(`/requests/${rid}`, { token: resident })).json
 check('no date on a rejected request', rejected.expectedReady === null && rejected.awaitingResident === false)

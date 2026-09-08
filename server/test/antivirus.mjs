@@ -3,6 +3,7 @@
 // and reply parsing — not a stubbed-out function.
 import { createServer } from 'node:net'
 import { spawn } from 'node:child_process'
+import { formFiller } from './fixtures.mjs'
 
 const PORT = 43310
 const API_PORT = 4100
@@ -57,6 +58,7 @@ for (let i = 0; i < 40; i++) {
   await new Promise((r) => setTimeout(r, 250))
 }
 
+const formFor = await formFiller(API)
 const j = async (p, o = {}) => {
   const res = await fetch(API + p, { method: o.method ?? 'GET', headers: { 'Content-Type': 'application/json', ...(o.token ? { Authorization: `Bearer ${o.token}` } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined })
   return { status: res.status, json: await res.json().catch(() => null) }
@@ -70,7 +72,7 @@ async function put(path, token, bytes, name) {
 
 const PDF = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(500, 0x20), Buffer.from('\n%%EOF')])
 const token = (await j('/auth/register', { method: 'POST', body: { email: `av.${Date.now()}@example.com`, password: 'tamang-lakas-2026', fullName: 'Scan Tester' } })).json.token
-const id = (await j('/requests', { method: 'POST', token, body: { serviceId: 'cedula', formValues: { purpose: 'Employment' } } })).json.id
+const id = (await j('/requests', { method: 'POST', token, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })).json.id
 
 console.log('\n== scanning is reported as on ==')
 check('health says scanning enabled', (await j('/health')).json?.virusScanning === 'enabled')

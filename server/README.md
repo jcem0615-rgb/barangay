@@ -293,6 +293,7 @@ npm run test:pagination   # paging boundaries, cursor stability, and search
 npm run test:programs     # sectoral registries: who may write, expiry, and isolation
 npm run test:drafts       # drafts stay out of every queue, and clear on submit
 npm run test:ready-dates  # working-day arithmetic, holidays, and the paused clock
+npm run test:field-rules  # required fields, select/number/date types, draft exemption
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```
@@ -300,6 +301,24 @@ npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
 Covers registration and login, request submission, the full assess → pay →
 release path, rejection, and the access rules: one department cannot read or act
 on another's requests, and one resident cannot read another's.
+
+## Form validation
+
+`checkFormValues` in `routes/requests.ts` takes a `complete` flag. Submissions pass
+`true`: every required field must be filled, a `select` value must be one of its declared
+options, a `number` must parse, and a `date` must be a real calendar day (`2026-02-31` is
+refused, `2024-02-29` is not). Errors use the field's label, so the resident reads the same
+words the form showed them.
+
+Drafts pass `false` and are held only to the structural rules — declared field ids and
+`MAX_FIELD_LENGTH`. A draft is unfinished by definition; validating it would reject the
+resident's own half-typed input as they went.
+
+The browser applies the same rules first. This is the backstop that makes them real, since
+a caller can POST straight to the endpoint.
+
+`test/fixtures.mjs` builds valid submissions from `/api/catalogue`, so test data cannot
+drift from the catalogue it is filling in.
 
 ## Expected ready dates
 

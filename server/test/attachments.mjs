@@ -1,5 +1,6 @@
 // Resident-supplied requirement files, and the rules around them.
 const API = process.env.API_URL ?? 'http://127.0.0.1:4000/api'
+import { formFiller } from './fixtures.mjs'
 let pass = 0, fail = 0
 const check = (n, c, x = '') => { if (c) { pass++; console.log(`  PASS  ${n}`) } else { fail++; console.log(`  FAIL  ${n} ${x}`) } }
 async function j(p, o = {}) {
@@ -15,6 +16,8 @@ async function put(path, token, bytes, name, requirement) {
   const res = await fetch(API + path, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
   return { status: res.status, json: await res.json().catch(() => null) }
 }
+const formFor = await formFiller(API)
+
 const PDF = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(600, 0x20), Buffer.from('\n%%EOF')])
 const PNG = Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]), Buffer.alloc(400, 1)])
 
@@ -23,7 +26,7 @@ const resident = (await j('/auth/register', { method: 'POST', body: {
 const mto = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const lcr = (await j('/auth/login', { method: 'POST', body: { email: 'lcr@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const id = (await j('/requests', { method: 'POST', token: resident, body: {
-  serviceId: 'cedula', formValues: { purpose: 'Employment' } } })).json.id
+  serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })).json.id
 
 console.log('\n== attaching a requirement ==')
 const up = await put(`/requests/${id}/attachments`, resident, PDF, 'my id.pdf', 'Valid government ID')

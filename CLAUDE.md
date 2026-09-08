@@ -131,6 +131,27 @@ Two deliberate boundaries:
   requirements, and form field labels are catalogue data too, so they render in whatever
   language the catalogue was authored in.
 
+## Form validation
+
+A service's fields are catalogue data, so the rules they imply are enforced from the same
+place. `checkFormValues` (`server/src/routes/requests.ts`) rejects a submission that is
+missing a required field, puts a value in a `select` that is not one of its options, a
+non-number in a `number`, or a date that never existed ("2026-02-31"). Errors name the
+field the way the form named it — "Business address is required", not `businessAddress`.
+
+The browser checks the same rules first, but nothing stops a caller POSTing straight past
+the form, so the server is what makes them true. The client renders a real `<select>` and
+native `number`/`date` inputs, so ordinary use never reaches these rejections.
+
+**Drafts are deliberately exempt.** A draft is half-finished by definition, and often
+mid-keystroke — a date reading `199`, a select reading `New`. It is held only to the rules
+that protect the store itself (declared fields, sane lengths); everything else waits until
+the resident submits. That split is the `complete` flag on `checkFormValues`.
+
+Server test fixtures build their submissions from the live catalogue
+(`server/test/fixtures.mjs`) rather than hand-writing partial forms, so a fixture cannot
+drift from the service it fills in.
+
 ## Expected ready dates
 
 `processingTime` is prose for the counter ("3–5 working days"); `processingDaysMin` and
@@ -271,8 +292,6 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   balancer instead of the client. A locked account rejects the correct password too, which
   means an attacker who knows an address can keep that resident out for 15 minutes at a
   time — the accepted trade for not leaving accounts guessable.
-- **Required fields** are enforced in the client only. The API rejects undeclared
-  fields and over-long values, but not a submission missing a required one.
 - **Queue paging** is keyset on `(submitted_at, id)`; the cursor must carry the
   timestamp at full microsecond precision or pages overlap. See `server/README.md`.
 - Navigation stack resets on reload (in-memory, not URL-based).

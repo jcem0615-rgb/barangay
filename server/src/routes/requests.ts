@@ -27,11 +27,19 @@ const createSchema = z.object({
   draftId: z.uuid().optional(),
 })
 
+interface ServiceField {
+  id: string
+  label?: string
+  type?: string
+  options?: string[]
+  required?: boolean
+}
+
 interface ServiceRow {
   id: string
   department_id: string
   fee_centavos: number
-  fields: Array<{ id: string }>
+  fields: ServiceField[]
 }
 
 const loadService = (serviceId: string) =>
@@ -41,25 +49,74 @@ const loadService = (serviceId: string) =>
     [serviceId]
   )
 
+/** A field is named to the resident the way the form named it to them. */
+const nameOf = (field: ServiceField) => field.label ?? field.id
+
 /**
- * Only the fields this service declares are stored, and none of them oversized.
- * Applied to drafts as well as submissions: a draft is written by the same
- * client and read back into the same form, so letting one hold what the other
- * would refuse just moves the rejection to a worse moment.
+ * Checks a form against the shape its service declares.
+ *
+ * `complete` separates the two callers. A submission must satisfy every rule:
+ * once it is filed, a clerk acts on it, and an application missing its business
+ * address is one someone has to chase the resident about. A draft is by
+ * definition half-finished and possibly mid-keystroke, so it is held only to
+ * the rules that protect the store itself — declared fields, sane lengths —
+ * and everything else waits until the resident actually submits.
+ *
+ * The browser applies the same rules first; this is what makes them true, since
+ * nothing stops a caller from POSTing straight past the form.
  *
  * Returns an error message, or null when the values are acceptable.
  */
-function checkFormValues(service: ServiceRow, formValues: Record<string, string>): string | null {
+function checkFormValues(
+  service: ServiceRow,
+  formValues: Record<string, string>,
+  { complete }: { complete: boolean }
+): string | null {
   // Without this a caller could attach arbitrary keys, which staff would then
   // be shown as if the resident had filled them in.
-  const declared = new Set(service.fields.map((f) => f.id))
+  const declared = new Map(service.fields.map((f) => [f.id, f]))
   const unknown = Object.keys(formValues).find((k) => !declared.has(k))
   if (unknown) return `Unexpected field: ${unknown}`
 
   const tooLong = Object.entries(formValues).find(([, v]) => v.length > MAX_FIELD_LENGTH)
-  if (tooLong) return `${tooLong[0]} is too long (max ${MAX_FIELD_LENGTH} characters).`
+  if (tooLong) {
+    const field = declared.get(tooLong[0])
+    return `${field ? nameOf(field) : tooLong[0]} is too long (max ${MAX_FIELD_LENGTH} characters).`
+  }
+
+  if (!complete) return null
+
+  for (const field of service.fields) {
+    const value = (formValues[field.id] ?? '').trim()
+
+    if (field.required && value === '') return `${nameOf(field)} is required.`
+    // An optional field left blank is finished; only a filled one is checked
+    // against its type.
+    if (value === '') continue
+
+    if (field.type === 'select' && field.options?.length && !field.options.includes(value)) {
+      return `${nameOf(field)} must be one of the listed choices.`
+    }
+    if (field.type === 'number' && !Number.isFinite(Number(value))) {
+      return `${nameOf(field)} must be a number.`
+    }
+    // The form uses a native date input, which always yields YYYY-MM-DD.
+    if (field.type === 'date' && !isCalendarDate(value)) {
+      return `${nameOf(field)} must be a valid date.`
+    }
+  }
 
   return null
+}
+
+/** A real day, not merely something Date.parse tolerates ("2026-02-31"). */
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [y, m, d] = value.split('-').map(Number)
+  const asDate = new Date(Date.UTC(y!, m! - 1, d!))
+  return (
+    asDate.getUTCFullYear() === y && asDate.getUTCMonth() === m! - 1 && asDate.getUTCDate() === d
+  )
 }
 
 requestsRouter.post('/', async (req, res) => {
@@ -70,7 +127,7 @@ requestsRouter.post('/', async (req, res) => {
   const service = await loadService(serviceId)
   if (!service) return res.status(404).json({ error: 'That service is no longer offered.' })
 
-  const invalid = checkFormValues(service, formValues)
+  const invalid = checkFormValues(service, formValues, { complete: true })
   if (invalid) return res.status(400).json({ error: invalid })
 
   const created = await transaction(async (client) => {
@@ -184,7 +241,7 @@ requestsRouter.put('/drafts/:serviceId', async (req, res) => {
   const service = await loadService(req.params.serviceId)
   if (!service) return res.status(404).json({ error: 'That service is no longer offered.' })
 
-  const invalid = checkFormValues(service, parsed.data.formValues)
+  const invalid = checkFormValues(service, parsed.data.formValues, { complete: false })
   if (invalid) return res.status(400).json({ error: invalid })
 
   const saved = await one(

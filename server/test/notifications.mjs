@@ -1,6 +1,7 @@
 // Resident notifications: recorded with the change they describe, delivered
 // outward afterwards, and readable only by the person they belong to.
 import { spawn } from 'node:child_process'
+import { formFiller } from './fixtures.mjs'
 import { readFile, rm } from 'node:fs/promises'
 
 const API_PORT = 4104
@@ -19,6 +20,7 @@ for (let i = 0; i < 40; i++) {
   try { if ((await fetch(`${API}/health`)).ok) break } catch {}
   await new Promise((r) => setTimeout(r, 250))
 }
+const formFor = await formFiller(API)
 const j = async (p, o = {}) => {
   const res = await fetch(API + p, { method: o.method ?? 'GET', headers: { 'Content-Type': 'application/json', ...(o.token ? { Authorization: `Bearer ${o.token}` } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined })
   return { status: res.status, json: await res.json().catch(() => null) }
@@ -33,7 +35,7 @@ const settle = () => new Promise((r) => setTimeout(r, 700))
 const email = `notify.${Date.now()}@example.com`
 const resident = (await j('/auth/register', { method: 'POST', body: { email, password: 'tamang-lakas-2026', fullName: 'Divina Ocampo' } })).json.token
 const mto = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const id = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: { purpose: 'Employment' } } })).json.id
+const id = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })).json.id
 
 console.log('\n== nothing before the office acts ==')
 const initial = await j('/notifications', { token: resident })
@@ -63,7 +65,7 @@ check('and says it can be downloaded', afterRelease.json.notifications.find(n =>
 check('unread now two', afterRelease.json.unread === 2)
 
 console.log('\n== rejection explains itself ==')
-const other = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: { purpose: 'Employment' } } })).json.id
+const other = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })).json.id
 await j(`/staff/requests/${other}/reject`, { method: 'POST', token: mto, body: { reason: 'Declared income does not match the payslip.' } })
 await settle()
 const afterReject = (await j('/notifications', { token: resident })).json.notifications.find(n => n.kind === 'rejected')
@@ -93,7 +95,7 @@ check('a valid one is accepted', prefs.json?.phone === '09171234567' && prefs.js
 const before = (await mailsTo(email)).length
 // A fresh request: `other` was rejected above, and the API rightly refuses to
 // assess a closed one.
-const third = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: { purpose: 'Employment' } } })).json.id
+const third = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })).json.id
 await j(`/staff/requests/${third}/assess`, { method: 'POST', token: mto, body: { fee: 55 } })
 await settle()
 check('opting out of email stops the email', (await mailsTo(email)).length === before, `${(await mailsTo(email)).length} vs ${before}`)

@@ -1,4 +1,5 @@
 const API = 'http://127.0.0.1:4000/api'
+import { formFiller } from './fixtures.mjs'
 let pass = 0, fail = 0
 const check = (name, cond, extra = '') => {
   if (cond) { pass++; console.log(`  PASS  ${name}`) }
@@ -16,6 +17,8 @@ async function call(path, { method = 'GET', token, body } = {}) {
 }
 
 console.log('\n== catalogue (public) ==')
+const formFor = await formFiller(API)
+
 const cat = await call('/catalogue')
 check('catalogue returns 6 offices', cat.json?.departments?.length === 6, JSON.stringify(cat.json?.departments?.length))
 check('catalogue returns 17 services', cat.json?.services?.length === 17)
@@ -42,7 +45,7 @@ check('unknown email gives same message as wrong password', unknown.json?.error 
 
 console.log('\n== resident submits a request ==')
 const submit = await call('/requests', { method: 'POST', token: resident,
-  body: { serviceId: 'building-permit', formValues: { workType: 'New Construction', floorArea: '84' } } })
+  body: { serviceId: 'building-permit', formValues: formFor('building-permit', { workType: 'New Construction', floorArea: '84' }) } })
 check('submit returns 201', submit.status === 201, JSON.stringify(submit.json))
 const reqId = submit.json?.id
 check('reference number is OBO-prefixed', /^OBO-\d{4}-\d{5}$/.test(submit.json?.referenceNo ?? ''), submit.json?.referenceNo)
@@ -91,7 +94,7 @@ check('other resident gets 404 on the request', (await call(`/requests/${reqId}`
 check('other resident list is empty', (await call('/requests', { token: other })).json?.length === 0)
 
 console.log('\n== rejection path ==')
-const cedula = await call('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: { purpose: 'Employment' } } })
+const cedula = await call('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })
 const mtoTok = (await call('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
 check('empty rejection reason refused', (await call(`/staff/requests/${cedula.json.id}/reject`, { method: 'POST', token: mtoTok, body: { reason: '' } })).status === 400)
 const rejected = await call(`/staff/requests/${cedula.json.id}/reject`, { method: 'POST', token: mtoTok, body: { reason: 'Declared income does not match submitted payslip.' } })

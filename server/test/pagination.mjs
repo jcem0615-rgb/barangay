@@ -4,6 +4,7 @@
 // matters: a page boundary must not drop or repeat a row, even when new
 // requests arrive between pages.
 import { spawn } from 'node:child_process'
+import { formFiller } from './fixtures.mjs'
 
 const API_PORT = 4105
 const API = `http://127.0.0.1:${API_PORT}/api`
@@ -19,6 +20,7 @@ for (let i = 0; i < 40; i++) {
   try { if ((await fetch(`${API}/health`)).ok) break } catch {}
   await new Promise((r) => setTimeout(r, 250))
 }
+const formFor = await formFiller(API)
 const j = async (p, o = {}) => {
   const res = await fetch(API + p, { method: o.method ?? 'GET', headers: { 'Content-Type': 'application/json', ...(o.token ? { Authorization: `Bearer ${o.token}` } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined })
   return { status: res.status, json: await res.json().catch(() => null) }
@@ -33,7 +35,7 @@ const health = (await j('/auth/login', { method: 'POST', body: { email: 'health@
 const created = []
 for (let i = 0; i < 12; i++) {
   const r = await j('/requests', { method: 'POST', token: resident, body: {
-    serviceId: 'health-certificate', formValues: { natureOfWork: 'Food Handler', employer: `Shop ${i}` } } })
+    serviceId: 'health-certificate', formValues: formFor('health-certificate', { employer: `Shop ${i}` }) } })
   created.push(r.json.id)
 }
 // Scope every assertion to this run's resident so other tests' rows don't interfere.
@@ -67,7 +69,7 @@ console.log('\n== a new arrival mid-paging does not disturb the cursor ==')
 // inserted before the next page shifts everything and page 2 repeats a row.
 const page1 = await j(`/staff/queue?q=${encodeURIComponent(mine)}&limit=5`, { token: health })
 await j('/requests', { method: 'POST', token: resident, body: {
-  serviceId: 'health-certificate', formValues: { natureOfWork: 'Food Handler', employer: 'Late arrival' } } })
+  serviceId: 'health-certificate', formValues: formFor('health-certificate', { natureOfWork: 'Food Handler', employer: 'Late arrival' }) } })
 const page2 = await j(`/staff/queue?q=${encodeURIComponent(mine)}&limit=5&cursor=${encodeURIComponent(page1.json.nextCursor)}`, { token: health })
 const overlap = page2.json.items.filter((r) => page1.json.items.some((p) => p.id === r.id))
 check('page 2 repeats nothing from page 1', overlap.length === 0, JSON.stringify(overlap.map(r => r.referenceNo)))
