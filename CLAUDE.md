@@ -391,6 +391,47 @@ is the expensive part of dealing with an LGU, and it is worth a panel to avoid o
 All of this is translated. The step labels themselves are not — they name stages of an
 official process, like "Cedula" and "Building Permit".
 
+## Editing the municipality's own data
+
+Hotlines, the holiday calendar and each office's address were seeded and then unreachable:
+correcting a wrong number meant editing `mockData.ts` and reseeding the database. No
+municipality can do that, so in practice the numbers stayed wrong. The **Municipality** tab
+(`StaffMunicipality.tsx`, admin only) is where they are now fixed.
+
+This matters most for the hotlines. A number that rings nowhere is worse than none at all,
+because a resident trusts it in the moment they can least afford to — so the panel says so,
+and asks whoever is editing to ring it before saving.
+
+**Every write is audited in the same transaction as the change** (`admin_audit`,
+`recordAudit` in `server/src/municipality.ts`), with the whole row as it was. That log is
+the entire safety net here: an administrator can quietly point the fire hotline anywhere,
+and the only defence against a mistake nobody notices is a record with the old number still
+in it. The actor's name is stored beside their id rather than joined at read time, so a
+renamed or removed account does not erase who did what. The "What changed" panel shows only
+the fields that actually moved on an edit — diffing two long office addresses by eye is
+exactly the job the screen exists to spare someone.
+
+**Phone validation is deliberately loose** (`looksDialable`). Philippine numbers are
+written every which way — `(045) 961-2400`, `0917 123 4567`, `+63 2 8888 4000`, `911` — and
+a validator strict enough to have an opinion would reject a number that rings perfectly
+well. It rules out only the unusable. The real check is a person ringing it, which is what
+`DEPLOY.md` asks for.
+
+**Only contact details, never the catalogue.** What an office is called and what it offers
+is a change to what the municipality provides, not a correction to how to reach it, so
+`PATCH /admin/offices/:id` takes address, hours, phone and email and nothing else. An
+unknown key is stripped, which leaves nothing to change and refuses the whole request
+rather than quietly doing something different.
+
+**Declaring a holiday moves dates already promised**, because every estimate is computed
+over the calendar rather than stored. That is the intended behaviour — the hall really is
+shut — and it is why `POST /admin/holidays` upserts: a proclamation renaming or moving a
+day is the ordinary case, not a reason to make someone delete a row first.
+
+In the demo these live in `DemoState` rather than reading the imported constants, since a
+demo whose catalogue is hard-wired to the seed would show an edit saving and then not
+appearing anywhere.
+
 ## Accessibility
 
 The app registers senior citizens and persons with disability, so legibility is a
@@ -463,16 +504,12 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   date, and a figure is never stale. It is also why the period is capped at a year; if the
   scan ever gets slow, add an index on `(department_id, submitted_at)` before reaching for a
   summary table.
-- **The holiday calendar** is seeded with 2026 Philippine dates and two invented local
-  ones. National holidays move each year by proclamation, so this needs checking annually
-  and the local rows replacing — an out-of-date calendar quietly promises dates on which
-  the hall is shut. There is no admin screen for it yet; it is a reseed.
-- **Office addresses, hours and phone numbers** in `SERVICE_CATEGORIES` are placeholders
-  for a sample municipality. Replace them and reseed before a real deployment; the Data
-  Privacy screen's DPO address too.
-- **The municipal emergency hotlines** in `EMERGENCY_CONTACTS` are placeholders as well,
-  and matter more than the rest: verify every one against the LGU before launch. The
-  national numbers (911, 143) are correct as published.
+- **The seeded holidays, office details and hotlines are still placeholders**, but they are
+  now correctable in the app rather than by reseeding — see *Editing the municipality's own
+  data*. The 2026 calendar still needs checking against the year's proclamation, the local
+  rows replacing, and **every municipal hotline verifying before launch**; the national
+  numbers (911, 143) are correct as published. `mockData.ts` remains the authoring source
+  for a fresh seed. The Data Privacy screen's DPO address is still code, not data.
 - **Sessions** are 12-hour JWTs with no refresh or general revocation list. Signing out
   clears the token client-side; it stays valid until it expires. The one exception is a
   password change, which `users.password_changed_at` enforces on every request.

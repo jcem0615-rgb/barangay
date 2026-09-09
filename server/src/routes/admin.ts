@@ -6,6 +6,7 @@ import { authenticate, hashPassword, requireRole } from '../auth.ts'
 import { issueResetToken } from '../resetTokens.ts'
 import { resetEmail, sendMail } from '../mailer.ts'
 import { env } from '../env.ts'
+import { isRealDate, looksDialable, recordAudit } from '../municipality.ts'
 
 export const adminRouter = Router()
 adminRouter.use(authenticate, requireRole('admin'))
@@ -236,4 +237,251 @@ adminRouter.post('/staff/:id/send-reset', async (req, res) => {
     return res.status(502).json({ error: 'The account was found but the email could not be sent.' })
   }
   res.status(202).json({ message: `A reset link has been sent to ${row.email}.` })
+})
+
+// ---------------------------------------------------------------------------
+// The municipality's own data
+//
+// Hotlines, the holiday calendar and each office's contact details were seeded
+// and then unreachable — correcting a wrong number meant editing the source and
+// reseeding. Everything below is admin-only and audited: `recordAudit` runs in
+// the same transaction as the change, so the log cannot be missing an entry for
+// something that happened.
+// ---------------------------------------------------------------------------
+
+const phone = z.string().trim().min(1).max(40).refine(looksDialable, {
+  message: 'That does not look like a number a resident could dial.',
+})
+
+const hotlineBody = z.object({
+  label: z.string().trim().min(1).max(60),
+  agency: z.string().trim().min(1).max(120),
+  phone,
+  isNational: z.boolean(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+})
+
+const HOTLINE_SELECT = `id, label, agency, phone, is_national as "isNational", sort_order as "sortOrder"`
+
+adminRouter.get('/hotlines', async (_req, res) => {
+  res.json(
+    await query(
+      `select ${HOTLINE_SELECT} from emergency_contacts order by is_national, sort_order, label`
+    )
+  )
+})
+
+adminRouter.post('/hotlines', async (req, res) => {
+  const parsed = hotlineBody.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the hotline details.' })
+  }
+  const { label, agency, phone: number, isNational, sortOrder } = parsed.data
+  const actor = req.user!
+  // Slugged from the label so the id reads as something in the audit log, with
+  // a short random tail because two offices may both be called "Police".
+  const id = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'hotline'}-${randomBytes(3).toString('hex')}`
+
+  const created = await transaction(async (client) => {
+    const { rows } = await client.query(
+      `insert into emergency_contacts (id, label, agency, phone, is_national, sort_order)
+       values ($1, $2, $3, $4, $5, $6) returning ${HOTLINE_SELECT}`,
+      [id, label, agency, number, isNational, sortOrder ?? 0]
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'hotline.create', target: id, after: rows[0],
+    })
+    return rows[0]
+  })
+  res.status(201).json(created)
+})
+
+adminRouter.put('/hotlines/:id', async (req, res) => {
+  const parsed = hotlineBody.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the hotline details.' })
+  }
+  const { label, agency, phone: number, isNational, sortOrder } = parsed.data
+  const actor = req.user!
+
+  const updated = await transaction(async (client) => {
+    // Locked and read first: the old value is the point of the log.
+    const existing = await client.query(
+      `select ${HOTLINE_SELECT} from emergency_contacts where id = $1 for update`,
+      [req.params.id]
+    )
+    if (existing.rowCount === 0) return null
+    const { rows } = await client.query(
+      `update emergency_contacts
+          set label = $2, agency = $3, phone = $4, is_national = $5, sort_order = $6
+        where id = $1 returning ${HOTLINE_SELECT}`,
+      [req.params.id, label, agency, number, isNational, sortOrder ?? existing.rows[0].sortOrder]
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'hotline.update', target: req.params.id,
+      before: existing.rows[0], after: rows[0],
+    })
+    return rows[0]
+  })
+  if (!updated) return res.status(404).json({ error: 'Hotline not found.' })
+  res.json(updated)
+})
+
+adminRouter.delete('/hotlines/:id', async (req, res) => {
+  const actor = req.user!
+  const removed = await transaction(async (client) => {
+    const existing = await client.query(
+      `select ${HOTLINE_SELECT} from emergency_contacts where id = $1 for update`,
+      [req.params.id]
+    )
+    if (existing.rowCount === 0) return false
+    await client.query(`delete from emergency_contacts where id = $1`, [req.params.id])
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'hotline.delete', target: req.params.id, before: existing.rows[0],
+    })
+    return true
+  })
+  if (!removed) return res.status(404).json({ error: 'Hotline not found.' })
+  res.status(204).end()
+})
+
+const holidayBody = z.object({
+  date: z.string().refine(isRealDate, { message: 'That is not a real date.' }),
+  name: z.string().trim().min(1).max(120),
+  isLocal: z.boolean(),
+})
+
+adminRouter.get('/holidays', async (req, res) => {
+  // Defaults to the calendar from the start of this year: an admin checking
+  // against the year's proclamation wants the whole year, not what is left.
+  const year = Number(req.query.year) || new Date().getUTCFullYear()
+  if (year < 2000 || year > 2100) return res.status(400).json({ error: 'Pick a year between 2000 and 2100.' })
+  res.json(
+    await query(
+      `select observed_on::text as date, name, is_local as "isLocal"
+         from holidays
+        where extract(year from observed_on) = $1
+        order by observed_on`,
+      [year]
+    )
+  )
+})
+
+adminRouter.post('/holidays', async (req, res) => {
+  const parsed = holidayBody.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the holiday.' })
+  }
+  const { date, name, isLocal } = parsed.data
+  const actor = req.user!
+
+  const saved = await transaction(async (client) => {
+    const existing = await client.query(
+      `select observed_on::text as date, name, is_local as "isLocal"
+         from holidays where observed_on = $1 for update`,
+      [date]
+    )
+    // Upsert rather than reject: a proclamation moving a holiday's name or
+    // making it local is the ordinary case, and an admin should not have to
+    // delete a row to correct one.
+    const { rows } = await client.query(
+      `insert into holidays (observed_on, name, is_local) values ($1, $2, $3)
+       on conflict (observed_on) do update set name = excluded.name, is_local = excluded.is_local
+       returning observed_on::text as date, name, is_local as "isLocal"`,
+      [date, name, isLocal]
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: existing.rowCount === 0 ? 'holiday.create' : 'holiday.update',
+      target: date,
+      before: existing.rows[0], after: rows[0],
+    })
+    return rows[0]
+  })
+  res.status(201).json(saved)
+})
+
+adminRouter.delete('/holidays/:date', async (req, res) => {
+  if (!isRealDate(req.params.date)) return res.status(400).json({ error: 'That is not a real date.' })
+  const actor = req.user!
+  const removed = await transaction(async (client) => {
+    const existing = await client.query(
+      `select observed_on::text as date, name, is_local as "isLocal"
+         from holidays where observed_on = $1 for update`,
+      [req.params.date]
+    )
+    if (existing.rowCount === 0) return false
+    await client.query(`delete from holidays where observed_on = $1`, [req.params.date])
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'holiday.delete', target: req.params.date, before: existing.rows[0],
+    })
+    return true
+  })
+  if (!removed) return res.status(404).json({ error: 'That day is not in the calendar.' })
+  res.status(204).end()
+})
+
+// Contact details only. What an office *is* — its name, its services, its fees —
+// is the service catalogue, and changing that is a change to what the
+// municipality offers, not a correction to how to reach it.
+const officeBody = z.object({
+  address: z.string().trim().max(200).nullable(),
+  hours: z.string().trim().max(120).nullable(),
+  phone: z.union([phone, z.null()]),
+  email: z.union([z.email().max(160), z.null()]),
+})
+
+const OFFICE_SELECT = `id, name, office_name as "officeName", address, hours, phone, email`
+
+adminRouter.get('/offices', async (_req, res) => {
+  res.json(await query(`select ${OFFICE_SELECT} from departments order by sort_order, name`))
+})
+
+adminRouter.patch('/offices/:id', async (req, res) => {
+  const parsed = officeBody.partial().safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the office details.' })
+  }
+  const patch = parsed.data
+  if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'Nothing to change.' })
+  const actor = req.user!
+
+  const updated = await transaction(async (client) => {
+    const existing = await client.query(
+      `select ${OFFICE_SELECT} from departments where id = $1 for update`,
+      [req.params.id]
+    )
+    if (existing.rowCount === 0) return null
+    const merged = { ...existing.rows[0], ...patch }
+    const { rows } = await client.query(
+      `update departments set address = $2, hours = $3, phone = $4, email = $5
+        where id = $1 returning ${OFFICE_SELECT}`,
+      [req.params.id, merged.address, merged.hours, merged.phone, merged.email]
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'office.update', target: req.params.id,
+      before: existing.rows[0], after: rows[0],
+    })
+    return rows[0]
+  })
+  if (!updated) return res.status(404).json({ error: 'Office not found.' })
+  res.json(updated)
+})
+
+/** The trail, newest first. Read-only — nothing in the app writes here twice. */
+adminRouter.get('/audit', async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200)
+  res.json(
+    await query(
+      `select id, actor_name as "actorName", action, target, before, after,
+              created_at as "createdAt"
+         from admin_audit order by created_at desc, id desc limit $1`,
+      [limit]
+    )
+  )
 })

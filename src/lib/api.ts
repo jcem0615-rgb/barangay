@@ -255,6 +255,43 @@ async function fetchBlob(path: string): Promise<Blob | null> {
   return res.blob()
 }
 
+export interface Hotline {
+  id: string
+  label: string
+  agency: string
+  phone: string
+  isNational: boolean
+  sortOrder: number
+}
+
+export type HotlineInput = Omit<Hotline, 'id' | 'sortOrder'> & { sortOrder?: number }
+
+export interface Holiday {
+  date: string
+  name: string
+  isLocal: boolean
+}
+
+export interface OfficeContact {
+  id: string
+  name: string
+  officeName: string
+  address: string | null
+  hours: string | null
+  phone: string | null
+  email: string | null
+}
+
+export interface AuditRow {
+  id: number
+  actorName: string
+  action: string
+  target: string
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  createdAt: string
+}
+
 export interface StaffAccount {
   id: string
   email: string
@@ -465,6 +502,32 @@ export const api = {
 
   sendStaffReset: (id: string) =>
     request<{ message: string }>(`/admin/staff/${id}/send-reset`, { method: 'POST' }),
+
+  // The municipal facts that rot: hotlines, the calendar, and how to reach an
+  // office. Admin-only and audited server-side.
+  listHotlines: () => request<Hotline[]>('/admin/hotlines'),
+
+  createHotline: (body: HotlineInput) =>
+    request<Hotline>('/admin/hotlines', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHotline: (id: string, body: HotlineInput) =>
+    request<Hotline>(`/admin/hotlines/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deleteHotline: (id: string) => request<void>(`/admin/hotlines/${id}`, { method: 'DELETE' }),
+
+  listHolidays: (year: number) => request<Holiday[]>(`/admin/holidays?year=${year}`),
+
+  saveHoliday: (body: Holiday) =>
+    request<Holiday>('/admin/holidays', { method: 'POST', body: JSON.stringify(body) }),
+
+  deleteHoliday: (date: string) => request<void>(`/admin/holidays/${date}`, { method: 'DELETE' }),
+
+  listOffices: () => request<OfficeContact[]>('/admin/offices'),
+
+  updateOffice: (id: string, body: Partial<Omit<OfficeContact, 'id' | 'name' | 'officeName'>>) =>
+    request<OfficeContact>(`/admin/offices/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  auditTrail: (limit = 50) => request<AuditRow[]>(`/admin/audit?limit=${limit}`),
 
   staffQueue: (opts: {
     departmentId?: string

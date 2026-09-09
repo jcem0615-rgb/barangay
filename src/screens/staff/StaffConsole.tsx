@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, Building2, Inbox, LogOut, RefreshCw, ScanLine, Search, Users } from 'lucide-react'
+import { BarChart3, Building2, Inbox, Landmark, LogOut, RefreshCw, ScanLine, Search, Users } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { Application, ServiceCategory } from '../../types'
@@ -7,6 +7,7 @@ import StaffRequestPanel from './StaffRequestPanel'
 import StaffAccounts from './StaffAccounts'
 import StaffVerifyId from './StaffVerifyId'
 import StaffReports from './StaffReports'
+import StaffMunicipality from './StaffMunicipality'
 import { hasScannedCode } from '../../lib/scannedCode'
 import { formatPeso } from '../../lib/money'
 
@@ -28,7 +29,7 @@ export default function StaffConsole() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // A clerk who arrived by scanning a resident's ID opens on the check, not the
   // queue — that scan is the errand.
-  const [view, setView] = useState<'queue' | 'verify' | 'reports' | 'accounts'>(
+  const [view, setView] = useState<'queue' | 'verify' | 'reports' | 'accounts' | 'municipality'>(
     hasScannedCode() ? 'verify' : 'queue'
   )
   const [loading, setLoading] = useState(true)
@@ -129,7 +130,9 @@ export default function StaffConsole() {
                 ['queue', 'Queue', Inbox],
                 ['verify', 'Verify ID', ScanLine],
                 ['reports', 'Reports', BarChart3],
-                ...(user?.role === 'admin' ? [['accounts', 'Accounts', Users] as const] : []),
+                ...(user?.role === 'admin'
+                  ? [['accounts', 'Accounts', Users] as const, ['municipality', 'Municipality', Landmark] as const]
+                  : []),
               ] as const).map(([key, label, Icon]) => (
                 <button
                   key={key}
@@ -163,6 +166,8 @@ export default function StaffConsole() {
           />
         ) : view === 'accounts' ? (
           <StaffAccounts departments={departments} />
+        ) : view === 'municipality' ? (
+          <StaffMunicipality />
         ) : (
         <>
         <div className="mb-5 flex flex-wrap items-center gap-2">

@@ -78,6 +78,13 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `POST` | `/api/notifications/:id/read` | resident — mark one read |
 | `POST` | `/api/notifications/read-all` | resident — mark all read |
 | `GET`/`PATCH` | `/api/notifications/preferences` | resident — channels and mobile number |
+| `GET`/`POST` | `/api/admin/hotlines` | admin — the emergency numbers on every digital ID |
+| `PUT`/`DELETE` | `/api/admin/hotlines/:id` | admin — correct or withdraw one |
+| `GET`/`POST` | `/api/admin/holidays` | admin — the working-day calendar (`year`); POST upserts a date |
+| `DELETE` | `/api/admin/holidays/:date` | admin — undeclare a day |
+| `GET` | `/api/admin/offices` | admin — each office's contact details |
+| `PATCH` | `/api/admin/offices/:id` | admin — address, hours, phone, email only |
+| `GET` | `/api/admin/audit` | admin — every change above, newest first, with the old value |
 | `GET` | `/api/admin/staff` | admin — every staff and admin account |
 | `POST` | `/api/admin/staff` | admin — create an account and mail an invitation |
 | `PATCH` | `/api/admin/staff/:id` | admin — name, offices, position |
@@ -305,6 +312,7 @@ npm run test:portrait     # ID photo: images only, own-photo scoping, replace an
 npm run test:hotlines     # emergency numbers: published, dialable, grouped, unique
 npm run test:id-verification  # single use, expiry, scoping, and what staff may see
 npm run test:reports      # the two turnaround clocks, office scoping, and the CSV
+npm run test:municipality # hotlines, holidays and office details: who may edit, and the audit
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```

@@ -18,7 +18,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v7'
+const STORE_KEY = 'elgu-demo-state-v8'
 
 interface DemoUser {
   id: string
@@ -94,6 +94,32 @@ interface DemoState {
   verifications: DemoVerification[]
   notifications: DemoNotification[]
   counters: Record<string, number>
+  /**
+   * The municipal facts an administrator can edit. Held in state rather than
+   * read from the imported constants, because the whole point of the admin
+   * screen is that they change — a demo whose catalogue is hard-wired to the
+   * seed would show the edit saving and then not showing up anywhere.
+   */
+  hotlines: DemoHotline[]
+  holidays: DemoHoliday[]
+  offices: Record<string, DemoOfficeContact>
+  audit: DemoAudit[]
+}
+
+interface DemoHotline {
+  id: string; label: string; agency: string; phone: string
+  isNational: boolean; sortOrder: number
+}
+
+interface DemoHoliday { date: string; name: string; isLocal: boolean }
+
+interface DemoOfficeContact {
+  address: string | null; hours: string | null; phone: string | null; email: string | null
+}
+
+interface DemoAudit {
+  id: number; actorName: string; action: string; target: string
+  before: unknown; after: unknown; createdAt: string
 }
 
 const uid = () => crypto.randomUUID()
@@ -150,7 +176,20 @@ function seed(): DemoState {
   }
   users.push(resident)
 
-  const state: DemoState = { users, requests: [], drafts: [], verifications: [], notifications: [], counters: {} }
+  const state: DemoState = {
+    users, requests: [], drafts: [], verifications: [], notifications: [], counters: {},
+    // Copied out of the catalogue rather than referenced, so editing them in
+    // the console changes this browser's copy and not the authoring source.
+    hotlines: EMERGENCY_CONTACTS.map((c, i) => ({
+      id: c.id, label: c.label, agency: c.agency, phone: c.phone,
+      isNational: c.isNational ?? false, sortOrder: i,
+    })),
+    holidays: HOLIDAYS.map((h) => ({ date: h.date, name: h.name, isLocal: h.local ?? false })),
+    offices: Object.fromEntries(SERVICE_CATEGORIES.map((c) => [c.id, {
+      address: c.address ?? null, hours: c.hours ?? null, phone: c.phone ?? null, email: c.email ?? null,
+    }])),
+    audit: [],
+  }
 
   const boss = SERVICES.find((s) => s.id === 'boss-application')!
   const birth = SERVICES.find((s) => s.id === 'birth-certificate')!
@@ -401,7 +440,38 @@ const mayAdministerPrograms = (user: DemoUser) =>
 const officeName = (categoryId: string) =>
   SERVICE_CATEGORIES.find((c) => c.id === categoryId)?.officeName ?? 'The municipal office'
 
-const HOLIDAY_DAYS = new Set(HOLIDAYS.map((h) => h.date))
+/**
+ * Mirrors `looksDialable` and `isRealDate` in server/src/municipality.ts.
+ * Deliberately loose about phone shape: Philippine numbers are written every
+ * which way, and a validator strict enough to have an opinion would reject one
+ * that rings perfectly well.
+ */
+const dialable = (phone: string) => {
+  const t = phone.trim()
+  return t.length > 0 && t.length <= 40 && /^[0-9+().\-\s#*]+$/.test(t) && (t.match(/\d/g)?.length ?? 0) >= 3
+}
+
+function isRealDay(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(Date.UTC(y!, m! - 1, d!))
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m! - 1 && date.getUTCDate() === d
+}
+
+/** Validates a hotline the same way the server's zod schema does. */
+function readHotline(body: Record<string, unknown>, fallbackSort = 0) {
+  const label = String(body.label ?? '').trim()
+  const agency = String(body.agency ?? '').trim()
+  const phone = String(body.phone ?? '').trim()
+  if (!label || label.length > 60) throw new DemoError(400, 'Say what a resident is looking for.')
+  if (!agency || agency.length > 120) throw new DemoError(400, 'Say who answers it.')
+  if (!dialable(phone)) throw new DemoError(400, 'That does not look like a number a resident could dial.')
+  const sortOrder = Number.isInteger(body.sortOrder) ? Number(body.sortOrder) : fallbackSort
+  return { label, agency, phone, isNational: Boolean(body.isNational), sortOrder }
+}
+
+/** Read from state, so declaring a day in the console really does move a date. */
+const holidayDays = (state: DemoState) => new Set(state.holidays.map((h) => h.date))
 
 /** The same shape and rules as server/src/idVerification.ts. */
 const VERIFY_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
@@ -417,7 +487,7 @@ function makeVerifyCode(): string {
 }
 
 /** Working days between two dates, mirroring server/src/schedule.ts. */
-function countWorkingDays(start: Date, end: Date): number | null {
+function countWorkingDays(start: Date, end: Date, holidays: Set<string>): number | null {
   const from = new Date(start.getFullYear(), start.getMonth(), start.getDate())
   const to = new Date(end.getFullYear(), end.getMonth(), end.getDate())
   if (to < from) return null
@@ -426,7 +496,7 @@ function countWorkingDays(start: Date, end: Date): number | null {
   while (cursor < to) {
     cursor.setDate(cursor.getDate() + 1)
     const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
-    if (cursor.getDay() !== 0 && cursor.getDay() !== 6 && !HOLIDAY_DAYS.has(iso)) days += 1
+    if (cursor.getDay() !== 0 && cursor.getDay() !== 6 && !holidays.has(iso)) days += 1
   }
   return days
 }
@@ -490,7 +560,7 @@ function isCalendarDate(value: string): boolean {
  * The same rules as server/src/schedule.ts: working days only, no date while a
  * fee is unpaid, and none once the request is closed.
  */
-function readyFor(r: DemoRequest) {
+function readyFor(r: DemoRequest, holidays: Set<string>) {
   const service = SERVICES.find((s) => s.id === r.serviceId)
   if (!service) return { expectedReady: null, awaitingResident: false }
   if (r.status === 'completed' || r.status === 'rejected') {
@@ -502,8 +572,8 @@ function readyFor(r: DemoRequest) {
   const start = new Date(r.paidAt ?? r.dateSubmitted)
   return {
     expectedReady: {
-      from: addWorkingDays(start, service.processingDaysMin, HOLIDAY_DAYS),
-      to: addWorkingDays(start, service.processingDaysMax, HOLIDAY_DAYS),
+      from: addWorkingDays(start, service.processingDaysMin, holidays),
+      to: addWorkingDays(start, service.processingDaysMax, holidays),
     },
     awaitingResident: false,
   }
@@ -516,7 +586,7 @@ const serialize = (r: DemoRequest) => ({
   rejectionReason: r.rejectionReason, dateSubmitted: r.dateSubmitted,
   updatedAt: r.dateSubmitted,
   residentName: state.users.find((u) => u.id === r.residentId)?.fullName,
-  ...readyFor(r),
+  ...readyFor(r, holidayDays(state)),
 })
 
 /** A minimal but valid PDF, so the download in the demo is a real file. */
@@ -605,10 +675,15 @@ async function route(
     return {
       status: 200,
       body: {
-        departments: SERVICE_CATEGORIES, services: SERVICES,
+        // Offices merge their editable contact details over the seeded
+        // catalogue, so an address corrected in the console shows up here.
+        departments: SERVICE_CATEGORIES.map((c) => ({ ...c, ...(state.offices[c.id] ?? {}) })),
+        services: SERVICES,
         programs: SECTORAL_PROGRAMS, workflowSteps: WORKFLOW_STEPS,
-        emergencyContacts: EMERGENCY_CONTACTS,
-        holidays: HOLIDAYS.map((h) => ({ date: h.date, name: h.name, isLocal: h.local ?? false })),
+        emergencyContacts: [...state.hotlines].sort(
+          (a, b) => Number(a.isNational) - Number(b.isNational) || a.sortOrder - b.sortOrder || a.label.localeCompare(b.label)
+        ),
+        holidays: [...state.holidays].sort((a, b) => a.date.localeCompare(b.date)),
       },
     }
   }
@@ -978,6 +1053,7 @@ async function route(
         return day >= from && day <= to && (seeAll || scope.includes(r.categoryId))
       })
 
+      const holidays = holidayDays(state)
       const releasedAt = (r: DemoRequest) =>
         r.events.filter((e) => e.eventType === 'released').map((e) => e.createdAt).sort().pop() ?? null
 
@@ -1006,8 +1082,8 @@ async function route(
 
         const done = releasedAt(r)
         if (r.status !== 'completed' || !done) continue
-        const officeDays = countWorkingDays(new Date(r.paidAt ?? r.dateSubmitted), new Date(done))
-        const residentDays = countWorkingDays(new Date(r.dateSubmitted), new Date(done))
+        const officeDays = countWorkingDays(new Date(r.paidAt ?? r.dateSubmitted), new Date(done), holidays)
+        const residentDays = countWorkingDays(new Date(r.dateSubmitted), new Date(done), holidays)
         if (officeDays !== null) {
           row._office.push(officeDays)
           if (officeDays <= (service?.processingDaysMax ?? 0)) row.metTarget += 1
@@ -1219,6 +1295,133 @@ async function route(
     }
     const mine = state.notifications.filter((n) => n.userId === user.id)
     return { status: 200, body: { notifications: mine, unread: mine.filter((n) => !n.readAt).length } }
+  }
+
+  // ---- admin: the municipality's own data ----
+  // Same rules as server/src/routes/admin.ts: administrators only, the same
+  // validation, and every change written to the audit trail with the old value.
+  if (parts[0] === 'admin' && ['hotlines', 'holidays', 'offices', 'audit'].includes(parts[1] ?? '')) {
+    const actor = need('admin')
+    const audit = (action: string, target: string, before?: unknown, after?: unknown) => {
+      state.audit.unshift({
+        id: state.audit.length + 1, actorName: actor.fullName, action, target,
+        before: before ?? null, after: after ?? null, createdAt: new Date().toISOString(),
+      })
+    }
+
+    if (parts[1] === 'hotlines') {
+      const sorted = () => [...state.hotlines].sort(
+        (a, b) => Number(a.isNational) - Number(b.isNational) || a.sortOrder - b.sortOrder || a.label.localeCompare(b.label)
+      )
+      if (!parts[2] && method === 'GET') return { status: 200, body: sorted() }
+
+      if (!parts[2] && method === 'POST') {
+        const row = readHotline(body)
+        const id = `${row.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'hotline'}-${Math.random().toString(16).slice(2, 8)}`
+        const created = { id, ...row }
+        state.hotlines.push(created)
+        audit('hotline.create', id, undefined, created)
+        persist()
+        return { status: 201, body: created }
+      }
+
+      const found = state.hotlines.find((h) => h.id === parts[2])
+      if (!found) throw new DemoError(404, 'Hotline not found.')
+
+      if (method === 'PUT') {
+        const before = { ...found }
+        Object.assign(found, readHotline(body, found.sortOrder))
+        audit('hotline.update', found.id, before, { ...found })
+        persist()
+        return { status: 200, body: found }
+      }
+      if (method === 'DELETE') {
+        state.hotlines = state.hotlines.filter((h) => h.id !== found.id)
+        audit('hotline.delete', found.id, { ...found })
+        persist()
+        return { status: 204 }
+      }
+    }
+
+    if (parts[1] === 'holidays') {
+      if (!parts[2] && method === 'GET') {
+        const year = Number(query.get('year')) || new Date().getFullYear()
+        if (year < 2000 || year > 2100) throw new DemoError(400, 'Pick a year between 2000 and 2100.')
+        return {
+          status: 200,
+          body: state.holidays.filter((h) => h.date.startsWith(String(year))).sort((a, b) => a.date.localeCompare(b.date)),
+        }
+      }
+      if (!parts[2] && method === 'POST') {
+        const date = String(body.date ?? '')
+        if (!isRealDay(date)) throw new DemoError(400, 'That is not a real date.')
+        const name = String(body.name ?? '').trim()
+        if (!name || name.length > 120) throw new DemoError(400, 'Give the day a name.')
+        const isLocal = Boolean(body.isLocal)
+        const existing = state.holidays.find((h) => h.date === date)
+        const before = existing ? { ...existing } : undefined
+        // Upsert, exactly as the server does: a proclamation renaming a day is
+        // the ordinary case, not a reason to make someone delete a row first.
+        if (existing) Object.assign(existing, { name, isLocal })
+        else state.holidays.push({ date, name, isLocal })
+        const after = state.holidays.find((h) => h.date === date)!
+        audit(existing ? 'holiday.update' : 'holiday.create', date, before, { ...after })
+        persist()
+        return { status: 201, body: after }
+      }
+      if (parts[2] && method === 'DELETE') {
+        if (!isRealDay(parts[2])) throw new DemoError(400, 'That is not a real date.')
+        const existing = state.holidays.find((h) => h.date === parts[2])
+        if (!existing) throw new DemoError(404, 'That day is not in the calendar.')
+        state.holidays = state.holidays.filter((h) => h.date !== parts[2])
+        audit('holiday.delete', parts[2], { ...existing })
+        persist()
+        return { status: 204 }
+      }
+    }
+
+    if (parts[1] === 'offices') {
+      const rows = () => SERVICE_CATEGORIES.map((c) => ({
+        id: c.id, name: c.name, officeName: c.officeName, ...state.offices[c.id]!,
+      }))
+      if (!parts[2] && method === 'GET') return { status: 200, body: rows() }
+
+      if (parts[2] && method === 'PATCH') {
+        const office = state.offices[parts[2]]
+        const meta = SERVICE_CATEGORIES.find((c) => c.id === parts[2])
+        if (!office || !meta) throw new DemoError(404, 'Office not found.')
+        // Only contact details. An unknown key is dropped, which leaves nothing
+        // to change and refuses the whole request rather than doing something
+        // else quietly.
+        const patch: Record<string, string | null> = {}
+        for (const key of ['address', 'hours', 'phone', 'email'] as const) {
+          if (!(key in body)) continue
+          const raw = body[key]
+          const value = raw === null ? null : String(raw).trim() || null
+          if (key === 'phone' && value !== null && !dialable(value)) {
+            throw new DemoError(400, 'That does not look like a number a resident could dial.')
+          }
+          if (key === 'email' && value !== null && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
+            throw new DemoError(400, 'That is not an email address.')
+          }
+          patch[key] = value
+        }
+        if (Object.keys(patch).length === 0) throw new DemoError(400, 'Nothing to change.')
+        const before = { id: meta.id, name: meta.name, officeName: meta.officeName, ...office }
+        Object.assign(office, patch)
+        const after = { id: meta.id, name: meta.name, officeName: meta.officeName, ...office }
+        audit('office.update', meta.id, before, after)
+        persist()
+        return { status: 200, body: after }
+      }
+    }
+
+    if (parts[1] === 'audit' && method === 'GET') {
+      const limit = Math.min(Math.max(Number(query.get('limit')) || 50, 1), 200)
+      return { status: 200, body: state.audit.slice(0, limit) }
+    }
+
+    throw new DemoError(404, 'Not found.')
   }
 
   // ---- admin ----
