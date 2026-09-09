@@ -56,6 +56,21 @@ export const WORKFLOW_STEPS = [
 
 export type WorkflowStepLabel = (typeof WORKFLOW_STEPS)[number]
 
+/**
+ * Whose move each step is.
+ *
+ * The one question a resident actually has when they open a request is whether
+ * they are waiting or being waited on, and a row of step labels does not answer
+ * it. Only payment is theirs; everything else is the office's, which is also
+ * exactly why the ready-date clock pauses at that step and nowhere else.
+ */
+export const STEP_OWNER: Record<WorkflowStepLabel, 'office' | 'resident'> = {
+  'Submitted': 'office',
+  'Municipal Treasury Assessment': 'office',
+  'Payment': 'resident',
+  'e-Document Release': 'office',
+}
+
 export type ApplicationStatus =
   | 'draft' | 'submitted' | 'in_progress' | 'for_payment' | 'completed' | 'rejected'
 

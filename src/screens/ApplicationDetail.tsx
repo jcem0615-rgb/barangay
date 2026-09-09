@@ -3,6 +3,7 @@ import TopBar from '../components/TopBar'
 import StatusPill from '../components/StatusPill'
 import ReadyDate from '../components/ReadyDate'
 import WorkflowTracker from '../components/WorkflowTracker'
+import CounterChecklist from '../components/CounterChecklist'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
 import { useState } from 'react'
@@ -12,6 +13,7 @@ import { saveBlob } from '../lib/download'
 import Attachments from '../components/Attachments'
 import { resolveIcon } from '../lib/icons'
 import { formatPeso } from '../lib/money'
+import { WORKFLOW_STEPS } from '../types'
 import { useT } from '../lib/i18n'
 
 function formatDate(iso: string) {
@@ -93,7 +95,11 @@ export default function ApplicationDetail({ id }: { id: string }) {
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
             <p className="mb-1 text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">{t('detail.progress')}</p>
             <div className="mt-3">
-              <WorkflowTracker currentStepIndex={app.currentStepIndex} rejected={app.status === 'rejected'} />
+              <WorkflowTracker
+                currentStepIndex={app.currentStepIndex}
+                rejected={app.status === 'rejected'}
+                completed={app.status === 'completed'}
+              />
             </div>
           </div>
         )}
@@ -113,6 +119,10 @@ export default function ApplicationDetail({ id }: { id: string }) {
             </button>
           </div>
         )}
+
+        {(app.status === 'completed' ||
+          app.currentStepIndex === WORKFLOW_STEPS.length - 1) &&
+          app.status !== 'rejected' && <CounterChecklist referenceNo={app.referenceNo} />}
 
         {app.status === 'completed' && (
           <div>

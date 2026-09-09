@@ -358,6 +358,39 @@ every office and may narrow to one. Periods are capped at one year
 Reports are read-only and derived — there is no reports table to fall out of date, and
 nothing here can change a request.
 
+## What each workflow step means
+
+The four steps in `WORKFLOW_STEPS` used to render as four labels. A label does not
+answer the question a resident actually opened the screen for, which is whether they are
+waiting or being waited on.
+
+**Every step says whose move it is.** `STEP_OWNER` (`src/types.ts`) maps each step to
+`office` or `resident`; only Payment is the resident's, which is the same fact that pauses
+the ready-date clock at that step and nowhere else. The current step carries it as a word
+("Your move" / "With the office"), never as a colour — the difference between "the office
+is working on this" and "nothing happens until you act" is too important to encode as a
+hue.
+
+**Upcoming steps show their text too**, muted rather than blank. A resident who can only
+read as far as the step they are on cannot tell whether the next thing is a week of office
+work or a fee they must go and settle.
+
+**The final step is ticked only when the request is actually completed.** Paying moves a
+request onto the release step without closing it, so the tracker took a green check as
+"done" and told residents their document was out before the office had looked at it. It
+now takes `completed` from the server's status.
+
+`CounterChecklist` says what to bring if the office asks for a visit: the reference
+number, the digital ID open at its verification code (or any government ID), the official
+receipt if they paid at a window, and — the one people get wrong — an authorisation letter
+plus both IDs when someone else collects. It is framed as a conditional because the
+catalogue does not record which services need a counter visit, so promising one would be
+inventing a fact; saying what to bring *if* asked is true of every service. The wasted trip
+is the expensive part of dealing with an LGU, and it is worth a panel to avoid one.
+
+All of this is translated. The step labels themselves are not — they name stages of an
+official process, like "Cedula" and "Building Permit".
+
 ## Accessibility
 
 The app registers senior citizens and persons with disability, so legibility is a
