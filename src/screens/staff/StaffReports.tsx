@@ -152,6 +152,28 @@ export default function StaffReports({
 
           <OnTime report={report} />
 
+          {/*
+            The RA 11032 side, kept apart from the turnaround figures above.
+            A complaint is about an office rather than one request, and feedback
+            arrives after the transaction closes — folding either into the
+            per-service rows would make a service look badly rated because
+            somebody complained about a queue.
+          */}
+          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Tile
+              label="Average rating"
+              value={report.averageRating ?? '—'}
+              note={report.ratings === 1 ? 'from 1 rating' : `from ${report.ratings} ratings`}
+            />
+            <Tile label="Complaints filed" value={report.complaintsFiled} />
+            <Tile label="Answered" value={report.complaintsAnswered} />
+            <Tile
+              label="Past their deadline"
+              value={report.complaintsOverdue}
+              note={report.complaintsOverdue > 0 ? 'still awaiting a reply' : 'nothing overdue'}
+            />
+          </div>
+
           <section className="mt-5 rounded-2xl border border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-5 py-3.5">
               <h2 className="font-display text-[14px] font-bold text-navy-950">By service</h2>

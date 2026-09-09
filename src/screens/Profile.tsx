@@ -1,4 +1,4 @@
-import { ChevronRight, CircleHelp, FileText, IdCard, LogOut, ShieldCheck, Wifi } from 'lucide-react'
+import { ChevronRight, CircleHelp, FileText, IdCard, LogOut, MessageSquareWarning, ShieldCheck, Wifi } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import { addressLine, useResidentProfile } from '../lib/resident'
 import { useAuth } from '../lib/auth'
@@ -16,6 +16,7 @@ import { useT } from '../lib/i18n'
  */
 const SETTINGS = [
   { icon: IdCard, label: 'profile.digitalId' as const, screen: 'id-card' as const },
+  { icon: MessageSquareWarning, label: 'profile.complaints' as const, screen: 'complaints' as const },
   { icon: FileText, label: 'profile.privacy' as const, screen: 'privacy' as const },
   { icon: CircleHelp, label: 'profile.help' as const, screen: 'help' as const },
 ]

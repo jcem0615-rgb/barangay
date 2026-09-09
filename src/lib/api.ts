@@ -144,6 +144,11 @@ export interface ReportSummary {
   metTarget: number
   missedTarget: number
   onTimeRate: number | null
+  ratings: number
+  averageRating: number | null
+  complaintsFiled: number
+  complaintsAnswered: number
+  complaintsOverdue: number
   rows: ReportRow[]
 }
 
@@ -253,6 +258,38 @@ async function fetchBlob(path: string): Promise<Blob | null> {
   if (res.status === 404) return null
   if (!res.ok) throw new ApiError('Could not load that image.', res.status)
   return res.blob()
+}
+
+export interface Feedback {
+  requestId: string
+  rating: number
+  comment: string | null
+  createdAt: string
+}
+
+export const COMPLAINT_CATEGORIES = ['delay', 'conduct', 'fees', 'requirements', 'other'] as const
+export type ComplaintCategory = (typeof COMPLAINT_CATEGORIES)[number]
+
+export interface Complaint {
+  id: string
+  referenceNo: string
+  departmentId: string
+  requestId: string | null
+  category: ComplaintCategory
+  body: string
+  status: 'open' | 'answered'
+  dueOn: string
+  response: string | null
+  respondedAt: string | null
+  createdAt: string
+  officeName?: string
+}
+
+export interface StaffComplaint extends Complaint {
+  officeName: string
+  residentName: string
+  requestRef: string | null
+  overdue: boolean
 }
 
 export type AppointmentStatus = 'booked' | 'arrived' | 'served' | 'no_show' | 'cancelled'
@@ -604,6 +641,31 @@ export const api = {
 
   markAppointment: (id: string, action: 'arrived' | 'served' | 'no-show') =>
     request<StaffAppointment>(`/staff/appointments/${id}/${action}`, { method: 'POST' }),
+
+  // Feedback and complaints — the RA 11032 mechanism.
+  myFeedback: () => request<Feedback[]>('/feedback'),
+
+  rateRequest: (requestId: string, rating: number, comment?: string) =>
+    request<Feedback>(`/feedback/${requestId}`, { method: 'PUT', body: JSON.stringify({ rating, comment }) }),
+
+  myComplaints: () => request<Complaint[]>('/feedback/complaints'),
+
+  fileComplaint: (body: {
+    departmentId: string; category: ComplaintCategory; body: string; requestId?: string
+  }) => request<Complaint>('/feedback/complaints', { method: 'POST', body: JSON.stringify(body) }),
+
+  staffComplaints: (opts: { departmentId?: string; status?: 'open' | 'answered' } = {}) => {
+    const params = new URLSearchParams()
+    if (opts.departmentId) params.set('departmentId', opts.departmentId)
+    if (opts.status) params.set('status', opts.status)
+    const qs = params.toString()
+    return request<StaffComplaint[]>(`/staff/complaints${qs ? `?${qs}` : ''}`)
+  },
+
+  respondToComplaint: (id: string, response: string) =>
+    request<StaffComplaint>(`/staff/complaints/${id}/respond`, {
+      method: 'POST', body: JSON.stringify({ response }),
+    }),
 
   staffQueue: (opts: {
     departmentId?: string

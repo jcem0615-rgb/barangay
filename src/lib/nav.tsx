@@ -14,6 +14,7 @@ export type Screen =
   | { name: 'notifications' }
   | { name: 'appointments' }
   | { name: 'book-appointment'; serviceId?: string; requestId?: string }
+  | { name: 'complaints' }
   | { name: 'help' }
   | { name: 'privacy' }
 

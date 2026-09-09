@@ -64,6 +64,10 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `POST` | `/api/appointments` | resident — book a slot |
 | `DELETE` | `/api/appointments/:id` | resident — cancel their own booking |
 | `GET` | `/api/staff/appointments` | staff — the counter's day (`date`, `departmentId`) |
+| `GET`/`PUT` | `/api/feedback` / `/api/feedback/:requestId` | resident — rate a finished transaction |
+| `GET`/`POST` | `/api/feedback/complaints` | resident — their complaints, and file one |
+| `GET` | `/api/staff/complaints` | staff — the office's complaints (`status`, `departmentId`) |
+| `POST` | `/api/staff/complaints/:id/respond` | staff — reply, once |
 | `POST` | `/api/staff/appointments/:id/:action` | staff — `arrived`, `served` or `no-show` |
 | `GET` | `/api/staff/requests/:id` | staff — request + full audit trail |
 | `POST` | `/api/staff/requests/:id/assess` | staff — set the fee due |
@@ -321,6 +325,7 @@ npm run test:id-verification  # single use, expiry, scoping, and what staff may 
 npm run test:reports      # the two turnaround clocks, office scoping, and the CSV
 npm run test:municipality # hotlines, holidays and office details: who may edit, and the audit
 npm run test:appointments # the office calendar, capacity, queue numbers, and the counter's day
+npm run test:feedback     # ratings, complaints, the working-day deadline, and the figures
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```

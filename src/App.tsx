@@ -23,6 +23,7 @@ import StaffConsole from './screens/staff/StaffConsole'
 import HelpSupport from './screens/HelpSupport'
 import Appointments from './screens/Appointments'
 import BookAppointment from './screens/BookAppointment'
+import Complaints from './screens/Complaints'
 import DataPrivacy from './screens/DataPrivacy'
 
 function ScreenRouter() {
@@ -53,6 +54,8 @@ function ScreenRouter() {
       return <Appointments />
     case 'book-appointment':
       return <BookAppointment serviceId={screen.serviceId} requestId={screen.requestId} />
+    case 'complaints':
+      return <Complaints />
     case 'help':
       return <HelpSupport />
     case 'privacy':

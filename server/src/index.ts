@@ -11,6 +11,7 @@ import { authRouter } from './routes/auth.ts'
 import { catalogueRouter } from './routes/catalogue.ts'
 import { requestsRouter } from './routes/requests.ts'
 import { appointmentsRouter } from './routes/appointments.ts'
+import { feedbackRouter } from './routes/feedback.ts'
 import { staffRouter } from './routes/staff.ts'
 import { verifyRouter } from './routes/verify.ts'
 import { adminRouter } from './routes/admin.ts'
@@ -81,6 +82,7 @@ app.use('/api/auth', authRouter)
 app.use('/api/catalogue', catalogueRouter)
 app.use('/api/requests', requestsRouter)
 app.use('/api/appointments', appointmentsRouter)
+app.use('/api/feedback', feedbackRouter)
 app.use('/api/staff', staffRouter)
 app.use('/api/verify', verifyRouter)
 app.use('/api/admin', adminRouter)

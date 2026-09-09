@@ -16,6 +16,7 @@ import { consumeVerificationCode } from '../idVerification.ts'
 import { getFile } from '../storage.ts'
 import { buildReport, MAX_PERIOD_DAYS, toCsv } from '../reports.ts'
 import { APPOINTMENT_SELECT, officeToday } from '../appointments.ts'
+import { COMPLAINT_SELECT } from '../feedback.ts'
 
 export const staffRouter = Router()
 staffRouter.use(authenticate, requireRole('staff', 'admin'))
@@ -810,4 +811,90 @@ staffRouter.post('/appointments/:id/:action', async (req, res) => {
 
   if ('error' in outcome) return res.status(outcome.code!).json({ error: outcome.error })
   res.json(outcome.appointment)
+})
+
+// ---------------------------------------------------------------------------
+// Complaints
+//
+// The RA 11032 mechanism from the office's side. Oldest first, because a
+// complaint that has been waiting longest is the one to answer next, and each
+// carries the working-day deadline it was given when it was filed.
+// ---------------------------------------------------------------------------
+
+staffRouter.get('/complaints', async (req, res) => {
+  const user = req.user!
+  const isAdmin = user.role === 'admin'
+  const wanted = req.query.departmentId ? String(req.query.departmentId) : ''
+  if (wanted && !isAdmin && !user.departments.includes(wanted)) {
+    return res.status(403).json({ error: 'You are not assigned to that office.' })
+  }
+  const status = req.query.status === 'answered' ? 'answered' : req.query.status === 'open' ? 'open' : null
+  const scope = wanted ? [wanted] : user.departments
+
+  res.json(
+    await query(
+      `select ${COMPLAINT_SELECT}, d.office_name as "officeName",
+              u.full_name as "residentName", r.reference_no as "requestRef",
+              (c.status = 'open' and c.due_on < current_date) as overdue
+         from complaints c
+         join departments d on d.id = c.department_id
+         join users u on u.id = c.resident_id
+         left join requests r on r.id = c.request_id
+        where ($1::boolean or c.department_id = any($2::text[]))
+          and ($3::text is null or c.status = $3)
+        order by c.status = 'answered', c.created_at`,
+      [isAdmin && !wanted, scope, status]
+    )
+  )
+})
+
+const responseBody = z.object({ response: z.string().trim().min(1).max(4000) })
+
+staffRouter.post('/complaints/:id/respond', async (req, res) => {
+  const parsed = responseBody.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'Write a reply before sending it.' })
+  const user = req.user!
+
+  const outcome = await transaction(async (client) => {
+    const found = await client.query<{
+      department_id: string; status: string; reference_no: string; resident_id: string; request_id: string | null
+    }>(
+      `select department_id, status, reference_no, resident_id, request_id
+         from complaints where id = $1 for update`,
+      [req.params.id]
+    )
+    if (found.rowCount === 0) return { code: 404, error: 'Complaint not found.' }
+    const row = found.rows[0]!
+    if (user.role !== 'admin' && !user.departments.includes(row.department_id)) {
+      // Not found, not forbidden: another office's complaints are not this
+      // clerk's to learn the shape of.
+      return { code: 404, error: 'Complaint not found.' }
+    }
+    // A reply already given stands. Editing it after the fact would let an
+    // office quietly rewrite what it told a resident.
+    if (row.status === 'answered') return { code: 409, error: 'That complaint has already been answered.' }
+
+    const { rows } = await client.query(
+      `update complaints
+          set status = 'answered', response = $2, responded_by = $3, responded_at = now()
+        where id = $1 returning ${COMPLAINT_SELECT.replace(/c\./g, '')}`,
+      [req.params.id, parsed.data.response, user.id]
+    )
+    const office = await client.query<{ office_name: string }>(
+      `select office_name from departments where id = $1`, [row.department_id]
+    )
+    const notice: NotificationInput = {
+      userId: row.resident_id,
+      requestId: row.request_id,
+      kind: 'complaint_answered',
+      title: `Complaint ${row.reference_no} — answered`,
+      body: `${office.rows[0]?.office_name ?? 'The office'} has replied to your complaint (${row.reference_no}). Read it in the app.`,
+    }
+    await recordNotification(client, notice)
+    return { complaint: rows[0], notice }
+  })
+
+  if ('error' in outcome) return res.status(outcome.code!).json({ error: outcome.error })
+  void deliverNotification(outcome.notice!)
+  res.json(outcome.complaint)
 })

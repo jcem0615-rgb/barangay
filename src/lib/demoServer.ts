@@ -18,7 +18,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v9'
+const STORE_KEY = 'elgu-demo-state-v10'
 
 interface DemoUser {
   id: string
@@ -107,6 +107,21 @@ interface DemoState {
   appointments: DemoAppointment[]
   /** Queue numbers issued per office per day, so a cancellation frees no number. */
   queueCounters: Record<string, number>
+  feedback: DemoFeedback[]
+  complaints: DemoComplaint[]
+  complaintCounter: number
+}
+
+interface DemoFeedback {
+  requestId: string; residentId: string; rating: number
+  comment: string | null; createdAt: string
+}
+
+interface DemoComplaint {
+  id: string; referenceNo: string; residentId: string; departmentId: string
+  requestId: string | null; category: string; body: string
+  status: 'open' | 'answered'; dueOn: string
+  response: string | null; respondedAt: string | null; createdAt: string
 }
 
 interface DemoAppointment {
@@ -201,6 +216,9 @@ function seed(): DemoState {
     audit: [],
     appointments: [],
     queueCounters: {},
+    feedback: [],
+    complaints: [],
+    complaintCounter: 0,
   }
 
   const boss = SERVICES.find((s) => s.id === 'boss-application')!
@@ -489,6 +507,13 @@ function readHotline(body: Record<string, unknown>, fallbackSort = 0) {
  * close a day, the office's hours and slot length decide the times, and its
  * capacity decides how many people a slot holds.
  */
+/**
+ * The working-day deadline an office is given to answer a complaint, mirroring
+ * COMPLAINT_RESPONSE_DAYS in server/src/feedback.ts. A placeholder: set it to
+ * the response time in the deploying LGU's own Citizen's Charter.
+ */
+const COMPLAINT_RESPONSE_DAYS = 3
+
 const BOOKING_DEFAULTS = { enabled: true, opens: '08:00', closes: '16:00', slotMinutes: 30, capacity: 4, horizonDays: 21 }
 
 const officeToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date())
@@ -1199,6 +1224,31 @@ async function route(
         medianOfficeDays: medianOf(allOffice), medianResidentDays: medianOf(allResident),
         metTarget: met, missedTarget: missed,
         onTimeRate: met + missed === 0 ? null : Math.round((met / (met + missed)) * 100),
+        // The RA 11032 figures, over the same period and the same offices.
+        ...(() => {
+          const inScope = (departmentId: string) => seeAll || scope.includes(departmentId)
+          const rated = state.feedback.filter((f) => {
+            const r = state.requests.find((x) => x.id === f.requestId)
+            const day = f.createdAt.slice(0, 10)
+            return !!r && inScope(r.categoryId) && day >= from && day <= to
+          })
+          const filed = state.complaints.filter((c) => {
+            const day = c.createdAt.slice(0, 10)
+            return inScope(c.departmentId) && day >= from && day <= to
+          })
+          const today = officeToday()
+          return {
+            ratings: rated.length,
+            // An average of no ratings is not a five, and rendering one would
+            // be worse than a blank.
+            averageRating: rated.length === 0
+              ? null
+              : Math.round((rated.reduce((n, f) => n + f.rating, 0) / rated.length) * 100) / 100,
+            complaintsFiled: filed.length,
+            complaintsAnswered: filed.filter((c) => c.status === 'answered').length,
+            complaintsOverdue: filed.filter((c) => c.status === 'open' && c.dueOn < today).length,
+          }
+        })(),
         rows,
       }
 
@@ -1213,6 +1263,54 @@ async function route(
       }
 
       return { status: 200, body: summary }
+    }
+
+    // ---- complaints, the office's side ----
+    if (parts[1] === 'complaints') {
+      const today = officeToday()
+      if (!parts[2] && method === 'GET') {
+        const wanted = query.get('departmentId') ?? ''
+        if (wanted && user.role !== 'admin' && !user.departments.includes(wanted)) {
+          throw new DemoError(403, 'You are not assigned to that office.')
+        }
+        const seeAll = user.role === 'admin' && !wanted
+        const scope = wanted ? [wanted] : user.departments
+        const status = query.get('status')
+        return {
+          status: 200,
+          body: state.complaints
+            .filter((c) => (seeAll || scope.includes(c.departmentId)) && (!status || c.status === status))
+            // Oldest open first: the one waiting longest is the one to answer.
+            .sort((a, b) =>
+              Number(a.status === 'answered') - Number(b.status === 'answered') ||
+              a.createdAt.localeCompare(b.createdAt))
+            .map((c) => ({
+              ...c,
+              officeName: officeName(c.departmentId),
+              residentName: state.users.find((u) => u.id === c.residentId)?.fullName ?? 'Resident',
+              requestRef: state.requests.find((r) => r.id === c.requestId)?.referenceNo ?? null,
+              overdue: c.status === 'open' && c.dueOn < today,
+            })),
+        }
+      }
+      if (parts[2] && parts[3] === 'respond' && method === 'POST') {
+        const found = state.complaints.find((c) => c.id === parts[2])
+        if (!found || (user.role !== 'admin' && !user.departments.includes(found.departmentId))) {
+          throw new DemoError(404, 'Complaint not found.')
+        }
+        if (found.status === 'answered') throw new DemoError(409, 'That complaint has already been answered.')
+        const response = String(body.response ?? '').trim()
+        if (!response || response.length > 4000) throw new DemoError(400, 'Write a reply before sending it.')
+        found.status = 'answered'
+        found.response = response
+        found.respondedAt = new Date().toISOString()
+        notify(found.residentId, found.requestId, 'complaint_answered',
+          `Complaint ${found.referenceNo} — answered`,
+          `${officeName(found.departmentId)} has replied to your complaint (${found.referenceNo}). Read it in the app.`)
+        persist()
+        return { status: 200, body: found }
+      }
+      throw new DemoError(404, 'Not found.')
     }
 
     // ---- the counter's day ----
@@ -1426,6 +1524,81 @@ async function route(
     }
     const mine = state.notifications.filter((n) => n.userId === user.id)
     return { status: 200, body: { notifications: mine, unread: mine.filter((n) => !n.readAt).length } }
+  }
+
+  // ---- feedback and complaints (RA 11032) ----
+  // Same rules as server/src/routes/feedback.ts: a transaction can only be
+  // rated once the office has finished with it, and only by whoever filed it.
+  if (parts[0] === 'feedback') {
+    const user = need('resident')
+
+    if (parts[1] === 'complaints') {
+      if (!parts[2] && method === 'GET') {
+        return {
+          status: 200,
+          body: state.complaints
+            .filter((c) => c.residentId === user.id)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+            .map((c) => ({ ...c, officeName: officeName(c.departmentId) })),
+        }
+      }
+      if (!parts[2] && method === 'POST') {
+        const departmentId = String(body.departmentId ?? '')
+        if (!SERVICE_CATEGORIES.some((c) => c.id === departmentId)) throw new DemoError(404, 'Office not found.')
+        const category = String(body.category ?? '')
+        if (!['delay', 'conduct', 'fees', 'requirements', 'other'].includes(category)) {
+          throw new DemoError(400, 'Choose what the complaint is about.')
+        }
+        const text = String(body.body ?? '').trim()
+        if (text.length < 10 || text.length > 4000) throw new DemoError(400, 'Say a little more about what happened.')
+        const requestId = body.requestId ? String(body.requestId) : null
+        if (requestId && !state.requests.some((r) => r.id === requestId && r.residentId === user.id)) {
+          throw new DemoError(404, 'Request not found.')
+        }
+        const year = new Date().getFullYear()
+        state.complaintCounter += 1
+        const made: DemoComplaint = {
+          id: uid(),
+          referenceNo: `CMP-${year}-${String(state.complaintCounter).padStart(5, '0')}`,
+          residentId: user.id, departmentId, requestId, category, body: text,
+          status: 'open',
+          // Working days, over the same calendar as everything else.
+          dueOn: addWorkingDays(new Date(), COMPLAINT_RESPONSE_DAYS, holidayDays(state)),
+          response: null, respondedAt: null, createdAt: new Date().toISOString(),
+        }
+        state.complaints.push(made)
+        notify(user.id, requestId, 'complaint_filed', `Complaint filed — ${made.referenceNo}`,
+          `${officeName(departmentId)} has your complaint (${made.referenceNo}). ` +
+          `They are due to reply by ${made.dueOn}.`)
+        persist()
+        return { status: 201, body: { ...made, officeName: officeName(departmentId) } }
+      }
+      throw new DemoError(404, 'Not found.')
+    }
+
+    if (!parts[1] && method === 'GET') {
+      return { status: 200, body: state.feedback.filter((f) => f.residentId === user.id) }
+    }
+
+    if (parts[1] && method === 'PUT') {
+      const request = state.requests.find((r) => r.id === parts[1] && r.residentId === user.id)
+      if (!request) throw new DemoError(404, 'Request not found.')
+      if (request.status !== 'completed' && request.status !== 'rejected') {
+        throw new DemoError(409, 'You can rate this once the office has finished with it.')
+      }
+      const rating = Number(body.rating)
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        throw new DemoError(400, 'Give a rating between 1 and 5.')
+      }
+      const comment = body.comment ? String(body.comment).slice(0, 1000) : null
+      const existing = state.feedback.find((f) => f.requestId === request.id)
+      if (existing) Object.assign(existing, { rating, comment })
+      else state.feedback.push({ requestId: request.id, residentId: user.id, rating, comment, createdAt: new Date().toISOString() })
+      persist()
+      return { status: 200, body: state.feedback.find((f) => f.requestId === request.id) }
+    }
+
+    throw new DemoError(404, 'Not found.')
   }
 
   // ---- appointments ----

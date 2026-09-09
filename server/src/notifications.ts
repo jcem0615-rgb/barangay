@@ -22,6 +22,7 @@ export type NotificationKind =
   | RequestNotificationKind
   | 'program_granted' | 'program_revoked'
   | 'appointment_booked' | 'appointment_cancelled' | 'appointment_missed'
+  | 'complaint_filed' | 'complaint_answered'
 
 export interface NotificationInput {
   userId: string

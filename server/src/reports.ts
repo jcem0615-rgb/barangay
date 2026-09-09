@@ -60,6 +60,16 @@ export interface ReportSummary {
   missedTarget: number
   /** Percentage released within the promised time, or null with nothing to judge. */
   onTimeRate: number | null
+  /**
+   * The RA 11032 side: how residents said it went, and what they complained
+   * about. Null where nobody rated anything — an average of no ratings is not
+   * a five, and a report that quietly renders one is worse than a blank.
+   */
+  ratings: number
+  averageRating: number | null
+  complaintsFiled: number
+  complaintsAnswered: number
+  complaintsOverdue: number
   rows: ReportRow[]
 }
 
@@ -194,7 +204,44 @@ export async function buildReport(opts: {
     metTarget,
     missedTarget,
     onTimeRate: judged === 0 ? null : Math.round((metTarget / judged) * 100),
+    ...(await satisfaction(opts)),
     rows: reportRows.sort((a, b) => b.submitted - a.submitted),
+  }
+}
+
+/**
+ * What residents said, over the same period and the same offices.
+ *
+ * Counted separately from the turnaround figures rather than joined into them:
+ * a complaint is about an office, not necessarily about one request, and
+ * feedback arrives after the transaction closes. Forcing both into the
+ * per-service rows would make a service look badly rated because someone
+ * complained about a queue.
+ */
+async function satisfaction(opts: { from: string; to: string; departments: string[]; all: boolean }) {
+  const rated = await query<{ n: string; avg: string | null }>(
+    `select count(*) as n, avg(f.rating)::numeric(4,2) as avg
+       from feedback f join requests r on r.id = f.request_id
+      where f.created_at >= $1::date and f.created_at < ($2::date + 1)
+        and ($3::boolean or r.department_id = any($4::text[]))`,
+    [opts.from, opts.to, opts.all, opts.departments]
+  )
+  const complaints = await query<{ filed: string; answered: string; overdue: string }>(
+    `select count(*) as filed,
+            count(*) filter (where status = 'answered') as answered,
+            count(*) filter (where status = 'open' and due_on < current_date) as overdue
+       from complaints
+      where created_at >= $1::date and created_at < ($2::date + 1)
+        and ($3::boolean or department_id = any($4::text[]))`,
+    [opts.from, opts.to, opts.all, opts.departments]
+  )
+  const ratings = Number(rated[0]?.n ?? 0)
+  return {
+    ratings,
+    averageRating: ratings === 0 ? null : Number(rated[0]!.avg),
+    complaintsFiled: Number(complaints[0]?.filed ?? 0),
+    complaintsAnswered: Number(complaints[0]?.answered ?? 0),
+    complaintsOverdue: Number(complaints[0]?.overdue ?? 0),
   }
 }
 

@@ -4,9 +4,10 @@ import StatusPill from '../components/StatusPill'
 import ReadyDate from '../components/ReadyDate'
 import WorkflowTracker from '../components/WorkflowTracker'
 import CounterChecklist from '../components/CounterChecklist'
+import RateTransaction from '../components/RateTransaction'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useCatalogue } from '../lib/catalogue'
 import { api, ApiError } from '../lib/api'
 import { saveBlob } from '../lib/download'
@@ -25,6 +26,19 @@ export default function ApplicationDetail({ id }: { id: string }) {
   const { findCategory, findService } = useCatalogue()
   const { t } = useT()
   const [downloading, setDownloading] = useState(false)
+  // A rating already given must show as given, or the app asks the same
+  // question every time the screen is opened.
+  const [rating, setRating] = useState<{ rating: number; comment: string | null } | null>(null)
+  const loadRating = useCallback(async () => {
+    try {
+      const mine = await api.myFeedback()
+      setRating(mine.find((f) => f.requestId === id) ?? null)
+    } catch {
+      // A rating that will not load is not worth an error banner on a screen
+      // whose job is the request itself.
+    }
+  }, [id])
+  useEffect(() => { void loadRating() }, [loadRating])
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const { push, replace } = useNav()
   const app = applications.find((a) => a.id === id)
@@ -136,6 +150,19 @@ export default function ApplicationDetail({ id }: { id: string }) {
               </button>
             </>
           )}
+
+        {/*
+          Asked only once the office has finished, which is the only moment a
+          resident can answer honestly. A rejected request counts too — how a
+          refusal was handled is exactly the thing worth measuring.
+        */}
+        {(app.status === 'completed' || app.status === 'rejected') && (
+          <RateTransaction
+            requestId={app.id}
+            existing={rating}
+            onRated={() => void loadRating()}
+          />
+        )}
 
         {app.status === 'completed' && (
           <div>

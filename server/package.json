@@ -24,6 +24,7 @@
     "test:reports": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/reports.mjs",
     "test:municipality": "node test/municipality.mjs",
     "test:appointments": "node test/appointments.mjs",
+    "test:feedback": "node test/feedback.mjs",
     "test:id-verification": "node test/id-verification.mjs",
     "test:hotlines": "node test/hotlines.mjs",
     "test:portrait": "node test/portrait.mjs",

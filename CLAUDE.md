@@ -477,6 +477,46 @@ the ID check follows. `arrived` is them presenting themselves; `served` and `no_
 the visit and are final, because what happened at a window should not be quietly rewritten
 later in the day.
 
+## Feedback and complaints (RA 11032)
+
+The Ease of Doing Business and Efficient Government Service Delivery Act requires every
+office to publish a Citizen's Charter and to run a mechanism for feedback and complaints
+against it. **The service catalogue is effectively the charter** — every fee, processing
+time and requirement the app promises is published from it — so what was missing was the
+other half.
+
+**Rating is asked once, at the only moment a resident can answer honestly:** when the office
+has finished. A rejected request counts too; how a refusal was handled is exactly the thing
+worth measuring. One request, one rating (`feedback.request_id` is the primary key) —
+letting somebody rate the same transaction five times makes the figure meaningless.
+
+It is deliberately **one question**. A full Client Satisfaction Measurement has prescribed
+dimensions, and asking eight of them on a phone gets eight blank answers; a star rating with
+an optional sentence gets a real one. The stars carry `aria-label`s and the scale is
+labelled at both ends, because a row of stars tells a screen reader nothing and tells anyone
+unsure which end is good only slightly more.
+
+**A complaint gets a reference and a visible deadline.** `COMPLAINT_RESPONSE_DAYS` working
+days from filing, over the same calendar as everything else — an office is not late for a
+day the hall was shut. Both the reference and the date are shown to the resident, because a
+deadline nobody can see is not a deadline. **That day count is a placeholder: set it to the
+response time in the deploying LGU's own Citizen's Charter.**
+
+**A reply, once given, stands.** The server refuses a second one. An office quietly rewriting
+what it told a resident is the precise thing a complaints mechanism exists to prevent. The
+office queue is ordered oldest-open-first and anything past its deadline says "Overdue" in
+words rather than only in colour.
+
+The report gains four figures — average rating, complaints filed, answered, and past their
+deadline — kept **apart from the turnaround rows above them**. A complaint is about an office
+rather than one request, and feedback arrives after a transaction closes; folding either into
+the per-service rows would make a service look badly rated because somebody complained about
+a queue. `averageRating` is null with nothing rated: an average of no ratings is not a five,
+and rendering one would be worse than a blank.
+
+Complaints are reached from Profile rather than the bottom nav — it is the screen you go
+looking for, not one you pass through.
+
 ## Accessibility
 
 The app registers senior citizens and persons with disability, so legibility is a
@@ -555,6 +595,11 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   rows replacing, and **every municipal hotline verifying before launch**; the national
   numbers (911, 143) are correct as published. `mockData.ts` remains the authoring source
   for a fresh seed. The Data Privacy screen's DPO address is still code, not data.
+- **The RA 11032 day count** (`COMPLAINT_RESPONSE_DAYS`) is a placeholder, like the holiday
+  calendar. Set it to the response time in the deploying LGU's own Citizen's Charter before
+  launch — a deadline the office never agreed to is worse than none, because the app reports
+  them late against it. The rating is a single overall score rather than the prescribed
+  Client Satisfaction Measurement dimensions.
 - **Sessions** are 12-hour JWTs with no refresh or general revocation list. Signing out
   clears the token client-side; it stays valid until it expires. The one exception is a
   password change, which `users.password_changed_at` enforces on every request.
