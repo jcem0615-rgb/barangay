@@ -308,6 +308,40 @@ leaving a pile of near-identical copies. Submitting deletes the draft inside the
 transaction as the insert, so a lost response cannot leave a resident with both a filed
 request and the draft of it.
 
+## Office reports
+
+The Reports tab answers one question for a department head: what did this office do,
+and was it on time. `GET /api/staff/reports` aggregates a period; the console renders
+it and offers the same figures as CSV.
+
+**Two turnaround clocks, because either alone lies.** *Office days* run from
+`paid_at ?? submitted_at` to release — only while the office actually held the request.
+*Resident days* run from submission to release regardless. Quoting only the first
+flatters the office; quoting only the second blames it for a permit that sat unpaid for
+a week. Both are shown, and **the gap between them is itself the finding** — a wide gap
+is a payment step residents are struggling with, not a slow office.
+
+On-time is judged against the catalogue's own `processingDaysMax` for that service, on
+the office clock — the same promise the resident was quoted when they applied, so the
+report cannot drift from the front of the app.
+
+**Medians, not means.** One permit stuck behind a land dispute for eight months would
+drag a mean until the number described nothing. The median says what a normal request
+looks like, and a separate p90 column says how bad the tail gets, which is the pair a
+head actually needs.
+
+The arithmetic is working days (`workingDaysBetween` in `server/src/schedule.ts`), so it
+skips weekends and the `holidays` table exactly as the expected-ready-date quote does —
+an office is not late for a day the hall was shut.
+
+**Scope is the server's, never the query's.** A staff account gets its own departments;
+naming a `departmentId` it does not serve is a 403, not an empty report. An admin sees
+every office and may narrow to one. Periods are capped at one year
+(`MAX_PERIOD_DAYS`), which is what keeps an unbounded scan out of the queue table.
+
+Reports are read-only and derived — there is no reports table to fall out of date, and
+nothing here can change a request.
+
 ## Accessibility
 
 The app registers senior citizens and persons with disability, so legibility is a
@@ -378,6 +412,11 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
 - **Programme enrolment is reached through a request**, so a resident who has never filed
   one cannot be enrolled from the console. A real deployment would want a resident lookup,
   which is a new authorization surface worth designing deliberately rather than bolting on.
+- **Reports are computed per request**, scanning the period rather than reading a rolled-up
+  table. At a municipality's volume that is the right trade — no aggregation to fall out of
+  date, and a figure is never stale. It is also why the period is capped at a year; if the
+  scan ever gets slow, add an index on `(department_id, submitted_at)` before reaching for a
+  summary table.
 - **The holiday calendar** is seeded with 2026 Philippine dates and two invented local
   ones. National holidays move each year by proclamation, so this needs checking annually
   and the local rows replacing — an out-of-date calendar quietly promises dates on which
@@ -411,10 +450,16 @@ clicked through without Postgres and the API. Its rules mirror the server's —
 department scoping, workflow order, who may read what — so the demo does not
 teach anything the real system would refuse.
 
-It is opt-in at build time and tree-shaken out of the production bundle; check
-with `grep -c demoServer dist/assets/*.js` after a normal build (expect 0).
+It is opt-in at build time and tree-shaken out of the production bundle; check with
+`grep -o "elgu-demo-state-v[0-9]*" dist/assets/*.js` after a normal build, which should
+find nothing. (Don't grep for `demoServer` — minification renames it, so that search
+comes back empty for a demo build too and proves nothing.)
 State lives in this browser's localStorage, so a second window or profile starts
-over: switching role means signing out, not opening another window.
+over: switching role means signing out, not opening another window. The seed includes
+a year of closed requests across all six offices (`seedHistory`) belonging to residents
+who are not sign-in accounts, so the Reports tab has something to report on while the
+demo resident's own list stays short enough to read. Bump `STORE_KEY` whenever the seed
+shape changes, or returning browsers keep the old state.
 
 ## Deployment
 

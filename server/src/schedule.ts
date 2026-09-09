@@ -62,6 +62,33 @@ export function addWorkingDays(start: Date, days: number, holidays: Set<string>)
   return iso(cursor)
 }
 
+/**
+ * Working days from `start` to `end`, counted the way an office counts them:
+ * a request filed and released the same working day took zero days, not one.
+ * Weekends and holidays in between do not count against the office.
+ *
+ * Returns null when the dates are the wrong way round, which means the data is
+ * wrong rather than the turnaround being negative.
+ */
+export function workingDaysBetween(start: Date, end: Date, holidays: Set<string>): number | null {
+  const from = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()))
+  const to = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()))
+  if (to < from) return null
+
+  let days = 0
+  const cursor = new Date(from)
+  while (cursor < to) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+    if (isWorkingDay(cursor, holidays)) days += 1
+  }
+  return days
+}
+
+/** The holiday calendar, for callers that count days themselves. */
+export async function loadHolidays(): Promise<Set<string>> {
+  return holidaySet()
+}
+
 export interface ReadyEstimate {
   /** Earliest and latest working day the office expects to release it. */
   expectedReady: { from: string; to: string } | null

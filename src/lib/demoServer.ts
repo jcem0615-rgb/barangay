@@ -13,12 +13,12 @@ import {
   EMERGENCY_CONTACTS, HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
 } from '../data/mockData'
 import { addWorkingDays } from './schedule'
-import { WORKFLOW_STEPS, type ServiceDefinition } from '../types'
+import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../types'
 
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v6'
+const STORE_KEY = 'elgu-demo-state-v7'
 
 interface DemoUser {
   id: string
@@ -188,7 +188,108 @@ function seed(): DemoState {
     )
   )
 
+  seedHistory(state, resident, now)
+
   return state
+}
+
+/**
+ * Closed requests across every office, so the Reports tab has something to
+ * report on.
+ *
+ * They belong to residents who are not sign-in accounts: the demo resident's
+ * own list stays the three requests above, which is what makes her screens
+ * readable, while the offices still have a year of work behind them.
+ *
+ * The turnarounds are deliberately uneven — a couple of them miss the
+ * catalogue's promised processing time — because a report where every office
+ * is perfect demonstrates nothing.
+ */
+function seedHistory(state: DemoState, resident: DemoUser, now: number) {
+  const DAY = 86_400_000
+  // serviceId, weeks ago, days the resident took to pay, days the office then took
+  const history: [string, number, number, number][] = [
+    ['cedula', 2, 0, 0], ['cedula', 3, 0, 1], ['cedula', 5, 1, 0], ['cedula', 8, 0, 0],
+    ['cedula', 11, 0, 1], ['cedula', 14, 2, 0], ['cedula', 19, 0, 0], ['cedula', 26, 0, 1],
+    ['boss-application', 4, 3, 6], ['boss-application', 9, 1, 4], ['boss-application', 17, 8, 12],
+    ['birth-certificate', 6, 0, 2], ['birth-certificate', 13, 1, 3], ['birth-certificate', 22, 0, 2],
+    ['building-permit', 7, 4, 11], ['building-permit', 20, 2, 21],
+    ['health-certificate', 5, 0, 2], ['health-certificate', 12, 1, 1], ['health-certificate', 24, 0, 3],
+    ['solo-parent-id', 10, 0, 5], ['solo-parent-id', 21, 0, 9],
+    ['aics-application', 15, 0, 4], ['senior-pwd-id', 18, 0, 3],
+  ]
+
+  for (const [serviceId, weeks, payDays, officeDays] of history) {
+    const service = SERVICES.find((s) => s.id === serviceId)
+    if (!service) continue
+    const submitted = now - DAY * 7 * weeks
+    const paid = submitted + DAY * payDays
+    const released = paid + DAY * officeDays
+    const r = makeRequest(state, resident, service, sampleValues(service), submitted)
+    r.residentId = `demo-history-${r.id}`
+    r.status = 'completed'
+    r.currentStepIndex = WORKFLOW_STEPS.length - 1
+    r.paid = true
+    r.paymentMethod = 'Over the counter'
+    r.paidAt = new Date(paid).toISOString()
+    r.events.push(
+      { eventType: 'assessed', note: null, createdAt: new Date(submitted).toISOString(), actorName: 'Counter staff' },
+      { eventType: 'paid', note: null, createdAt: new Date(paid).toISOString(), actorName: 'Resident' },
+      { eventType: 'released', note: null, createdAt: new Date(released).toISOString(), actorName: 'Counter staff' },
+    )
+    state.requests.push(r)
+  }
+
+  // One refusal, so "rejected" is not permanently zero.
+  const bossService = SERVICES.find((s) => s.id === 'boss-application')!
+  const refused = makeRequest(state, resident, bossService, sampleValues(bossService), now - DAY * 40)
+  refused.residentId = `demo-history-${refused.id}`
+  refused.status = 'rejected'
+  refused.rejectionReason = 'Barangay clearance had expired.'
+  refused.events.push({
+    eventType: 'rejected', note: 'Barangay clearance had expired.',
+    createdAt: new Date(now - DAY * 38).toISOString(), actorName: 'Rico M. Dela Cruz',
+  })
+  state.requests.push(refused)
+}
+
+/**
+ * A filled-in form for a seeded request, taken from the service's own field
+ * list so a clerk opening one in the demo queue sees the shape of the real
+ * thing rather than an empty panel.
+ */
+/** Mirrors `toCsv` in server/src/reports.ts — same columns, same quoting. */
+function reportCsv(report: { rows: any[] }): string {
+  const header = [
+    'Office', 'Service', 'Submitted', 'Completed', 'Rejected', 'In progress',
+    'Awaiting payment', 'Median office days', 'Median resident days',
+    'Slowest 10% (office days)', 'Met target', 'Missed target',
+  ]
+  // Quote everything: an office name with a comma in it must not shift columns.
+  const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  return [
+    header.map(escape).join(','),
+    ...report.rows.map((r) =>
+      [
+        r.departmentName, r.serviceName, r.submitted, r.completed, r.rejected,
+        r.inProgress, r.awaitingPayment,
+        r.medianOfficeDays ?? '', r.medianResidentDays ?? '', r.p90OfficeDays ?? '',
+        r.metTarget, r.missedTarget,
+      ].map(escape).join(',')
+    ),
+  ].join('\r\n')
+}
+
+function sampleValues(service: { fields: ServiceField[] }): Record<string, string> {
+  const values: Record<string, string> = {}
+  for (const field of service.fields) {
+    values[field.id] =
+      field.type === 'select' ? (field.options?.[0] ?? '')
+      : field.type === 'number' ? '1'
+      : field.type === 'date' ? '2026-01-15'
+      : `Sample ${field.label.toLowerCase()}`
+  }
+  return values
 }
 
 const PREFIX: Record<string, string> = {
@@ -313,6 +414,34 @@ function makeVerifyCode(): string {
     if (i % 4 === 3 && i !== 11) code += '-'
   }
   return code
+}
+
+/** Working days between two dates, mirroring server/src/schedule.ts. */
+function countWorkingDays(start: Date, end: Date): number | null {
+  const from = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const to = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  if (to < from) return null
+  let days = 0
+  const cursor = new Date(from)
+  while (cursor < to) {
+    cursor.setDate(cursor.getDate() + 1)
+    const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
+    if (cursor.getDay() !== 0 && cursor.getDay() !== 6 && !HOLIDAY_DAYS.has(iso)) days += 1
+  }
+  return days
+}
+
+const medianOf = (v: number[]) => {
+  if (v.length === 0) return null
+  const s = [...v].sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 === 0 ? (s[m - 1]! + s[m]!) / 2 : s[m]!
+}
+
+const p90Of = (v: number[]) => {
+  if (v.length === 0) return null
+  const s = [...v].sort((a, b) => a - b)
+  return s[Math.min(s.length - 1, Math.ceil(s.length * 0.9) - 1)]!
 }
 
 const normaliseCode = (raw: string) => String(raw ?? '').toUpperCase().replace(/-/g, '')
@@ -821,6 +950,108 @@ async function route(
         const [, mime] = /^data:([^;]+);/.exec(resident.photo) ?? []
         return { status: 200, blob: dataUrlToBlob(resident.photo, mime ?? 'image/jpeg') }
       }
+    }
+
+    // ---- reports ----
+    // Same two clocks and the same scoping as server/src/reports.ts, on a
+    // working-day count rather than calendar days.
+    if (parts[1] === 'reports') {
+      const from = query.get('from') ?? ''
+      const to = query.get('to') ?? ''
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        throw new DemoError(400, 'Give a from and to date, as YYYY-MM-DD.')
+      }
+      if (from > to) throw new DemoError(400, 'The start date is after the end date.')
+      if ((Date.parse(to) - Date.parse(from)) / 86_400_000 > 366) {
+        throw new DemoError(400, 'Reports cover at most one year at a time.')
+      }
+
+      const wanted = query.get('departmentId') ?? ''
+      if (wanted && user.role !== 'admin' && !user.departments.includes(wanted)) {
+        throw new DemoError(403, 'You are not assigned to that office.')
+      }
+      const scope = wanted ? [wanted] : user.departments
+      const seeAll = user.role === 'admin' && !wanted
+
+      const within = state.requests.filter((r) => {
+        const day = r.dateSubmitted.slice(0, 10)
+        return day >= from && day <= to && (seeAll || scope.includes(r.categoryId))
+      })
+
+      const releasedAt = (r: DemoRequest) =>
+        r.events.filter((e) => e.eventType === 'released').map((e) => e.createdAt).sort().pop() ?? null
+
+      const byService = new Map<string, any>()
+      for (const r of within) {
+        const service = SERVICES.find((s) => s.id === r.serviceId)
+        const key = `${r.categoryId}:${r.serviceId}`
+        let row = byService.get(key)
+        if (!row) {
+          row = {
+            departmentId: r.categoryId,
+            departmentName: SERVICE_CATEGORIES.find((c) => c.id === r.categoryId)?.name ?? r.categoryId,
+            serviceId: r.serviceId, serviceName: r.serviceName,
+            submitted: 0, completed: 0, rejected: 0, inProgress: 0, awaitingPayment: 0,
+            medianOfficeDays: null, medianResidentDays: null, p90OfficeDays: null,
+            metTarget: 0, missedTarget: 0,
+            _office: [] as number[], _resident: [] as number[],
+          }
+          byService.set(key, row)
+        }
+        row.submitted += 1
+        if (r.status === 'completed') row.completed += 1
+        else if (r.status === 'rejected') row.rejected += 1
+        else if (r.status === 'for_payment') row.awaitingPayment += 1
+        else row.inProgress += 1
+
+        const done = releasedAt(r)
+        if (r.status !== 'completed' || !done) continue
+        const officeDays = countWorkingDays(new Date(r.paidAt ?? r.dateSubmitted), new Date(done))
+        const residentDays = countWorkingDays(new Date(r.dateSubmitted), new Date(done))
+        if (officeDays !== null) {
+          row._office.push(officeDays)
+          if (officeDays <= (service?.processingDaysMax ?? 0)) row.metTarget += 1
+          else row.missedTarget += 1
+        }
+        if (residentDays !== null) row._resident.push(residentDays)
+      }
+
+      const allOffice: number[] = []
+      const allResident: number[] = []
+      const rows = [...byService.values()].map((row) => {
+        row.medianOfficeDays = medianOf(row._office)
+        row.medianResidentDays = medianOf(row._resident)
+        row.p90OfficeDays = p90Of(row._office)
+        allOffice.push(...row._office)
+        allResident.push(...row._resident)
+        const { _office, _resident, ...rest } = row
+        return rest
+      }).sort((a, b) => b.submitted - a.submitted)
+
+      const sum = (k: string) => rows.reduce((n, r) => n + (r as any)[k], 0)
+      const met = sum('metTarget')
+      const missed = sum('missedTarget')
+      const summary = {
+        from, to,
+        submitted: sum('submitted'), completed: sum('completed'), rejected: sum('rejected'),
+        stillOpen: sum('submitted') - sum('completed') - sum('rejected'),
+        medianOfficeDays: medianOf(allOffice), medianResidentDays: medianOf(allResident),
+        metTarget: met, missedTarget: missed,
+        onTimeRate: met + missed === 0 ? null : Math.round((met / (met + missed)) * 100),
+        rows,
+      }
+
+      // The same columns and the same quoting as server/src/reports.ts, so a
+      // spreadsheet opened from the demo has the shape of the real export.
+      if (query.get('format') === 'csv') {
+        return {
+          status: 200,
+          blob: new Blob([reportCsv(summary)], { type: 'text/csv;charset=utf-8' }),
+          fileName: `elgu-report-${from}-to-${to}.csv`,
+        }
+      }
+
+      return { status: 200, body: summary }
     }
 
     if (parts[1] === 'summary') return { status: 200, body: [] }

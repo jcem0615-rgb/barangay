@@ -115,6 +115,38 @@ export interface IdCheck {
   checkedAt: string
 }
 
+export interface ReportRow {
+  departmentId: string
+  departmentName: string
+  serviceId: string
+  serviceName: string
+  submitted: number
+  completed: number
+  rejected: number
+  inProgress: number
+  awaitingPayment: number
+  medianOfficeDays: number | null
+  medianResidentDays: number | null
+  p90OfficeDays: number | null
+  metTarget: number
+  missedTarget: number
+}
+
+export interface ReportSummary {
+  from: string
+  to: string
+  submitted: number
+  completed: number
+  rejected: number
+  stillOpen: number
+  medianOfficeDays: number | null
+  medianResidentDays: number | null
+  metTarget: number
+  missedTarget: number
+  onTimeRate: number | null
+  rows: ReportRow[]
+}
+
 export interface DraftRecord {
   id: string
   serviceId: string
@@ -296,6 +328,17 @@ export const api = {
     request<IdCheck>('/staff/verify-id', { method: 'POST', body: JSON.stringify({ code }) }),
 
   verifiedPhoto: (residentId: string) => fetchBlob(`/staff/verify-id/${residentId}/photo`),
+
+  staffReport: (from: string, to: string, departmentId?: string) =>
+    request<ReportSummary>(
+      `/staff/reports?from=${from}&to=${to}${departmentId ? `&departmentId=${departmentId}` : ''}`
+    ),
+
+  /** Fetched with the bearer token, then handed to the browser as a download. */
+  staffReportCsv: (from: string, to: string, departmentId?: string) =>
+    downloadPdf(
+      `/staff/reports?from=${from}&to=${to}${departmentId ? `&departmentId=${departmentId}` : ''}&format=csv`
+    ),
 
   listDrafts: () => request<DraftRecord[]>('/requests/drafts'),
 

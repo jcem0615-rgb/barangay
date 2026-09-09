@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Building2, Inbox, LogOut, RefreshCw, ScanLine, Search, Users } from 'lucide-react'
+import { BarChart3, Building2, Inbox, LogOut, RefreshCw, ScanLine, Search, Users } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { Application, ServiceCategory } from '../../types'
 import StaffRequestPanel from './StaffRequestPanel'
 import StaffAccounts from './StaffAccounts'
 import StaffVerifyId from './StaffVerifyId'
+import StaffReports from './StaffReports'
 import { formatPeso } from '../../lib/money'
 
 const STATUS_TABS = [
@@ -24,7 +25,7 @@ export default function StaffConsole() {
   const [status, setStatus] = useState<string>('')
   const [departmentId, setDepartmentId] = useState<string>('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [view, setView] = useState<'queue' | 'verify' | 'accounts'>('queue')
+  const [view, setView] = useState<'queue' | 'verify' | 'reports' | 'accounts'>('queue')
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -113,7 +114,7 @@ export default function StaffConsole() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-{/*
+            {/*
               Verifying an ID is counter work, so every office gets it — a clerk
               anywhere may be handed a senior-citizen discount to check.
               Accounts stays with administrators.
@@ -122,6 +123,7 @@ export default function StaffConsole() {
               {([
                 ['queue', 'Queue', Inbox],
                 ['verify', 'Verify ID', ScanLine],
+                ['reports', 'Reports', BarChart3],
                 ...(user?.role === 'admin' ? [['accounts', 'Accounts', Users] as const] : []),
               ] as const).map(([key, label, Icon]) => (
                 <button
@@ -148,6 +150,12 @@ export default function StaffConsole() {
       <div className="mx-auto max-w-6xl px-6 py-6">
         {view === 'verify' ? (
           <StaffVerifyId />
+        ) : view === 'reports' ? (
+          <StaffReports
+            departments={departments}
+            isAdmin={user?.role === 'admin'}
+            ownDepartments={user?.departments ?? []}
+          />
         ) : view === 'accounts' ? (
           <StaffAccounts departments={departments} />
         ) : (

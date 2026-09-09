@@ -14,6 +14,7 @@ import {
 } from '../programs.ts'
 import { consumeVerificationCode } from '../idVerification.ts'
 import { getFile } from '../storage.ts'
+import { buildReport, MAX_PERIOD_DAYS, toCsv } from '../reports.ts'
 
 export const staffRouter = Router()
 staffRouter.use(authenticate, requireRole('staff', 'admin'))
@@ -667,4 +668,61 @@ staffRouter.get('/verify-id/:residentId/photo', async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('Cache-Control', 'private, no-store')
   res.send(content)
+})
+
+// ---------------------------------------------------------------------------
+// Reports
+//
+// Scoped like the queue: an office sees its own work, an administrator sees
+// every office. Reporting is reading, so there is no separate permission —
+// but a clerk must not be able to read another department's numbers by asking
+// for them, so the scope is applied server-side and not taken from the query.
+// ---------------------------------------------------------------------------
+
+const reportSchema = z.object({
+  from: z.iso.date(),
+  to: z.iso.date(),
+  departmentId: z.string().max(40).optional(),
+  format: z.enum(['json', 'csv']).optional(),
+})
+
+staffRouter.get('/reports', async (req, res) => {
+  const parsed = reportSchema.safeParse(req.query)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Give a from and to date, as YYYY-MM-DD.' })
+  }
+  const { from, to, departmentId, format } = parsed.data
+  const user = req.user!
+  const isAdmin = user.role === 'admin'
+
+  if (from > to) return res.status(400).json({ error: 'The start date is after the end date.' })
+  const span = (Date.parse(to) - Date.parse(from)) / 86_400_000
+  if (span > MAX_PERIOD_DAYS) {
+    return res.status(400).json({ error: 'Reports cover at most one year at a time.' })
+  }
+
+  // A named department must be one the caller actually serves.
+  if (departmentId && !isAdmin && !user.departments.includes(departmentId)) {
+    return res.status(403).json({ error: 'You are not assigned to that office.' })
+  }
+  if (!isAdmin && user.departments.length === 0) {
+    return res.status(403).json({ error: 'Your account is not assigned to an office yet.' })
+  }
+
+  const scope = departmentId ? [departmentId] : user.departments
+  const report = await buildReport({
+    from,
+    to,
+    departments: scope,
+    all: isAdmin && !departmentId,
+  })
+
+  if (format === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="elgu-report-${from}-to-${to}.csv"`)
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    return res.send(toCsv(report))
+  }
+
+  res.json(report)
 })
