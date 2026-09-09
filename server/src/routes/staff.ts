@@ -15,6 +15,7 @@ import {
 import { consumeVerificationCode } from '../idVerification.ts'
 import { getFile } from '../storage.ts'
 import { buildReport, MAX_PERIOD_DAYS, toCsv } from '../reports.ts'
+import { APPOINTMENT_SELECT, officeToday } from '../appointments.ts'
 
 export const staffRouter = Router()
 staffRouter.use(authenticate, requireRole('staff', 'admin'))
@@ -725,4 +726,88 @@ staffRouter.get('/reports', async (req, res) => {
   }
 
   res.json(report)
+})
+
+// ---------------------------------------------------------------------------
+// The counter's day
+//
+// One office, one day, in time order. This is what a clerk works from at the
+// window, so it carries the queue number, who is expected and what for — and
+// nothing else about the resident, which is the same rule the ID check follows.
+// ---------------------------------------------------------------------------
+
+const APPOINTMENT_STATUSES = { arrived: 'arrived', served: 'served', 'no-show': 'no_show' } as const
+
+staffRouter.get('/appointments', async (req, res) => {
+  const user = req.user!
+  const date = String(req.query.date ?? officeToday())
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Give a date as YYYY-MM-DD.' })
+  }
+  const wanted = req.query.departmentId ? String(req.query.departmentId) : ''
+  const isAdmin = user.role === 'admin'
+  if (wanted && !isAdmin && !user.departments.includes(wanted)) {
+    return res.status(403).json({ error: 'You are not assigned to that office.' })
+  }
+  const scope = wanted ? [wanted] : user.departments
+
+  const rows = await query(
+    `select ${APPOINTMENT_SELECT}, s.name as "serviceName", d.office_name as "officeName",
+            u.full_name as "residentName", r.reference_no as "referenceNo"
+       from appointments a
+       join services s on s.id = a.service_id
+       join departments d on d.id = a.department_id
+       join users u on u.id = a.resident_id
+       left join requests r on r.id = a.request_id
+      where a.scheduled_on = $1
+        and ($2::boolean or a.department_id = any($3::text[]))
+      order by a.start_time, a.queue_no`,
+    [date, isAdmin && !wanted, scope]
+  )
+  res.json({ date, appointments: rows })
+})
+
+/**
+ * What happened at the window.
+ *
+ * `arrived` is the resident presenting themselves; `served` and `no_show` close
+ * the visit. A booking already closed is not reopened here — the record of what
+ * happened at a counter should not be quietly rewritten later in the day.
+ */
+staffRouter.post('/appointments/:id/:action', async (req, res) => {
+  const action = req.params.action as keyof typeof APPOINTMENT_STATUSES
+  const status = APPOINTMENT_STATUSES[action]
+  if (!status) return res.status(404).json({ error: 'Not found.' })
+  const user = req.user!
+
+  const outcome = await transaction(async (client) => {
+    const found = await client.query<{ status: string; department_id: string }>(
+      `select status, department_id from appointments where id = $1 for update`,
+      [req.params.id]
+    )
+    if (found.rowCount === 0) return { code: 404, error: 'Appointment not found.' }
+    const row = found.rows[0]!
+    if (user.role !== 'admin' && !user.departments.includes(row.department_id)) {
+      // Not found rather than forbidden: another office's day is not this
+      // clerk's to learn the shape of.
+      return { code: 404, error: 'Appointment not found.' }
+    }
+    if (row.status === 'cancelled') return { code: 409, error: 'That appointment was cancelled.' }
+    if (row.status === 'served' || row.status === 'no_show') {
+      return { code: 409, error: `That visit is already closed as ${row.status.replace('_', ' ')}.` }
+    }
+    const { rows } = await client.query(
+      `update appointments
+          set status = $2,
+              arrived_at = case when $2 = 'arrived' then now() else arrived_at end,
+              closed_at  = case when $2 in ('served', 'no_show') then now() else closed_at end
+        where id = $1
+      returning ${APPOINTMENT_SELECT.replace(/a\./g, '')}`,
+      [req.params.id, status]
+    )
+    return { appointment: rows[0] }
+  })
+
+  if ('error' in outcome) return res.status(outcome.code!).json({ error: outcome.error })
+  res.json(outcome.appointment)
 })

@@ -12,6 +12,8 @@ export type Screen =
   | { name: 'profile' }
   | { name: 'id-card' }
   | { name: 'notifications' }
+  | { name: 'appointments' }
+  | { name: 'book-appointment'; serviceId?: string; requestId?: string }
   | { name: 'help' }
   | { name: 'privacy' }
 

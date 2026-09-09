@@ -432,6 +432,51 @@ In the demo these live in `DemoState` rather than reading the imported constants
 demo whose catalogue is hard-wired to the seed would show an edit saving and then not
 appearing anywhere.
 
+## Appointments and queue numbers
+
+The app already saved a resident the paperwork; it did not save them the queue. Plenty of
+municipal business still needs a person at a window, and the way that works without this is
+that everyone arrives at eight and waits.
+
+An appointment is with an **office**, about a **service**, and optionally about a **request**
+the office already holds — so a resident whose permit is stuck can book a time from the
+request itself rather than starting again.
+
+**The calendar is the one everything else uses.** A day the hall is shut cannot be booked,
+which means weekends and the `holidays` table, exactly as the expected-ready-date arithmetic
+reads them. Declaring a holiday in the Municipality tab closes booking on that day as a
+consequence, not as a second thing to remember.
+
+**Capacity is real, and enforced under a lock.** `office_booking` holds one row per office —
+hours, slot length, how many residents a slot holds, and how far ahead booking opens.
+Booking locks that row before counting, which serialises booking for the office. Coarse, but
+a municipal counter books a handful a minute, and an oversold slot is discovered with people
+standing in front of it.
+
+**One live booking per resident per office.** Without it a resident books four slots to keep
+their options open and the office spends the morning calling empty numbers. The refusal names
+the booking in the way, so they know what to cancel.
+
+**Queue numbers come from a counter, never from a row count** (`appointment_counters`), so a
+cancellation frees the slot but not the number. Two people answering to MTO-007 on one
+morning is the exact confusion a queue number exists to prevent.
+
+**Time is the office's, not the server's** (`officeToday`, `officeMinutesNow` — `Asia/Manila`).
+A server clock somewhere else would tell a resident in Manila at 9am that today is over, or
+offer them a slot that has been and gone.
+
+A full or past slot is shown greyed rather than hidden: a resident looking at a half-empty
+morning needs to see that 8:30 has gone, not to wonder whether the office opens at nine. The
+booking error renders **under the time grid** rather than at the top of the page — a
+refusal seven hundred pixels above where they just tapped reads as the button not working,
+which is how it was first built and what browser-driving caught.
+
+The staff **Today** tab is the counter's day: one office, in time order, with the queue
+number, who is expected and what for — and nothing else about the resident, the same rule
+the ID check follows. `arrived` is them presenting themselves; `served` and `no_show` close
+the visit and are final, because what happened at a window should not be quietly rewritten
+later in the day.
+
 ## Accessibility
 
 The app registers senior citizens and persons with disability, so legibility is a

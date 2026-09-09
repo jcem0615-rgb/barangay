@@ -21,6 +21,8 @@ import SignIn from './screens/SignIn'
 import ResetPassword from './screens/ResetPassword'
 import StaffConsole from './screens/staff/StaffConsole'
 import HelpSupport from './screens/HelpSupport'
+import Appointments from './screens/Appointments'
+import BookAppointment from './screens/BookAppointment'
 import DataPrivacy from './screens/DataPrivacy'
 
 function ScreenRouter() {
@@ -47,6 +49,10 @@ function ScreenRouter() {
       return <IdCardScreen />
     case 'notifications':
       return <NotificationsScreen />
+    case 'appointments':
+      return <Appointments />
+    case 'book-appointment':
+      return <BookAppointment serviceId={screen.serviceId} requestId={screen.requestId} />
     case 'help':
       return <HelpSupport />
     case 'privacy':

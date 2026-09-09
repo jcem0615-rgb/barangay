@@ -18,7 +18,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v8'
+const STORE_KEY = 'elgu-demo-state-v9'
 
 interface DemoUser {
   id: string
@@ -104,6 +104,16 @@ interface DemoState {
   holidays: DemoHoliday[]
   offices: Record<string, DemoOfficeContact>
   audit: DemoAudit[]
+  appointments: DemoAppointment[]
+  /** Queue numbers issued per office per day, so a cancellation frees no number. */
+  queueCounters: Record<string, number>
+}
+
+interface DemoAppointment {
+  id: string; residentId: string; departmentId: string; serviceId: string
+  requestId: string | null; scheduledOn: string; startTime: string
+  queueNo: string; status: 'booked' | 'arrived' | 'served' | 'no_show' | 'cancelled'
+  note: string | null; createdAt: string
 }
 
 interface DemoHotline {
@@ -189,6 +199,8 @@ function seed(): DemoState {
       address: c.address ?? null, hours: c.hours ?? null, phone: c.phone ?? null, email: c.email ?? null,
     }])),
     audit: [],
+    appointments: [],
+    queueCounters: {},
   }
 
   const boss = SERVICES.find((s) => s.id === 'boss-application')!
@@ -468,6 +480,79 @@ function readHotline(body: Record<string, unknown>, fallbackSort = 0) {
   if (!dialable(phone)) throw new DemoError(400, 'That does not look like a number a resident could dial.')
   const sortOrder = Number.isInteger(body.sortOrder) ? Number(body.sortOrder) : fallbackSort
   return { label, agency, phone, isNational: Boolean(body.isNational), sortOrder }
+}
+
+/**
+ * Booking a slot at the counter — the same rules as server/src/appointments.ts.
+ *
+ * The office's own calendar decides everything: weekends and the holidays table
+ * close a day, the office's hours and slot length decide the times, and its
+ * capacity decides how many people a slot holds.
+ */
+const BOOKING_DEFAULTS = { enabled: true, opens: '08:00', closes: '16:00', slotMinutes: 30, capacity: 4, horizonDays: 21 }
+
+const officeToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date())
+
+const officeMinutesNow = () => {
+  const [h, m] = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date()).split(':').map(Number)
+  return h! * 60 + m!
+}
+
+const hhmmToMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h! * 60 + m! }
+const minutesToHhmm = (n: number) =>
+  `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+
+const plusDays = (date: string, n: number) => {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Why a day cannot be booked, in the words the resident is shown. */
+function closedReasonFor(date: string, holidays: Set<string>): string | null {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay()
+  if (day === 0 || day === 6) return 'The hall is closed at weekends.'
+  if (holidays.has(date)) return 'The hall is closed that day.'
+  return null
+}
+
+function demoSlots(date: string, departmentId: string, holidays: Set<string>) {
+  const rules = BOOKING_DEFAULTS
+  const closed = closedReasonFor(date, holidays)
+  const today = officeToday()
+  const now = officeMinutesNow()
+  const slots: Array<{ startTime: string; booked: number; capacity: number; available: boolean }> = []
+  for (let m = hhmmToMinutes(rules.opens); m + rules.slotMinutes <= hhmmToMinutes(rules.closes); m += rules.slotMinutes) {
+    const startTime = minutesToHhmm(m)
+    const booked = state.appointments.filter(
+      (a) => a.departmentId === departmentId && a.scheduledOn === date &&
+             a.startTime === startTime && a.status !== 'cancelled'
+    ).length
+    const past = date < today || (date === today && m <= now)
+    slots.push({ startTime, booked, capacity: rules.capacity, available: !closed && !past && booked < rules.capacity })
+  }
+  return { slots, closedReason: closed }
+}
+
+/** Mirrors `checkBookable`: where a slot must fall before capacity matters. */
+function bookableProblem(date: string, startTime: string): string | null {
+  const rules = BOOKING_DEFAULTS
+  const today = officeToday()
+  if (date < today) return 'That day has already passed.'
+  if (date > plusDays(today, rules.horizonDays)) {
+    return `This office takes bookings up to ${rules.horizonDays} days ahead.`
+  }
+  const m = hhmmToMinutes(startTime)
+  if (m < hhmmToMinutes(rules.opens) || m + rules.slotMinutes > hhmmToMinutes(rules.closes)) {
+    return 'The office is not open at that time.'
+  }
+  if ((m - hhmmToMinutes(rules.opens)) % rules.slotMinutes !== 0) {
+    return 'That is not one of the office\u2019s appointment times.'
+  }
+  if (date === today && m <= officeMinutesNow()) return 'That time has already passed today.'
+  return null
 }
 
 /** Read from state, so declaring a day in the console really does move a date. */
@@ -1130,6 +1215,52 @@ async function route(
       return { status: 200, body: summary }
     }
 
+    // ---- the counter's day ----
+    if (parts[1] === 'appointments') {
+      const date = query.get('date') ?? officeToday()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new DemoError(400, 'Give a date as YYYY-MM-DD.')
+
+      if (!parts[2] && method === 'GET') {
+        const wanted = query.get('departmentId') ?? ''
+        if (wanted && user.role !== 'admin' && !user.departments.includes(wanted)) {
+          throw new DemoError(403, 'You are not assigned to that office.')
+        }
+        const seeAll = user.role === 'admin' && !wanted
+        const scope = wanted ? [wanted] : user.departments
+        const appointments = state.appointments
+          .filter((a) => a.scheduledOn === date && (seeAll || scope.includes(a.departmentId)))
+          .sort((a, b) => a.startTime.localeCompare(b.startTime) || a.queueNo.localeCompare(b.queueNo))
+          .map((a) => ({
+            ...a,
+            serviceName: SERVICES.find((s) => s.id === a.serviceId)?.name ?? a.serviceId,
+            officeName: officeName(a.departmentId),
+            residentName: state.users.find((u) => u.id === a.residentId)?.fullName ?? 'Resident',
+            referenceNo: state.requests.find((r) => r.id === a.requestId)?.referenceNo ?? null,
+          }))
+        return { status: 200, body: { date, appointments } }
+      }
+
+      if (parts[2] && parts[3] && method === 'POST') {
+        const next = ({ arrived: 'arrived', served: 'served', 'no-show': 'no_show' } as const)[parts[3] as 'arrived']
+        if (!next) throw new DemoError(404, 'Not found.')
+        const found = state.appointments.find((a) => a.id === parts[2])
+        // Not found rather than forbidden: another office's day is not this
+        // clerk's to learn the shape of.
+        if (!found || (user.role !== 'admin' && !user.departments.includes(found.departmentId))) {
+          throw new DemoError(404, 'Appointment not found.')
+        }
+        if (found.status === 'cancelled') throw new DemoError(409, 'That appointment was cancelled.')
+        if (found.status === 'served' || found.status === 'no_show') {
+          throw new DemoError(409, `That visit is already closed as ${found.status.replace('_', ' ')}.`)
+        }
+        found.status = next
+        persist()
+        return { status: 200, body: found }
+      }
+
+      throw new DemoError(404, 'Not found.')
+    }
+
     if (parts[1] === 'summary') return { status: 200, body: [] }
 
     if (parts[1] === 'requests') {
@@ -1295,6 +1426,125 @@ async function route(
     }
     const mine = state.notifications.filter((n) => n.userId === user.id)
     return { status: 200, body: { notifications: mine, unread: mine.filter((n) => !n.readAt).length } }
+  }
+
+  // ---- appointments ----
+  // Same rules as server/src/routes/appointments.ts: the office's calendar,
+  // its capacity, one live booking per resident per office, and a queue number
+  // that is never handed out twice.
+  if (parts[0] === 'appointments') {
+    const user = need('resident')
+    const holidays = holidayDays(state)
+
+    const serialize = (a: DemoAppointment) => {
+      const svc = SERVICES.find((s) => s.id === a.serviceId)
+      const cat = SERVICE_CATEGORIES.find((c) => c.id === a.departmentId)
+      return {
+        ...a,
+        serviceName: svc?.name ?? a.serviceId,
+        officeName: cat?.officeName ?? a.departmentId,
+        officeAddress: state.offices[a.departmentId]?.address ?? null,
+      }
+    }
+
+    if (parts[1] === 'days' && method === 'GET') {
+      const departmentId = query.get('departmentId') ?? ''
+      if (!SERVICE_CATEGORIES.some((c) => c.id === departmentId)) throw new DemoError(404, 'Office not found.')
+      const today = officeToday()
+      const days = Array.from({ length: BOOKING_DEFAULTS.horizonDays + 1 }, (_, i) => {
+        const date = plusDays(today, i)
+        const reason = closedReasonFor(date, holidays)
+        return { date, open: reason === null, reason }
+      })
+      return { status: 200, body: { office: { departmentId, ...BOOKING_DEFAULTS }, days } }
+    }
+
+    if (parts[1] === 'availability' && method === 'GET') {
+      const departmentId = query.get('departmentId') ?? ''
+      const date = query.get('date') ?? ''
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new DemoError(400, 'Give a date as YYYY-MM-DD.')
+      if (!SERVICE_CATEGORIES.some((c) => c.id === departmentId)) throw new DemoError(404, 'Office not found.')
+      return { status: 200, body: { date, ...demoSlots(date, departmentId, holidays) } }
+    }
+
+    if (!parts[1] && method === 'GET') {
+      return {
+        status: 200,
+        body: state.appointments
+          .filter((a) => a.residentId === user.id)
+          .sort((a, b) => b.scheduledOn.localeCompare(a.scheduledOn) || b.startTime.localeCompare(a.startTime))
+          .map(serialize),
+      }
+    }
+
+    if (!parts[1] && method === 'POST') {
+      const service = SERVICES.find((s) => s.id === body.serviceId)
+      if (!service) throw new DemoError(404, 'Service not found.')
+      const date = String(body.scheduledOn ?? '')
+      const startTime = String(body.startTime ?? '')
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new DemoError(400, 'Give a date as YYYY-MM-DD.')
+      if (!/^\d{2}:\d{2}$/.test(startTime)) throw new DemoError(400, 'Give a time as HH:MM.')
+
+      const problem = bookableProblem(date, startTime)
+      if (problem) throw new DemoError(400, problem)
+      const closed = closedReasonFor(date, holidays)
+      if (closed) throw new DemoError(400, closed)
+
+      const taken = state.appointments.filter(
+        (a) => a.departmentId === service.categoryId && a.scheduledOn === date &&
+               a.startTime === startTime && a.status !== 'cancelled'
+      ).length
+      if (taken >= BOOKING_DEFAULTS.capacity) {
+        throw new DemoError(409, 'That time has just been taken. Please choose another.')
+      }
+
+      const clash = state.appointments.find(
+        (a) => a.residentId === user.id && a.departmentId === service.categoryId &&
+               (a.status === 'booked' || a.status === 'arrived') && a.scheduledOn >= officeToday()
+      )
+      if (clash) {
+        throw new DemoError(409,
+          `You already have an appointment at this office on ${clash.scheduledOn} (${clash.queueNo}). ` +
+          'Cancel it first if you need a different time.')
+      }
+
+      const requestId = body.requestId ? String(body.requestId) : null
+      if (requestId && !state.requests.some((r) => r.id === requestId && r.residentId === user.id)) {
+        throw new DemoError(409, 'Request not found.')
+      }
+
+      const key = `${service.categoryId}:${date}`
+      state.queueCounters[key] = (state.queueCounters[key] ?? 0) + 1
+      const made: DemoAppointment = {
+        id: uid(), residentId: user.id, departmentId: service.categoryId, serviceId: service.id,
+        requestId, scheduledOn: date, startTime,
+        queueNo: `${PREFIX[service.categoryId] ?? 'LGU'}-${String(state.queueCounters[key]).padStart(3, '0')}`,
+        status: 'booked', note: body.note ? String(body.note).slice(0, 300) : null,
+        createdAt: new Date().toISOString(),
+      }
+      state.appointments.push(made)
+      notify(user.id, requestId, 'appointment_booked', `${service.name} — appointment booked`,
+        `You are booked at ${officeName(service.categoryId)} on ${date} at ${startTime}. ` +
+        `Your queue number is ${made.queueNo}.`)
+      persist()
+      return { status: 201, body: serialize(made) }
+    }
+
+    if (parts[1] && method === 'DELETE') {
+      const found = state.appointments.find((a) => a.id === parts[1] && a.residentId === user.id)
+      if (!found) throw new DemoError(404, 'Appointment not found.')
+      if (found.status !== 'booked') {
+        throw new DemoError(409, `That appointment is already marked ${found.status.replace('_', ' ')}.`)
+      }
+      found.status = 'cancelled'
+      notify(user.id, null, 'appointment_cancelled', 'Appointment cancelled',
+        `Your appointment at ${officeName(found.departmentId)} on ${found.scheduledOn} (${found.queueNo}) ` +
+        'has been cancelled. The slot is free for someone else.')
+      persist()
+      return { status: 204 }
+    }
+
+    throw new DemoError(404, 'Not found.')
   }
 
   // ---- admin: the municipality's own data ----

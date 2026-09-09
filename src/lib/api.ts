@@ -255,6 +255,54 @@ async function fetchBlob(path: string): Promise<Blob | null> {
   return res.blob()
 }
 
+export type AppointmentStatus = 'booked' | 'arrived' | 'served' | 'no_show' | 'cancelled'
+
+export interface Appointment {
+  id: string
+  departmentId: string
+  serviceId: string
+  requestId: string | null
+  scheduledOn: string
+  startTime: string
+  queueNo: string
+  status: AppointmentStatus
+  note: string | null
+  createdAt: string
+  serviceName?: string
+  officeName?: string
+  officeAddress?: string | null
+}
+
+export interface StaffAppointment extends Appointment {
+  serviceName: string
+  officeName: string
+  residentName: string
+  referenceNo: string | null
+}
+
+export interface OfficeBooking {
+  departmentId: string
+  enabled: boolean
+  opens: string
+  closes: string
+  slotMinutes: number
+  capacity: number
+  horizonDays: number
+}
+
+export interface BookingDay {
+  date: string
+  open: boolean
+  reason: string | null
+}
+
+export interface BookingSlot {
+  startTime: string
+  booked: number
+  capacity: number
+  available: boolean
+}
+
 export interface Hotline {
   id: string
   label: string
@@ -528,6 +576,34 @@ export const api = {
     request<OfficeContact>(`/admin/offices/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   auditTrail: (limit = 50) => request<AuditRow[]>(`/admin/audit?limit=${limit}`),
+
+  // Appointments: booking a slot at the counter, and what the office sees.
+  myAppointments: () => request<Appointment[]>('/appointments'),
+
+  bookingDays: (departmentId: string) =>
+    request<{ office: OfficeBooking; days: BookingDay[] }>(
+      `/appointments/days?departmentId=${encodeURIComponent(departmentId)}`
+    ),
+
+  bookingSlots: (departmentId: string, date: string) =>
+    request<{ date: string; slots: BookingSlot[]; closedReason: string | null }>(
+      `/appointments/availability?departmentId=${encodeURIComponent(departmentId)}&date=${date}`
+    ),
+
+  bookAppointment: (body: {
+    serviceId: string; scheduledOn: string; startTime: string
+    requestId?: string; note?: string
+  }) => request<Appointment>('/appointments', { method: 'POST', body: JSON.stringify(body) }),
+
+  cancelAppointment: (id: string) => request<void>(`/appointments/${id}`, { method: 'DELETE' }),
+
+  staffDay: (date: string, departmentId?: string) =>
+    request<{ date: string; appointments: StaffAppointment[] }>(
+      `/staff/appointments?date=${date}${departmentId ? `&departmentId=${encodeURIComponent(departmentId)}` : ''}`
+    ),
+
+  markAppointment: (id: string, action: 'arrived' | 'served' | 'no-show') =>
+    request<StaffAppointment>(`/staff/appointments/${id}/${action}`, { method: 'POST' }),
 
   staffQueue: (opts: {
     departmentId?: string

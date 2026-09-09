@@ -1,4 +1,4 @@
-import { CloudOff, Download, FileEdit, Wallet2 } from 'lucide-react'
+import { CalendarClock, CloudOff, Download, FileEdit, Wallet2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import StatusPill from '../components/StatusPill'
 import ReadyDate from '../components/ReadyDate'
@@ -122,7 +122,20 @@ export default function ApplicationDetail({ id }: { id: string }) {
 
         {(app.status === 'completed' ||
           app.currentStepIndex === WORKFLOW_STEPS.length - 1) &&
-          app.status !== 'rejected' && <CounterChecklist referenceNo={app.referenceNo} />}
+          app.status !== 'rejected' && (
+            <>
+              <CounterChecklist referenceNo={app.referenceNo} />
+              {/* The moment a counter visit is on the cards is the moment to
+                  offer a time for it, rather than leaving the resident to find
+                  the booking screen and re-pick the service. */}
+              <button
+                onClick={() => push({ name: 'book-appointment', serviceId: app.serviceId, requestId: app.id })}
+                className="tap-target flex w-full items-center justify-center gap-2 rounded-xl border border-navy-100 bg-navy-50 text-[calc(14.5px_*_var(--text-scale))] font-semibold text-navy-800 active:bg-navy-100"
+              >
+                <CalendarClock size={16} /> {t('detail.bookVisit')}
+              </button>
+            </>
+          )}
 
         {app.status === 'completed' && (
           <div>

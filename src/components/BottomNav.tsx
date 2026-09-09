@@ -1,4 +1,4 @@
-import { Home, LayoutGrid, FileClock, UserRound } from 'lucide-react'
+import { Home, LayoutGrid, FileClock, CalendarClock, UserRound } from 'lucide-react'
 import { useNav } from '../lib/nav'
 import { useT } from '../lib/i18n'
 
@@ -6,6 +6,7 @@ const ITEMS = [
   { key: 'dashboard', label: 'nav.home', icon: Home },
   { key: 'services', label: 'nav.services', icon: LayoutGrid },
   { key: 'applications', label: 'nav.requests', icon: FileClock },
+  { key: 'appointments', label: 'nav.appointments', icon: CalendarClock },
   { key: 'profile', label: 'nav.profile', icon: UserRound },
 ] as const
 
@@ -20,6 +21,8 @@ export default function BottomNav() {
         ? 'services'
         : screen.name === 'applications' || screen.name === 'application-detail' || screen.name === 'payment'
           ? 'applications'
+          : screen.name === 'appointments' || screen.name === 'book-appointment'
+          ? 'appointments'
           : screen.name === 'profile' || screen.name === 'id-card'
             ? 'profile'
             : ''

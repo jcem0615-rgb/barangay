@@ -58,6 +58,13 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `GET` | `/api/staff/queue` | staff — their departments' requests, paged (`limit`, `cursor`, `q`) |
 | `GET` | `/api/staff/summary` | staff — counts by status |
 | `GET` | `/api/staff/reports` | staff — what the office did over a period (`from`, `to`, `departmentId`, `format=csv`) |
+| `GET` | `/api/appointments` | resident — their own bookings |
+| `GET` | `/api/appointments/days` | resident — which days an office is open (`departmentId`) |
+| `GET` | `/api/appointments/availability` | resident — the times on a day, and how full each is |
+| `POST` | `/api/appointments` | resident — book a slot |
+| `DELETE` | `/api/appointments/:id` | resident — cancel their own booking |
+| `GET` | `/api/staff/appointments` | staff — the counter's day (`date`, `departmentId`) |
+| `POST` | `/api/staff/appointments/:id/:action` | staff — `arrived`, `served` or `no-show` |
 | `GET` | `/api/staff/requests/:id` | staff — request + full audit trail |
 | `POST` | `/api/staff/requests/:id/assess` | staff — set the fee due |
 | `POST` | `/api/staff/requests/:id/advance` | staff — move one step forward |
@@ -313,6 +320,7 @@ npm run test:hotlines     # emergency numbers: published, dialable, grouped, uni
 npm run test:id-verification  # single use, expiry, scoping, and what staff may see
 npm run test:reports      # the two turnaround clocks, office scoping, and the CSV
 npm run test:municipality # hotlines, holidays and office details: who may edit, and the audit
+npm run test:appointments # the office calendar, capacity, queue numbers, and the counter's day
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```

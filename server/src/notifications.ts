@@ -18,7 +18,10 @@ import { env } from './env.ts'
 export type RequestNotificationKind = 'assessed' | 'advanced' | 'released' | 'rejected'
 
 /** Everything a notification row can be, including notices tied to no request. */
-export type NotificationKind = RequestNotificationKind | 'program_granted' | 'program_revoked'
+export type NotificationKind =
+  | RequestNotificationKind
+  | 'program_granted' | 'program_revoked'
+  | 'appointment_booked' | 'appointment_cancelled' | 'appointment_missed'
 
 export interface NotificationInput {
   userId: string

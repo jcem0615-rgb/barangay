@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, Building2, Inbox, Landmark, LogOut, RefreshCw, ScanLine, Search, Users } from 'lucide-react'
+import { BarChart3, Building2, CalendarClock, Inbox, Landmark, LogOut, RefreshCw, ScanLine, Search, Users } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { Application, ServiceCategory } from '../../types'
@@ -8,6 +8,7 @@ import StaffAccounts from './StaffAccounts'
 import StaffVerifyId from './StaffVerifyId'
 import StaffReports from './StaffReports'
 import StaffMunicipality from './StaffMunicipality'
+import StaffDay from './StaffDay'
 import { hasScannedCode } from '../../lib/scannedCode'
 import { formatPeso } from '../../lib/money'
 
@@ -29,7 +30,7 @@ export default function StaffConsole() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // A clerk who arrived by scanning a resident's ID opens on the check, not the
   // queue — that scan is the errand.
-  const [view, setView] = useState<'queue' | 'verify' | 'reports' | 'accounts' | 'municipality'>(
+  const [view, setView] = useState<'queue' | 'day' | 'verify' | 'reports' | 'accounts' | 'municipality'>(
     hasScannedCode() ? 'verify' : 'queue'
   )
   const [loading, setLoading] = useState(true)
@@ -128,6 +129,7 @@ export default function StaffConsole() {
             <div className="flex rounded-xl bg-slate-100 p-1">
               {([
                 ['queue', 'Queue', Inbox],
+                ['day', 'Today', CalendarClock],
                 ['verify', 'Verify ID', ScanLine],
                 ['reports', 'Reports', BarChart3],
                 ...(user?.role === 'admin'
@@ -166,6 +168,12 @@ export default function StaffConsole() {
           />
         ) : view === 'accounts' ? (
           <StaffAccounts departments={departments} />
+        ) : view === 'day' ? (
+          <StaffDay
+            departments={departments}
+            isAdmin={user?.role === 'admin'}
+            ownDepartments={user?.departments ?? []}
+          />
         ) : view === 'municipality' ? (
           <StaffMunicipality />
         ) : (
