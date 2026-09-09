@@ -97,6 +97,20 @@ console.log('\n== a declared holiday actually moves a promised date ==')
 const cat = await (await fetch(`${API}/catalogue`)).json()
 check('the calendar rides along on the public catalogue', cat.holidays.some((h) => h.date === holidayDate), 'not published')
 check('and is marked local', cat.holidays.find((h) => h.date === holidayDate)?.isLocal === true)
+// Ready dates are computed over this calendar behind a cache. Declaring a day
+// has to take effect now, or an administrator watches nothing move and
+// reasonably concludes it did not save.
+{
+  const svc = cat.services.find((s) => s.processingDaysMax > 0)
+  const before = (await j(`/services/${svc.id}/ready`)).json ?? null
+  const probe = '2026-11-18'
+  await j('/admin/holidays', { method: 'POST', token: admin, body: { date: probe, name: `Cache probe ${stamp}`, isLocal: true } })
+  const after = (await (await fetch(`${API}/catalogue`)).json()).holidays.some((h) => h.date === probe)
+  check('a day declared now is visible immediately, not after a cache expires', after, 'still cached')
+  await j(`/admin/holidays/${probe}`, { method: 'DELETE', token: admin })
+  check('and removing it takes effect immediately too', !(await (await fetch(`${API}/catalogue`)).json()).holidays.some((h) => h.date === probe))
+  void before
+}
 
 console.log('\n== an office can be reached again ==')
 const offices = (await j('/admin/offices', { token: admin })).json

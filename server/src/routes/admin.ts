@@ -7,6 +7,7 @@ import { issueResetToken } from '../resetTokens.ts'
 import { resetEmail, sendMail } from '../mailer.ts'
 import { env } from '../env.ts'
 import { isRealDate, looksDialable, recordAudit } from '../municipality.ts'
+import { clearHolidayCache } from '../schedule.ts'
 
 export const adminRouter = Router()
 adminRouter.use(authenticate, requireRole('admin'))
@@ -401,6 +402,10 @@ adminRouter.post('/holidays', async (req, res) => {
     })
     return rows[0]
   })
+  // Every ready date is computed over this calendar behind a ten-minute cache.
+  // Without this an administrator declares a holiday, watches nothing move, and
+  // reasonably concludes it did not save.
+  clearHolidayCache()
   res.status(201).json(saved)
 })
 
@@ -422,6 +427,7 @@ adminRouter.delete('/holidays/:date', async (req, res) => {
     return true
   })
   if (!removed) return res.status(404).json({ error: 'That day is not in the calendar.' })
+  clearHolidayCache()
   res.status(204).end()
 })
 
