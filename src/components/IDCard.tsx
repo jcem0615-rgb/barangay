@@ -1,6 +1,5 @@
 import { ShieldCheck, ChevronRight } from 'lucide-react'
 import type { ResidentProfile } from '../types'
-import QrPattern from './QrPattern'
 import { useT } from '../lib/i18n'
 import { useCatalogue } from '../lib/catalogue'
 import { IdPortraitFrame } from './IdPortrait'
@@ -45,7 +44,6 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
           <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] text-navy-100">{addressLine(profile.barangay, profile.municipality)}</p>
           </div>
         </div>
-        <QrPattern seed={profile.qrSeed} size={9} dim={54} dark />
       </div>
 
       <div className="relative mt-5 flex items-end justify-between">

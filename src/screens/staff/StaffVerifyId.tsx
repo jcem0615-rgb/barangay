@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { BadgeCheck, Loader2, ScanLine, ShieldX } from 'lucide-react'
 import { api, ApiError, type IdCheck } from '../../lib/api'
 import { useCatalogue } from '../../lib/catalogue'
+import { takeScannedCode } from '../../lib/scannedCode'
 
 /**
  * Checking a digital ID a resident is showing at the counter.
@@ -35,8 +36,17 @@ export default function StaffVerifyId() {
     if (objectUrl.current) URL.revokeObjectURL(objectUrl.current)
   }, [])
 
-  async function check() {
-    const entered = code.trim()
+  // A clerk who arrived by scanning the resident's QR has the code already;
+  // running it here is the whole point of the scan. Taken rather than read, so
+  // a re-render cannot spend the same single-use code twice.
+  useEffect(() => {
+    const scanned = takeScannedCode()
+    if (scanned) void check(scanned)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function check(scanned?: string) {
+    const entered = (scanned ?? code).trim()
     if (!entered) return
     setBusy(true)
     setError(null)
@@ -63,8 +73,9 @@ export default function StaffVerifyId() {
           <div>
             <h2 className="font-display text-[15px] font-bold text-navy-950">Verify a digital ID</h2>
             <p className="mt-0.5 text-[12.5px] leading-snug text-slate-600">
-              Ask the resident for the code on their ID screen. It works once and expires after
-              90 seconds, so a screenshot of someone else's ID will not check out.
+              Scan the QR on the resident's ID screen with your phone, or type the code printed
+              under it. Either way it works once and expires after 90 seconds, so a screenshot of
+              someone else's ID will not check out.
             </p>
           </div>
         </div>

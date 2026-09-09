@@ -1,41 +1,46 @@
-// Generates a deterministic grid of booleans from a seed string, used to render
-// a stylized "QR verification" pattern without a network call or extra dependency.
-export function generateQrGrid(seed: string, size = 9): boolean[][] {
-  let hash = 0
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
-  }
+import qrcode from 'qrcode-generator'
 
+/**
+ * A real, scannable QR matrix.
+ *
+ * This used to be a seeded pseudo-random grid that merely looked like a QR
+ * code. On a government ID that is worse than no code at all: a clerk points a
+ * phone at it, nothing happens, and the ID looks broken rather than decorative.
+ * So it encodes real content now, and nothing draws one without content to put
+ * in it.
+ *
+ * Error correction is **M** (~15% recoverable). A QR on a phone screen is read
+ * off glass, at an angle, under whatever light a municipal hall has — L is too
+ * fragile for that, and H would push the module count up until the individual
+ * squares are smaller than the scan can resolve at this size.
+ */
+export function generateQrGrid(content: string): boolean[][] {
+  // Type 0 picks the smallest version that fits the content.
+  const qr = qrcode(0, 'M')
+  qr.addData(content)
+  qr.make()
+
+  const count = qr.getModuleCount()
   const grid: boolean[][] = []
-  let state = hash || 1
-  const next = () => {
-    // xorshift32
-    state ^= state << 13
-    state ^= state >>> 17
-    state ^= state << 5
-    state >>>= 0
-    return state / 4294967295
-  }
-
-  for (let r = 0; r < size; r++) {
+  for (let r = 0; r < count; r++) {
     const row: boolean[] = []
-    for (let c = 0; c < size; c++) {
-      row.push(next() > 0.52)
-    }
+    for (let c = 0; c < count; c++) row.push(qr.isDark(r, c))
     grid.push(row)
   }
-
-  // Force finder-pattern-like solid corners for QR authenticity
-  const stampCorner = (r0: number, c0: number) => {
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        grid[r0 + r][c0 + c] = r === 1 && c === 1 ? false : true
-      }
-    }
-  }
-  stampCorner(0, 0)
-  stampCorner(0, size - 3)
-  stampCorner(size - 3, 0)
-
   return grid
+}
+
+/**
+ * What the QR on a resident's ID actually carries: a link that opens this
+ * portal with the verification code already filled in.
+ *
+ * A link rather than the bare code, because the scanner is the clerk's own
+ * phone camera — the same reasoning as handing document photos to the phone's
+ * camera app instead of building a preview in the page. Any phone can already
+ * read a URL and open it; none of them know what to do with twelve loose
+ * characters. The staff side still requires a staff session, so the link is a
+ * shortcut into the check, never the check itself.
+ */
+export function verificationUrl(code: string, origin = window.location.origin): string {
+  return `${origin}/?verify=${encodeURIComponent(code)}`
 }

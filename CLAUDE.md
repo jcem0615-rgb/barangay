@@ -48,7 +48,8 @@ src/
     db.ts                  idb-keyval wrapper (IndexedDB, store name "elgu-citizen-portal")
     useOnlineStatus.ts      navigator.onLine + online/offline listeners
     icons.ts                lucide icon name -> component lookup
-    qrPattern.ts             Deterministic pseudo-QR grid generator (seeded, no external dep)
+    qrPattern.ts             Real QR matrix (qrcode-generator) + the verification link it carries
+    scannedCode.ts           Reads ?verify= once at startup, for a clerk arriving by scan
   components/            Reusable UI: IDCard, WorkflowTracker, StatusPill, FormField, etc.
   screens/                One component per Screen variant in nav.tsx
   App.tsx                 Providers + ScreenRouter switch + bottom nav visibility
@@ -171,6 +172,21 @@ the first time a clerk checks it**: a screenshot is stale before it reaches a wi
 code passed along buys nothing. Issuing a new one retires any still outstanding, so a code
 left open in another tab is not a second key. Only the hash is stored
 (`server/src/idVerification.ts`), like reset tokens.
+
+**The code is shown twice: as a QR and as text.** The QR is real and scannable
+(`qrcode-generator`, error correction M) and carries a link back to this app with the code
+in it — `verificationUrl` in `src/lib/qrPattern.ts`. The scanner is the clerk's own phone
+camera, the same reasoning as handing document photos to the phone's camera app: every
+phone already knows what to do with a URL and none of them know what to do with twelve
+loose characters. `src/lib/scannedCode.ts` reads `?verify=` once at startup, strips it from
+the address bar so a reload cannot re-spend a used code, and the console opens on the check
+and runs it. The link is a shortcut into the check, never the check itself — the staff side
+still requires a staff session, and the code is still consumed server-side.
+
+There used to be a QR on the card face that encoded a static seed. It is gone. A code that
+scans to nothing is worse on a government ID than no code at all: a clerk points a phone at
+it, nothing happens, and the ID reads as broken rather than decorative. Nothing in the app
+draws a QR without real content to put in it.
 
 The three failure modes are reported apart because they mean different things at a counter:
 **unknown** is a typo or a forgery, **expired** just needs the resident to look again, and
@@ -391,11 +407,8 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
 
 ## Known simplifications (intentional, flag if scope grows)
 
-- **PhilSys sync** and the **QR code** are visual only — `qrPattern.ts` renders a
-  deterministic but non-scannable pattern. Verification is done with the typed code
-  instead, which works today; adding a real QR encoder would let a clerk scan it rather
-  than type it, and is the natural next step. A production build would also call a real
-  PhilSys verification API.
+- **PhilSys sync** is visual only. A production build would call a real PhilSys
+  verification API; the ID's own verification code is real and checked server-side.
 - **Payment** records that a resident chose a method and marks the request paid. There is no
   gateway integration: no redirect, no webhook, no settlement. Wiring a real one means
   server-side webhook verification — never mark a request paid from the client.
@@ -503,10 +516,5 @@ npm run preview   # serve the production build locally
 ## Suggested next steps
 
 1. Replace mock icons in `public/icons/` with a real LGU seal / wordmark.
-2. Add a real QR encoder so the verification code can be scanned rather than typed — the
-   code itself already works, this only removes the typing.
-3. Say what happens next per workflow step, and what to bring to the counter on release —
-   the expected date is there now, but the steps are still bare labels.
-4. Consider `react-router` if screens need shareable URLs.
-5. Wire a real backend once one exists — the `Application` type and `db.ts` interface are
-   already shaped to make that a drop-in swap.
+2. Consider `react-router` if screens need shareable URLs. Note that `?verify=` is already
+   handled by hand in `src/lib/scannedCode.ts`; a router would absorb it.

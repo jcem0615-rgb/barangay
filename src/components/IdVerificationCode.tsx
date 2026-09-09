@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
 import { api } from '../lib/api'
 import { useT } from '../lib/i18n'
+import QrPattern from './QrPattern'
+import { verificationUrl } from '../lib/qrPattern'
 
 /**
  * The code a resident reads out at a counter.
@@ -77,7 +79,16 @@ export default function IdVerificationCode() {
           <p className="text-[calc(13px_*_var(--text-scale))] leading-snug text-slate-600">{error}</p>
         ) : code ? (
           <>
-            <p className="font-display text-[calc(22px_*_var(--text-scale))] font-extrabold tracking-[0.06em] tabular-nums text-navy-950">
+            {/*
+              Both readings of the same code, so a counter can use whichever is
+              faster: the clerk scans it, or the resident reads it out. The QR
+              carries a link, since the scanner is the clerk's own phone camera
+              and a phone knows what to do with a URL.
+            */}
+            <div className="flex justify-center">
+              <QrPattern content={verificationUrl(code)} dim={132} />
+            </div>
+            <p className="font-display mt-3 text-[calc(22px_*_var(--text-scale))] font-extrabold tracking-[0.06em] tabular-nums text-navy-950">
               {code}
             </p>
             <p className="mt-1 text-[calc(12px_*_var(--text-scale))] text-slate-500">

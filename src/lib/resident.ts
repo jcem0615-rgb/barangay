@@ -23,7 +23,6 @@ export function useResidentProfile(): ResidentProfile | null {
     province: profile?.province ?? '',
     birthDate: profile?.birthDate ?? '',
     address: profile?.address ?? '',
-    qrSeed: profile?.philSysId ?? user.id,
     programs: profile?.programs ?? [],
   }
 }

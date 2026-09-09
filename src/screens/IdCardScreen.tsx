@@ -1,6 +1,5 @@
 import { ShieldCheck, Fingerprint } from 'lucide-react'
 import TopBar from '../components/TopBar'
-import QrPattern from '../components/QrPattern'
 import ProgramList from '../components/ProgramList'
 import EmergencyContacts from '../components/EmergencyContacts'
 import IdVerificationCode from '../components/IdVerificationCode'
@@ -31,9 +30,14 @@ export default function IdCardScreen() {
             </p>
           </div>
 
-          <div className="relative mt-5 flex items-center justify-center gap-4">
-            <IdPortraitFrame url={photoUrl} name={resident.fullName} size={104} onDark />
-            <QrPattern seed={resident.qrSeed} size={9} dim={150} dark />
+          {/*
+            The face, and only the face. There was a QR here, but it encoded a
+            static seed — a scanner got nothing from it. The scannable one lives
+            in the verification panel below, where it carries the live code and
+            expires with it.
+          */}
+          <div className="relative mt-5 flex items-center justify-center">
+            <IdPortraitFrame url={photoUrl} name={resident.fullName} size={112} onDark />
           </div>
 
           <div className="relative mt-5 text-center">

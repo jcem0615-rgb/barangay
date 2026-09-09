@@ -140,7 +140,6 @@ export interface ResidentProfile {
   province: string
   birthDate: string
   address: string
-  qrSeed: string
   /** Sectoral and poverty-reduction memberships, newest office record first. */
   programs: ResidentProgram[]
 }

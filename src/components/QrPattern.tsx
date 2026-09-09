@@ -1,21 +1,39 @@
+import { useMemo } from 'react'
 import { generateQrGrid } from '../lib/qrPattern'
 
-export default function QrPattern({ seed, size = 9, dim = 96, dark = false }: { seed: string; size?: number; dim?: number; dark?: boolean }) {
-  const grid = generateQrGrid(seed, size)
-  const cell = dim / size
+/**
+ * Renders real QR content as a square of modules.
+ *
+ * `dim` is the drawn size of the code itself; the quiet zone (four modules of
+ * background on every side, which the spec requires and scanners rely on) is
+ * added outside it. The modules are laid out on a grid of equal fractions
+ * rather than fixed pixel sizes, so a fractional module width rounds
+ * consistently instead of leaving a seam down the middle.
+ */
+export default function QrPattern({ content, dim = 150 }: { content: string; dim?: number }) {
+  const grid = useMemo(() => generateQrGrid(content), [content])
+  const size = grid.length
+  const quiet = (dim / size) * 4
 
   return (
     <div
-      className={`grid rounded-md p-1.5 ${dark ? 'bg-navy-950' : 'bg-white'}`}
-      style={{ width: dim + 12, height: dim + 12, gridTemplateColumns: `repeat(${size}, 1fr)` }}
+      // Always dark-on-white. An inverted code is legal but not reliably read,
+      // and a counter is the wrong place to discover which scanners cope.
+      className="grid rounded-md bg-white"
+      style={{
+        width: dim + quiet * 2,
+        height: dim + quiet * 2,
+        padding: quiet,
+        gridTemplateColumns: `repeat(${size}, 1fr)`,
+        gridTemplateRows: `repeat(${size}, 1fr)`,
+      }}
+      // Hidden from assistive tech: a scanner reads the modules, and the code
+      // is already printed in full beside it as text.
+      aria-hidden="true"
     >
       {grid.flatMap((row, r) =>
         row.map((filled, c) => (
-          <span
-            key={`${r}-${c}`}
-            style={{ width: cell, height: cell }}
-            className={filled ? (dark ? 'bg-gold-400' : 'bg-navy-950') : 'bg-transparent'}
-          />
+          <span key={`${r}-${c}`} className={filled ? 'bg-navy-950' : 'bg-white'} />
         ))
       )}
     </div>

@@ -272,7 +272,7 @@ export const en = {
 
   // id verification at a counter
   'verify.title': 'Verification code',
-  'verify.blurb': 'Read this out to the counter staff. It changes every minute and a half and works once, so a screenshot of your ID is no use to anyone else.',
+  'verify.blurb': 'Let the counter staff scan the square, or read out the code below it. It changes every minute and a half and works once, so a screenshot of your ID is no use to anyone else.',
   'verify.expiresIn': 'Changes in {seconds}s',
   'verify.newCode': 'Get a new code',
   'verify.unavailable': 'A code needs a connection. Your ID still shows your details offline.',
@@ -559,7 +559,7 @@ export const fil: Record<StringKey, string> = {
 
   // id verification at a counter
   'verify.title': 'Verification code',
-  'verify.blurb': 'Basahin ito sa kawani sa counter. Nagpapalit ito kada isa\u2019t kalahating minuto at isang beses lang gumagana, kaya walang silbi kaninuman ang screenshot ng ID mo.',
+  'verify.blurb': 'Pa-scan ang parisukat sa kawani sa counter, o basahin ang code sa ilalim nito. Nagpapalit ito kada isa\u2019t kalahating minuto at isang beses lang gumagana, kaya walang silbi kaninuman ang screenshot ng ID mo.',
   'verify.expiresIn': 'Magpapalit sa {seconds}s',
   'verify.newCode': 'Kumuha ng bagong code',
   'verify.unavailable': 'Kailangan ng koneksyon para sa code. Makikita pa rin ang detalye mo sa ID kahit offline.',

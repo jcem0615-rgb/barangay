@@ -7,6 +7,7 @@ import StaffRequestPanel from './StaffRequestPanel'
 import StaffAccounts from './StaffAccounts'
 import StaffVerifyId from './StaffVerifyId'
 import StaffReports from './StaffReports'
+import { hasScannedCode } from '../../lib/scannedCode'
 import { formatPeso } from '../../lib/money'
 
 const STATUS_TABS = [
@@ -25,7 +26,11 @@ export default function StaffConsole() {
   const [status, setStatus] = useState<string>('')
   const [departmentId, setDepartmentId] = useState<string>('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [view, setView] = useState<'queue' | 'verify' | 'reports' | 'accounts'>('queue')
+  // A clerk who arrived by scanning a resident's ID opens on the check, not the
+  // queue — that scan is the errand.
+  const [view, setView] = useState<'queue' | 'verify' | 'reports' | 'accounts'>(
+    hasScannedCode() ? 'verify' : 'queue'
+  )
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
