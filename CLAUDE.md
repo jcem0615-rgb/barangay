@@ -596,6 +596,43 @@ are unexercised. The browser test stubs `pushManager.subscribe` for the same rea
 headless Chromium has no push service to register with — so everything around that one call
 is the app's own code, and that call is not.
 
+## Data Privacy Act rights (RA 10173)
+
+The privacy notice says a resident has the right to see what is held about them, correct it,
+and have it erased. Saying so without providing it is the version of compliance that helps
+nobody, so the **My data** screen is where each of those becomes a button.
+
+**Export** (`GET /api/privacy/export`) is one JSON file with the profile, every request and
+its history, attachments, drafts, appointments, complaints, feedback, notifications,
+programme records, the times a clerk checked their ID, and the devices set to notify them.
+Attachments are *listed* rather than embedded: a JSON document with a dozen photographs
+base64'd into it is not something a resident can open, and every file is already downloadable
+from the request it belongs to.
+
+**Correction is scoped to what is theirs to correct.** An address and a phone number are
+facts the resident knows better than the office does. A name and a PhilSys number are
+identity claims an office verified against documents, and a portal that let someone retype
+either is not one an office could trust — so those go through the Local Civil Registrar, and
+the screen says so rather than leaving a disabled field with no explanation.
+
+**Erasure is the right the app cannot grant in full, and it says so first.** A released
+business permit is a public record the municipality must keep, and a permit with no applicant
+on it is not a record. `GET /privacy/closure-preview` names what would be deleted and what
+would stay *with the reason*, before anything happens — finding that out afterwards would be
+the worst possible order.
+
+Closing then does, immediately, everything that needs no judgement: the sign-in is closed and
+the password destroyed, contact details and the ID portrait erased, drafts, notifications,
+push subscriptions and unconsumed verification codes deleted, and upcoming appointments
+cancelled so the slot goes to somebody else. The email address is released, so the same
+person can register again later. A `privacy_closures` row records what was erased and what
+was retained **as it was at the time**, along with the resident's name — the account is
+anonymised, so without it there would be no way to answer "who asked for this".
+
+What stays: the requests (the office's records), the complaints (a complaints record the
+office can delete on request is not a complaints record), and programme memberships, which
+belong to the register that issued them rather than to this app.
+
 ## Accessibility
 
 The app registers senior citizens and persons with disability, so legibility is a
@@ -683,6 +720,10 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   tested, but nothing here can reach a push service, so the last hop and the dead-subscription
   cleanup it triggers have never actually run. Check them on a real deployment before relying
   on push as the channel that tells a resident their document is ready.
+- **Account closure is not reviewed by anyone yet.** The `privacy_closures` row is written
+  and the automatic erasure happens immediately, but there is no screen for the Data
+  Protection Officer to work through the retained items and erase what the retention period
+  has expired on. That review is a real obligation, and right now it happens in the database.
 - **Sessions** are 12-hour JWTs with no refresh or general revocation list. Signing out
   clears the token client-side; it stays valid until it expires. The one exception is a
   password change, which `users.password_changed_at` enforces on every request.

@@ -260,6 +260,22 @@ async function fetchBlob(path: string): Promise<Blob | null> {
   return res.blob()
 }
 
+export interface ResidentCorrection {
+  philSysId: string | null
+  barangay: string | null
+  municipality: string | null
+  province: string | null
+  birthDate: string | null
+  address: string | null
+  phone: string | null
+}
+
+export interface ClosureEffect {
+  erased: Record<string, string | null>
+  retained: Record<string, string | null>
+  howToGoFurther: string
+}
+
 export interface Feedback {
   requestId: string
   rating: number
@@ -653,6 +669,21 @@ export const api = {
 
   removePushSubscription: (endpoint: string) =>
     request<void>('/notifications/push', { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
+
+  // Data Privacy Act rights: see it all, correct what is yours, close the account.
+  exportMyData: () => downloadPdf('/privacy/export'),
+
+  correctProfile: (patch: {
+    barangay?: string | null; address?: string | null
+    phone?: string | null; birthDate?: string | null
+  }) => request<ResidentCorrection>('/privacy/profile', { method: 'PATCH', body: JSON.stringify(patch) }),
+
+  closurePreview: () => request<ClosureEffect>('/privacy/closure-preview'),
+
+  closeMyAccount: (reason?: string) =>
+    request<ClosureEffect & { closedAt: string }>('/privacy/close', {
+      method: 'POST', body: JSON.stringify({ reason }),
+    }),
 
   myFeedback: () => request<Feedback[]>('/feedback'),
 

@@ -17,6 +17,7 @@ export type Screen =
   | { name: 'complaints' }
   | { name: 'help' }
   | { name: 'privacy' }
+  | { name: 'my-data' }
 
 interface NavContextValue {
   screen: Screen

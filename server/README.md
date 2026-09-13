@@ -91,6 +91,10 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `GET`/`PATCH` | `/api/notifications/preferences` | resident — channels and mobile number |
 | `GET` | `/api/notifications/push-key` | resident — whether push is configured, and the VAPID public key |
 | `GET`/`POST`/`DELETE` | `/api/notifications/push` | resident — this device's push subscription |
+| `GET` | `/api/privacy/export` | resident — everything held about them, as a file |
+| `PATCH` | `/api/privacy/profile` | resident — correct their own contact details |
+| `GET` | `/api/privacy/closure-preview` | resident — what closing would erase and keep |
+| `POST` | `/api/privacy/close` | resident — close the account |
 | `GET`/`POST` | `/api/admin/hotlines` | admin — the emergency numbers on every digital ID |
 | `PUT`/`DELETE` | `/api/admin/hotlines/:id` | admin — correct or withdraw one |
 | `GET`/`POST` | `/api/admin/holidays` | admin — the working-day calendar (`year`); POST upserts a date |
@@ -330,6 +334,7 @@ npm run test:appointments # the office calendar, capacity, queue numbers, and th
 npm run test:feedback     # ratings, complaints, the working-day deadline, and the figures
 npm run test:search       # the terms are published, and the matcher ranks the way a person expects
 npm run test:push         # subscriptions, scoping, real VAPID signing, and the lock-screen rule
+npm run test:privacy      # export, correction, and what closure really erases and really keeps
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```

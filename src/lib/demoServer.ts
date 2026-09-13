@@ -18,7 +18,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v10'
+const STORE_KEY = 'elgu-demo-state-v11'
 
 interface DemoUser {
   id: string
@@ -1530,6 +1530,142 @@ async function route(
     }
     const mine = state.notifications.filter((n) => n.userId === user.id)
     return { status: 200, body: { notifications: mine, unread: mine.filter((n) => !n.readAt).length } }
+  }
+
+  // ---- Data Privacy Act rights ----
+  // Same shape as server/src/routes/privacy.ts: everything held, corrections to
+  // what is the resident's to correct, and a closure that is honest about what
+  // it cannot erase.
+  if (parts[0] === 'privacy') {
+    const user = need('resident')
+
+    if (parts[1] === 'export' && method === 'GET') {
+      const mine = state.requests.filter((r) => r.residentId === user.id)
+      const dump = {
+        exportedAt: new Date().toISOString(),
+        about:
+          'Everything the Municipality of San Fernando holds about you in this portal, provided ' +
+          'under your right to data portability (Republic Act 10173, the Data Privacy Act of 2012). ' +
+          'Files you uploaded are listed under "attachments" and can be downloaded from each request.',
+        account: {
+          id: user.id, email: user.email, fullName: user.fullName, role: user.role,
+          notifyEmail: user.notifyEmail, notifySms: user.notifySms,
+        },
+        profile: user.profile,
+        requests: mine.map((r) => ({
+          id: r.id, referenceNo: r.referenceNo, serviceId: r.serviceId,
+          departmentId: r.categoryId, status: r.status, fee: r.fee, paid: r.paid,
+          paymentMethod: r.paymentMethod, formValues: r.formValues,
+          rejectionReason: r.rejectionReason, submittedAt: r.dateSubmitted, paidAt: r.paidAt,
+        })),
+        requestHistory: mine.flatMap((r) => r.events.map((e) => ({ requestId: r.id, ...e }))),
+        attachments: mine.flatMap((r) => r.attachments.map((a) => ({
+          id: a.id, requestId: r.id, fileName: a.fileName,
+          contentType: a.contentType, requirement: a.requirement,
+        }))),
+        drafts: state.drafts.filter((d) => d.residentId === user.id),
+        appointments: state.appointments.filter((a) => a.residentId === user.id),
+        complaints: state.complaints.filter((c) => c.residentId === user.id),
+        feedback: state.feedback.filter((f) => f.residentId === user.id),
+        notifications: state.notifications.filter((n) => n.userId === user.id),
+        programs: user.programs,
+        idChecksAtCounters: state.verifications
+          .filter((v) => v.userId === user.id && v.consumedAt)
+          .map((v) => ({ checkedAt: v.consumedAt })),
+        devicesReceivingNotifications: [],
+      }
+      return {
+        status: 200,
+        blob: new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' }),
+        fileName: `elgu-my-data-${new Date().toISOString().slice(0, 10)}.json`,
+      }
+    }
+
+    if (parts[1] === 'profile' && method === 'PATCH') {
+      // Contact details only. A name and a PhilSys number are identity claims an
+      // office verified, so an unknown key leaves nothing to change and the
+      // whole request is refused rather than partly applied.
+      const patch: Record<string, string | null> = {}
+      for (const key of ['barangay', 'address', 'phone', 'birthDate'] as const) {
+        if (!(key in body)) continue
+        const raw = body[key]
+        const value = raw === null ? null : String(raw).trim() || null
+        if (key === 'birthDate' && value !== null && !isRealDay(value)) {
+          throw new DemoError(400, 'That is not a real date.')
+        }
+        patch[key] = value
+      }
+      if (Object.keys(patch).length === 0) throw new DemoError(400, 'Nothing to change.')
+      Object.assign(user.profile, patch)
+      persist()
+      return { status: 200, body: user.profile }
+    }
+
+    const closureEffect = () => {
+      const mine = state.requests.filter((r) => r.residentId === user.id)
+      const drafts = state.drafts.filter((d) => d.residentId === user.id).length
+      const upcoming = state.appointments.filter(
+        (a) => a.residentId === user.id && a.status === 'booked' && a.scheduledOn >= officeToday()
+      ).length
+      const notes = state.notifications.filter((n) => n.userId === user.id).length
+      return {
+        erased: {
+          signIn: 'Your sign-in is closed and your password is destroyed.',
+          contactDetails: 'Your email address, phone number and home address are removed.',
+          photo: user.photo ? 'The photograph on your digital ID is deleted.' : null,
+          drafts: drafts > 0 ? `${drafts} unfinished form(s) you never submitted.` : null,
+          appointments: upcoming > 0
+            ? `${upcoming} upcoming appointment(s), cancelled so the slot goes to somebody else.` : null,
+          notifications: notes > 0 ? `${notes} notification(s) held in the app.` : null,
+          devices: null,
+        },
+        retained: {
+          requests: mine.length > 0
+            ? `${mine.length} request(s) you filed, and any document released from them. These are ` +
+              'public records of the municipality: a permit or certificate with no applicant on it ' +
+              'is not a record, so the law requires the office to keep them.'
+            : null,
+          programs: user.programs.length > 0
+            ? `${user.programs.length} programme record(s). These belong to the register that issued ` +
+              'them (social welfare, OSCA, the agriculture office), not to this app, and are removed ' +
+              'by applying to that office.'
+            : null,
+          complaints:
+            'Any complaint you filed and the reply to it, because a complaints record the office can ' +
+            'delete on request is not a complaints record.',
+        },
+        howToGoFurther:
+          'For anything listed as retained, write to the Data Protection Officer. The office will tell ' +
+          'you the retention period for each record and erase what it is no longer required to keep.',
+      }
+    }
+
+    if (parts[1] === 'closure-preview' && method === 'GET') {
+      return { status: 200, body: closureEffect() }
+    }
+
+    if (parts[1] === 'close' && method === 'POST') {
+      const effect = closureEffect()
+      state.drafts = state.drafts.filter((d) => d.residentId !== user.id)
+      state.notifications = state.notifications.filter((n) => n.userId !== user.id)
+      state.verifications = state.verifications.filter((v) => v.userId !== user.id || v.consumedAt)
+      for (const a of state.appointments) {
+        if (a.residentId === user.id && a.status === 'booked' && a.scheduledOn >= officeToday()) {
+          a.status = 'cancelled'
+        }
+      }
+      user.photo = null
+      user.photoUpdatedAt = null
+      user.profile.phone = null
+      user.profile.address = null
+      user.active = false
+      user.email = `closed+${user.id}@invalid`
+      user.password = `closed-${uid()}`
+      persist()
+      return { status: 200, body: { ...effect, closedAt: new Date().toISOString() } }
+    }
+
+    throw new DemoError(404, 'Not found.')
   }
 
   // ---- feedback and complaints (RA 11032) ----
