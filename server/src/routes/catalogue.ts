@@ -16,11 +16,11 @@ catalogueRouter.get('/', async (_req, res) => {
     id: string; department_id: string; name: string; short_description: string
     processing_time: string; processing_days_min: number; processing_days_max: number
     fee_centavos: number; requires_payment: boolean
-    requirements: string[]; fields: unknown[]
+    requirements: string[]; fields: unknown[]; search_terms: string[]
   }>(
     `select id, department_id, name, short_description, processing_time,
             processing_days_min, processing_days_max,
-            fee_centavos, requires_payment, requirements, fields
+            fee_centavos, requires_payment, requirements, fields, search_terms
        from services where active = true order by department_id, name`
   )
 
@@ -52,6 +52,7 @@ catalogueRouter.get('/', async (_req, res) => {
       requiresPayment: s.requires_payment,
       requirements: s.requirements,
       fields: s.fields,
+      searchTerms: s.search_terms,
     })),
     workflowSteps: WORKFLOW_STEPS,
     // Published so the app can say "apply today, ready by …" on the form,

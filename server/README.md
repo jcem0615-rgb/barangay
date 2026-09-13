@@ -326,6 +326,7 @@ npm run test:reports      # the two turnaround clocks, office scoping, and the C
 npm run test:municipality # hotlines, holidays and office details: who may edit, and the audit
 npm run test:appointments # the office calendar, capacity, queue numbers, and the counter's day
 npm run test:feedback     # ratings, complaints, the working-day deadline, and the figures
+npm run test:search       # the terms are published, and the matcher ranks the way a person expects
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```

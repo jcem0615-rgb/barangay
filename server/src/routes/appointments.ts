@@ -4,8 +4,8 @@ import { one, query, transaction } from '../db.ts'
 import { authenticate, requireRole } from '../auth.ts'
 import { loadHolidays } from '../schedule.ts'
 import {
-  APPOINTMENT_SELECT, addDays, bookingRules, checkBookable, dayClosedReason,
-  nextQueueNo, officeToday, slotsFor,
+  APPOINTMENT_SELECT, addDays, bookingRules, checkBookableDate, checkBookableTime,
+  dayClosedReason, nextQueueNo, officeToday, slotsFor,
 } from '../appointments.ts'
 import { deliverNotification, recordNotification, type NotificationInput } from '../notifications.ts'
 
@@ -108,11 +108,17 @@ appointmentsRouter.post('/', async (req, res) => {
   const rules = await bookingRules(service.department_id)
   if (!rules) return res.status(404).json({ error: 'That office is not taking appointments.' })
 
-  const when = checkBookable(rules, scheduledOn, startTime)
-  if (when) return res.status(400).json({ error: when })
+  // Date, then whether the hall is open that day, then the time. A resident who
+  // picked a Saturday needs to hear that the hall is shut, not that 8am has
+  // been and gone.
+  const badDate = checkBookableDate(rules, scheduledOn)
+  if (badDate) return res.status(400).json({ error: badDate })
 
   const closed = await dayClosedReason(scheduledOn)
   if (closed) return res.status(400).json({ error: closed })
+
+  const badTime = checkBookableTime(rules, scheduledOn, startTime)
+  if (badTime) return res.status(400).json({ error: badTime })
 
   const outcome = await transaction(async (client) => {
     // Locking the office's own row serialises booking for that office, which

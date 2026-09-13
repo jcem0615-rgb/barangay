@@ -45,6 +45,16 @@ export interface ServiceDefinition {
   requiresPayment: boolean
   requirements: string[]
   fields: ServiceField[]
+  /**
+   * What residents actually call this, in either language.
+   *
+   * Nobody searches for "BOSS Business Permit Application"; they search for
+   * "sari-sari store" or "negosyo". These are the words that bridge the gap,
+   * and they are catalogue data for the same reason fees are — a term a
+   * municipality finds people typing is a row to add, not a release to cut.
+   * Never shown; they only widen what matches.
+   */
+  searchTerms: string[]
 }
 
 export const WORKFLOW_STEPS = [

@@ -48,6 +48,7 @@ src/
     db.ts                  idb-keyval wrapper (IndexedDB, store name "elgu-citizen-portal")
     useOnlineStatus.ts      navigator.onLine + online/offline listeners
     icons.ts                lucide icon name -> component lookup
+    search.ts               Finds a service by what residents call it, on the cached catalogue
     qrPattern.ts             Real QR matrix (qrcode-generator) + the verification link it carries
     scannedCode.ts           Reads ?verify= once at startup, for a clerk arriving by scan
   components/            Reusable UI: IDCard, WorkflowTracker, StatusPill, FormField, etc.
@@ -516,6 +517,41 @@ and rendering one would be worse than a blank.
 
 Complaints are reached from Profile rather than the bottom nav — it is the screen you go
 looking for, not one you pass through.
+
+## Finding a service
+
+Six offices and seventeen services is small enough to browse and large enough that browsing
+is the wrong first move for someone who already knows what they want. A resident thinking
+"permit for my sari-sari store" should not have to work out that this is Business Permits
+and Licensing before they can start.
+
+**The words residents use are catalogue data.** `searchTerms` on each service
+(`src/data/mockData.ts`, seeded into `services.search_terms`, published on `/api/catalogue`)
+carries what people actually type — "sari-sari store", "negosyo", "amilyar", "ayuda",
+"kasal", "yellow card" — in both languages. They are never shown; they only widen what
+matches. A term the municipality notices people typing is a row to add, not a release to
+cut.
+
+**Matching runs on the device, against the cached catalogue.** That comes free with the
+cache the hotlines already need: results are instant, cost the network nothing, and work on
+a phone with one bar outside the municipal hall — which is exactly where someone is standing
+when they need to know which office they want.
+
+It is deliberately plain (`src/lib/search.ts`): every query word must appear somewhere in
+the service's text. A resident who types more words expects fewer results, and a search that
+"helpfully" returns a birth certificate for "building permit" teaches people not to trust
+it. Ranking is by *where* a word landed — the name beats the search terms, which beat the
+description, which beats a requirement — so the thing itself outranks the thing that merely
+requires it.
+
+`normalise` folds case, accents and punctuation, which matters more than it sounds: the
+catalogue writes "mayor's permit" with a typographic apostrophe and every phone keyboard
+produces a straight one, so without it the most obvious search for a business permit finds
+nothing.
+
+The office tiles stay as the default view. Browsing is the right move for someone who does
+*not* know what they need, and an office list also tells a resident what the municipality
+actually does; search replaces it only while something is typed.
 
 ## Accessibility
 

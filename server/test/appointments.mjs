@@ -82,6 +82,8 @@ check('a different office is still open to them', (await j('/appointments', { me
   serviceId: 'health-certificate', scheduledOn: openDay, startTime: slot.startTime } })).status === 201)
 
 console.log('\n== a day the hall is shut cannot be booked ==')
+// Deliberately includes today when today is a weekend: the resident should be
+// told the hall is shut, not that the morning has already gone.
 if (closedDay) {
   const shut = await j('/appointments', { method: 'POST', token: other, body: {
     serviceId: 'cedula', scheduledOn: closedDay.date, startTime: slot.startTime } })

@@ -1,0 +1,11 @@
+-- What residents actually call a service.
+--
+-- Nobody searches for "BOSS Business Permit Application". They search for
+-- "sari-sari store", or "negosyo", or "mayor's permit" — and a search that
+-- only matches the official name finds nothing, which reads to a resident as
+-- the municipality not offering the thing they came for.
+--
+-- Catalogue data for the same reason fees are: a term the LGU notices people
+-- typing is a row to add, not a release to cut. Never shown; they only widen
+-- what matches.
+alter table services add column search_terms text[] not null default '{}';

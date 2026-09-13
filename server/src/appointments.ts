@@ -142,14 +142,23 @@ export async function slotsFor(
   return { slots, closedReason }
 }
 
-/** Where a slot must fall to be bookable at all, before capacity is considered. */
-export function checkBookable(rules: BookingRules, date: string, startTime: string): string | null {
+/**
+ * Whether the *day* can be booked at all — before anything is asked about the
+ * time. Order matters here: a resident who picks a Saturday should be told the
+ * hall is shut, not that 8am has already gone. The more fundamental fact wins.
+ */
+export function checkBookableDate(rules: BookingRules, date: string): string | null {
   if (!rules.enabled) return 'This office is not taking appointments at the moment.'
   const today = officeToday()
   if (date < today) return 'That day has already passed.'
   if (date > addDays(today, rules.horizonDays)) {
     return `This office takes bookings up to ${rules.horizonDays} days ahead.`
   }
+  return null
+}
+
+/** And whether the time falls on one of the office's slots, on a day already known to be open. */
+export function checkBookableTime(rules: BookingRules, date: string, startTime: string): string | null {
   const minutes = toMinutes(startTime)
   if (minutes < toMinutes(rules.opens) || minutes + rules.slotMinutes > toMinutes(rules.closes)) {
     return 'The office is not open at that time.'
@@ -157,7 +166,7 @@ export function checkBookable(rules: BookingRules, date: string, startTime: stri
   if ((minutes - toMinutes(rules.opens)) % rules.slotMinutes !== 0) {
     return 'That is not one of the office’s appointment times.'
   }
-  if (date === today && minutes <= officeMinutesNow()) return 'That time has already passed today.'
+  if (date === officeToday() && minutes <= officeMinutesNow()) return 'That time has already passed today.'
   return null
 }
 

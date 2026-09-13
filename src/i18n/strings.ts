@@ -14,7 +14,7 @@ export const en = {
   // shell
   'nav.home': 'Home',
   'nav.services': 'Services',
-  'nav.requests': 'My Requests',
+  'nav.requests': 'Requests',
   'nav.appointments': 'Appointments',
   'nav.profile': 'Profile',
   'common.viewAll': 'View all',
@@ -59,6 +59,14 @@ export const en = {
   // services
   'services.title': 'Services',
   'services.subtitle': 'Choose an LGU office',
+  'search.label': 'Search services',
+  'search.placeholder': 'What do you need? e.g. sari-sari store',
+  'search.clear': 'Clear the search',
+  'search.results': '{count} services match',
+  'search.oneResult': '1 service matches',
+  'search.noneTitle': 'Nothing matches \u201c{query}\u201d',
+  'search.noneBlurb': 'Try a different word, or browse the offices \u2014 not everything a municipality does can be applied for in the app yet.',
+  'search.browseInstead': 'Browse the offices',
 
   // request list
   'requests.title': 'My Requests',
@@ -430,6 +438,14 @@ export const fil: Record<StringKey, string> = {
 
   'services.title': 'Mga Serbisyo',
   'services.subtitle': 'Pumili ng tanggapan ng LGU',
+  'search.label': 'Maghanap ng serbisyo',
+  'search.placeholder': 'Ano ang kailangan mo? hal. sari-sari store',
+  'search.clear': 'Burahin ang hinahanap',
+  'search.results': '{count} serbisyo ang tugma',
+  'search.oneResult': '1 serbisyo ang tugma',
+  'search.noneTitle': 'Walang tumugma sa \u201c{query}\u201d',
+  'search.noneBlurb': 'Subukan ang ibang salita, o tingnan ang mga opisina \u2014 hindi pa lahat ng ginagawa ng munisipyo ay maaaring i-apply dito sa app.',
+  'search.browseInstead': 'Tingnan ang mga opisina',
 
   'requests.title': 'Mga Kahilingan Ko',
   'requests.count': '{count} kahilingan',

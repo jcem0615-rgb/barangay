@@ -90,3 +90,13 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/*
+  A search input draws the browser's own clear button on WebKit, which sits
+  beside the app's and gives the resident two X's that do the same thing.
+*/
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}

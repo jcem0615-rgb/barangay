@@ -561,14 +561,20 @@ function demoSlots(date: string, departmentId: string, holidays: Set<string>) {
   return { slots, closedReason: closed }
 }
 
-/** Mirrors `checkBookable`: where a slot must fall before capacity matters. */
-function bookableProblem(date: string, startTime: string): string | null {
+/** Mirrors `checkBookableDate`: whether the day can be booked at all. */
+function bookableDateProblem(date: string): string | null {
   const rules = BOOKING_DEFAULTS
   const today = officeToday()
   if (date < today) return 'That day has already passed.'
   if (date > plusDays(today, rules.horizonDays)) {
     return `This office takes bookings up to ${rules.horizonDays} days ahead.`
   }
+  return null
+}
+
+/** Mirrors `checkBookableTime`, asked only once the day is known to be open. */
+function bookableTimeProblem(date: string, startTime: string): string | null {
+  const rules = BOOKING_DEFAULTS
   const m = hhmmToMinutes(startTime)
   if (m < hhmmToMinutes(rules.opens) || m + rules.slotMinutes > hhmmToMinutes(rules.closes)) {
     return 'The office is not open at that time.'
@@ -576,7 +582,7 @@ function bookableProblem(date: string, startTime: string): string | null {
   if ((m - hhmmToMinutes(rules.opens)) % rules.slotMinutes !== 0) {
     return 'That is not one of the office\u2019s appointment times.'
   }
-  if (date === today && m <= officeMinutesNow()) return 'That time has already passed today.'
+  if (date === officeToday() && m <= officeMinutesNow()) return 'That time has already passed today.'
   return null
 }
 
@@ -1658,10 +1664,14 @@ async function route(
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new DemoError(400, 'Give a date as YYYY-MM-DD.')
       if (!/^\d{2}:\d{2}$/.test(startTime)) throw new DemoError(400, 'Give a time as HH:MM.')
 
-      const problem = bookableProblem(date, startTime)
-      if (problem) throw new DemoError(400, problem)
+      // Date, then the hall's calendar, then the time — same order as the
+      // server, so a Saturday reads as "the hall is closed", not "8am has gone".
+      const badDate = bookableDateProblem(date)
+      if (badDate) throw new DemoError(400, badDate)
       const closed = closedReasonFor(date, holidays)
       if (closed) throw new DemoError(400, closed)
+      const badTime = bookableTimeProblem(date, startTime)
+      if (badTime) throw new DemoError(400, badTime)
 
       const taken = state.appointments.filter(
         (a) => a.departmentId === service.categoryId && a.scheduledOn === date &&

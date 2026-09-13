@@ -21,8 +21,14 @@ check('a holiday in between does not count', workingDaysBetween(D('2026-09-07'),
 check('backwards is not a negative turnaround', workingDaysBetween(D('2026-09-10'), D('2026-09-07'), none) === null)
 
 console.log('\n== the two clocks, on crafted history ==')
-// A window nothing else in the suite touches, so these rows stand alone.
+// A window nothing else in the suite touches, so these rows stand alone — and
+// cleared of any earlier run's fixtures first, because the counts below are
+// exact and a second run would otherwise see double.
 const FROM = '2025-03-03', TO = '2025-03-31'
+await query(
+  `delete from requests where resident_id in (select id from users where full_name = 'Reports Fixture')`
+)
+await query(`delete from users where full_name = 'Reports Fixture'`)
 const stamp = Date.now()
 const resident = (await query(
   `insert into users (email, password_hash, role, full_name)

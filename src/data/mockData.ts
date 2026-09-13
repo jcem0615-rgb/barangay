@@ -95,6 +95,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 2850,
     requiresPayment: true,
     requirements: ['DTI / SEC registration', 'Barangay Business Clearance', 'Lease contract or land title', 'Fire Safety Inspection Certificate'],
+    searchTerms: ['business permit', 'mayor’s permit', 'negosyo', 'sari-sari store', 'tindahan', 'new business', 'renewal', 'business registration', 'permit sa negosyo'],
     fields: [
       { id: 'businessName', label: 'Business name', type: 'text', placeholder: 'e.g. Santos Sari-Sari Store', required: true },
       { id: 'businessType', label: 'Application type', type: 'select', options: ['New Business', 'Renewal'], required: true },
@@ -114,6 +115,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 0,
     requiresPayment: false,
     requirements: ['Valid government ID', 'Certificate of Indigency', 'Case-specific proof (medical abstract, death certificate, etc.)'],
+    searchTerms: ['ayuda', 'financial assistance', 'tulong', 'medical assistance', 'burial assistance', 'libing', 'pamasahe', 'crisis', 'AICS', 'cash aid'],
     fields: [
       { id: 'assistanceType', label: 'Type of assistance', type: 'select', options: ['Medical Assistance', 'Burial Assistance', 'Transportation Assistance', 'Food Assistance'], required: true },
       { id: 'amountRequested', label: 'Amount requested (₱)', type: 'number', placeholder: 'e.g. 5000', required: true },
@@ -131,6 +133,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 0,
     requiresPayment: false,
     requirements: ['Valid government ID', 'Birth certificate or proof of age', 'Medical certificate (for PWD)', '1x1 ID photo'],
+    searchTerms: ['senior citizen', 'matanda', 'PWD', 'person with disability', 'may kapansanan', 'discount card', 'OSCA', 'senior ID'],
     fields: [
       { id: 'idType', label: 'ID type', type: 'select', options: ['Senior Citizen ID', 'PWD ID'], required: true },
       { id: 'applicationKind', label: 'Application kind', type: 'select', options: ['New Application', 'Renewal', 'Lost ID Replacement'], required: true },
@@ -148,6 +151,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 155,
     requiresPayment: true,
     requirements: ['Valid government ID', 'Complete name and date of birth of registrant'],
+    searchTerms: ['birth certificate', 'birth cert', 'kapanganakan', 'PSA birth', 'NSO', 'born', 'live birth'],
     fields: [
       { id: 'registrantName', label: 'Full name of registrant', type: 'text', required: true },
       { id: 'dateOfBirth', label: 'Date of birth', type: 'date', required: true },
@@ -166,6 +170,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 155,
     requiresPayment: true,
     requirements: ['Valid government ID', 'Full names of both spouses and date of marriage'],
+    searchTerms: ['marriage certificate', 'kasal', 'marriage cert', 'PSA marriage', 'wedding'],
     fields: [
       { id: 'spouse1', label: "Spouse 1 full name", type: 'text', required: true },
       { id: 'spouse2', label: "Spouse 2 full name", type: 'text', required: true },
@@ -184,6 +189,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 155,
     requiresPayment: true,
     requirements: ['Valid government ID', 'Full name of deceased and date of death', 'Proof of relationship to the deceased'],
+    searchTerms: ['death certificate', 'namatay', 'death cert', 'PSA death', 'burial papers'],
     fields: [
       { id: 'deceasedName', label: 'Full name of deceased', type: 'text', required: true },
       { id: 'dateOfDeath', label: 'Date of death', type: 'date', required: true },
@@ -202,6 +208,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 55,
     requiresPayment: true,
     requirements: ['Valid government ID', 'Proof of address'],
+    searchTerms: ['cedula', 'community tax', 'sedula', 'CTC', 'residence certificate', 'buwis sa paninirahan'],
     fields: [
       { id: 'purpose', label: 'Purpose', type: 'select', options: ['Employment', 'Government Transaction', 'Bank / Loan Requirement', 'School Requirement', 'Other'], required: true },
       { id: 'occupation', label: 'Occupation', type: 'text', placeholder: 'e.g. Store owner', required: true },
@@ -219,6 +226,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 0,
     requiresPayment: false,
     requirements: ['Tax Declaration number', 'Latest official receipt (if previously paid)'],
+    searchTerms: ['real property tax', 'amilyar', 'land tax', 'property assessment', 'tax declaration', 'lupa'],
     fields: [
       { id: 'taxDecNo', label: 'Tax Declaration number', type: 'text', placeholder: 'e.g. 03-0012-00456', required: true },
       { id: 'propertyType', label: 'Property type', type: 'select', options: ['Residential Land', 'Residential Building', 'Commercial', 'Agricultural', 'Machinery'], required: true },
@@ -237,6 +245,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 100,
     requiresPayment: true,
     requirements: ['Tax Declaration number', 'Latest real property tax official receipt', 'Valid government ID'],
+    searchTerms: ['tax clearance', 'real property clearance', 'amilyar clearance', 'no tax due', 'property clearance'],
     fields: [
       { id: 'taxDecNo', label: 'Tax Declaration number', type: 'text', placeholder: 'e.g. 03-0012-00456', required: true },
       { id: 'purpose', label: 'Purpose', type: 'select', options: ['Property Sale / Transfer', 'Bank Loan Collateral', 'Building Permit Requirement', 'Other'], required: true },
@@ -254,6 +263,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 500,
     requiresPayment: true,
     requirements: ['Tax Declaration or land title', 'Vicinity map / sketch plan', 'Real Property Tax Clearance'],
+    searchTerms: ['zoning', 'locational clearance', 'land use', 'zoning clearance', 'pwesto'],
     fields: [
       { id: 'projectType', label: 'Intended use', type: 'select', options: ['Residential', 'Commercial', 'Industrial', 'Institutional', 'Mixed Use'], required: true },
       { id: 'projectLocation', label: 'Property location', type: 'textarea', placeholder: 'Lot, street, barangay', required: true },
@@ -277,6 +287,7 @@ export const SERVICES: ServiceDefinition[] = [
       'Structural computations',
       'Real Property Tax Clearance',
     ],
+    searchTerms: ['building permit', 'construction', 'magpapatayo', 'bahay', 'renovation', 'pagpapagawa', 'structure'],
     fields: [
       { id: 'workType', label: 'Scope of work', type: 'select', options: ['New Construction', 'Renovation / Alteration', 'Addition', 'Repair', 'Demolition'], required: true },
       { id: 'occupancyType', label: 'Occupancy classification', type: 'select', options: ['Residential (Single)', 'Residential (Duplex)', 'Commercial', 'Industrial', 'Institutional'], required: true },
@@ -296,6 +307,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 800,
     requiresPayment: true,
     requirements: ['Approved Building Permit', 'Certificate of Completion', 'As-built plans', 'Fire Safety Inspection Certificate'],
+    searchTerms: ['occupancy permit', 'certificate of occupancy', 'move in', 'tapos na bahay', 'final inspection'],
     fields: [
       { id: 'buildingPermitNo', label: 'Building Permit number', type: 'text', placeholder: 'e.g. BP-2026-00214', required: true },
       { id: 'completionDate', label: 'Date of completion', type: 'date', required: true },
@@ -313,6 +325,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 150,
     requiresPayment: true,
     requirements: ['Valid government ID', 'Chest X-ray result', 'Stool and urinalysis results', 'Completed medical examination'],
+    searchTerms: ['health certificate', 'health card', 'yellow card', 'food handler', 'sanitary health', 'medical clearance'],
     fields: [
       { id: 'employer', label: 'Employer / establishment', type: 'text', placeholder: 'e.g. Santos Sari-Sari Store', required: true },
       { id: 'natureOfWork', label: 'Nature of work', type: 'select', options: ['Food Handler', 'Food Service Crew', 'Sales / Front Desk', 'Personal Care Services', 'Other'], required: true },
@@ -330,6 +343,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 500,
     requiresPayment: true,
     requirements: ['Business permit application', 'Health Certificates of all workers', 'Water potability test result'],
+    searchTerms: ['sanitary permit', 'sanitation', 'kalinisan', 'food establishment', 'restaurant permit', 'karinderya'],
     fields: [
       { id: 'businessName', label: 'Establishment name', type: 'text', placeholder: 'e.g. Santos Sari-Sari Store', required: true },
       { id: 'establishmentType', label: 'Type of establishment', type: 'select', options: ['Food Establishment', 'Retail Store', 'Salon / Personal Care', 'Lodging', 'Other'], required: true },
@@ -348,6 +362,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 150,
     requiresPayment: true,
     requirements: ['Valid government ID', 'Community Tax Certificate (Cedula)', 'Health Certificate', 'Certificate of employment'],
+    searchTerms: ['occupational permit', 'working permit', 'worker permit', 'employment permit', 'trabaho'],
     fields: [
       { id: 'employer', label: 'Employer', type: 'text', placeholder: 'e.g. San Fernando Trading Corp.', required: true },
       { id: 'position', label: 'Position', type: 'text', placeholder: 'e.g. Sales Associate', required: true },
@@ -371,6 +386,7 @@ export const SERVICES: ServiceDefinition[] = [
       'Pre-marriage counseling certificate',
       'Parental consent or advice (if 18\u201324 years old)',
     ],
+    searchTerms: ['marriage license', 'ikakasal', 'wedding license', 'apply to marry', 'pakasal'],
     fields: [
       { id: 'applicantName', label: 'Your full name', type: 'text', required: true },
       { id: 'partnerName', label: "Partner's full name", type: 'text', required: true },
@@ -390,6 +406,7 @@ export const SERVICES: ServiceDefinition[] = [
     fee: 0,
     requiresPayment: false,
     requirements: ['Valid government ID', 'Birth certificate of child / children', 'Proof of solo parent status', 'Certificate of no marriage or death certificate of spouse (if applicable)'],
+    searchTerms: ['solo parent', 'single parent', 'solo parent ID', 'nag-iisang magulang', 'RA 8972'],
     fields: [
       { id: 'groundForSoloParent', label: 'Ground for solo parent status', type: 'select', options: ['Death of Spouse', 'Separation / Abandonment', 'Annulled Marriage', 'Solo Adoptive Parent', 'Other'], required: true },
       { id: 'childrenCount', label: 'Number of dependent children', type: 'number', placeholder: 'e.g. 2', required: true },
