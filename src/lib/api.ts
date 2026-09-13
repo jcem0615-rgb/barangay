@@ -643,6 +643,17 @@ export const api = {
     request<StaffAppointment>(`/staff/appointments/${id}/${action}`, { method: 'POST' }),
 
   // Feedback and complaints — the RA 11032 mechanism.
+  // Web Push. The public key is fetched rather than baked into the bundle, so
+  // a deployment that has not configured push says so instead of offering a
+  // switch that cannot work.
+  pushKey: () => request<{ enabled: boolean; publicKey: string | null }>('/notifications/push-key'),
+
+  savePushSubscription: (body: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    request<{ id: string }>('/notifications/push', { method: 'POST', body: JSON.stringify(body) }),
+
+  removePushSubscription: (endpoint: string) =>
+    request<void>('/notifications/push', { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
+
   myFeedback: () => request<Feedback[]>('/feedback'),
 
   rateRequest: (requestId: string, rating: number, comment?: string) =>

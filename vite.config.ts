@@ -35,6 +35,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Push and notification-click handling, kept as a static file so the
+        // caching worker stays generated rather than hand-written.
+        importScripts: ['/push-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
         runtimeCaching: [

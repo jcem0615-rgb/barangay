@@ -60,6 +60,14 @@ export const env = {
    */
   publicUrl: (process.env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
 
+  // Web Push. Absent means push is simply off — the app still records every
+  // notification and still sends mail, so a deployment without these loses a
+  // channel rather than the feature.
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+  // Who a push service should contact about a misbehaving sender.
+  vapidSubject: process.env.VAPID_SUBJECT ?? 'mailto:dpo@sanfernando.gov.ph',
+
   /** 'off' | 'log' | 'http'. SMS costs money per message, so it is opt-in. */
   smsTransport: (process.env.SMS_TRANSPORT ?? 'off') as 'off' | 'log' | 'http',
   smsUrl: process.env.SMS_URL || undefined,

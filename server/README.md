@@ -89,6 +89,8 @@ by an administrator (or the seed) — there is no self-service path to a staff r
 | `POST` | `/api/notifications/:id/read` | resident — mark one read |
 | `POST` | `/api/notifications/read-all` | resident — mark all read |
 | `GET`/`PATCH` | `/api/notifications/preferences` | resident — channels and mobile number |
+| `GET` | `/api/notifications/push-key` | resident — whether push is configured, and the VAPID public key |
+| `GET`/`POST`/`DELETE` | `/api/notifications/push` | resident — this device's push subscription |
 | `GET`/`POST` | `/api/admin/hotlines` | admin — the emergency numbers on every digital ID |
 | `PUT`/`DELETE` | `/api/admin/hotlines/:id` | admin — correct or withdraw one |
 | `GET`/`POST` | `/api/admin/holidays` | admin — the working-day calendar (`year`); POST upserts a date |
@@ -327,6 +329,7 @@ npm run test:municipality # hotlines, holidays and office details: who may edit,
 npm run test:appointments # the office calendar, capacity, queue numbers, and the counter's day
 npm run test:feedback     # ratings, complaints, the working-day deadline, and the figures
 npm run test:search       # the terms are published, and the matcher ranks the way a person expects
+npm run test:push         # subscriptions, scoping, real VAPID signing, and the lock-screen rule
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
 ```

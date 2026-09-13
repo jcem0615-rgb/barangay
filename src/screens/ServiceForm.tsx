@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, CheckCircle2, ClipboardList, CloudOff, Loader2, Paperclip, Send, Trash2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
+import PushToggle from '../components/PushToggle'
 import FormField from '../components/FormField'
 import OfflineBanner from '../components/OfflineBanner'
 import { useCatalogue } from '../lib/catalogue'
@@ -146,7 +147,15 @@ export default function ServiceForm({ serviceId }: { serviceId: string }) {
           </div>
         )}
 
-        <div className="mt-7 flex w-full max-w-xs flex-col gap-2.5">
+        {/*
+          The first moment the resident has anything to be notified about, and
+          so the only moment the question makes sense. Never asked on load.
+        */}
+        <div className="mt-6 w-full max-w-xs">
+          <PushToggle variant="prompt" />
+        </div>
+
+        <div className="mt-4 flex w-full max-w-xs flex-col gap-2.5">
           <button
             onClick={() => replace({ name: 'application-detail', id: submitted.id })}
             className="rounded-xl bg-navy-800 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-white active:bg-navy-900"

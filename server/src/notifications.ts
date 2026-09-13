@@ -3,6 +3,7 @@ import { one } from './db.ts'
 import { sendMail } from './mailer.ts'
 import { sendSms, smsEnabled, trimForSms } from './sms.ts'
 import { env } from './env.ts'
+import { pushBodyFor, pushToResident } from './push.ts'
 
 /**
  * Resident notifications.
@@ -68,6 +69,16 @@ export async function deliverNotification(input: NotificationInput): Promise<voi
         text: `${input.body}\n\nView it here: ${env.publicUrl}\n\n— eLGU Citizen Portal`,
       }).catch((err) => console.error('notification email failed', err))
     }
+
+    // Push goes to every device the resident registered. It is not behind
+    // notify_email: granting the browser permission *is* the opt-in, and a
+    // resident who turned off email did not thereby ask their phone to stay
+    // silent.
+    await pushToResident(input.userId, {
+      title: input.title,
+      body: pushBodyFor(input.kind, input.body),
+      url: env.publicUrl,
+    }).catch((err) => console.error('notification push failed', err))
 
     if (person.notify_sms && person.phone && smsEnabled()) {
       await sendSms({

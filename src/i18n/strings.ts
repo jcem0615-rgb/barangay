@@ -171,6 +171,15 @@ export const en = {
   'complain.reply': 'The office replied',
   'complain.dueBy': 'The office is due to reply by {date}.',
 
+  // push notifications
+  'push.promptTitle': 'Get told when it is ready',
+  'push.promptBlurb': 'Your phone can let you know the moment the office finishes, so you are not checking the app to find out.',
+  'push.turnOn': 'Turn on notifications',
+  'push.rowLabel': 'Notifications on this device',
+  'push.onThisDevice': 'On \u2014 this device will be notified',
+  'push.offThisDevice': 'Off \u2014 tap to turn on',
+  'push.blocked': 'This browser is blocking notifications for the portal. Turn them back on in your browser\u2019s site settings, then come back here.',
+
   // request detail
   'detail.notFound': 'Request not found',
   'detail.removed': 'This request may have been removed.',
@@ -546,6 +555,15 @@ export const fil: Record<StringKey, string> = {
   'complain.answered': 'Nasagot na',
   'complain.reply': 'Sumagot ang opisina',
   'complain.dueBy': 'Dapat sumagot ang opisina bago sumapit ang {date}.',
+
+  // push notifications
+  'push.promptTitle': 'Ipaalam kapag handa na',
+  'push.promptBlurb': 'Maaari kang abisuhan ng telepono mo sa oras na matapos ang opisina, para hindi mo na kailangang tingnan-tingnan ang app.',
+  'push.turnOn': 'I-on ang abiso',
+  'push.rowLabel': 'Abiso sa device na ito',
+  'push.onThisDevice': 'Naka-on \u2014 aabisuhan ang device na ito',
+  'push.offThisDevice': 'Naka-off \u2014 pindutin para i-on',
+  'push.blocked': 'Hinaharangan ng browser na ito ang abiso para sa portal. I-on itong muli sa site settings ng browser mo, saka bumalik dito.',
 
   'detail.notFound': 'Hindi natagpuan ang kahilingan',
   'detail.removed': 'Maaaring natanggal na ang kahilingang ito.',

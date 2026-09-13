@@ -4,6 +4,7 @@ import { addressLine, useResidentProfile } from '../lib/resident'
 import { useAuth } from '../lib/auth'
 import NotificationSettings from '../components/NotificationSettings'
 import LanguageToggle from '../components/LanguageToggle'
+import PushToggle from '../components/PushToggle'
 import TextSizeToggle from '../components/TextSizeToggle'
 import { useNav } from '../lib/nav'
 import { useOnlineStatus } from '../lib/useOnlineStatus'
@@ -64,6 +65,10 @@ export default function Profile() {
         </div>
 
         <p className="mb-2 mt-6 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">{t('profile.notifications')}</p>
+        {/* Per device, so it sits above the account-wide email and SMS choices. */}
+        <div className="mb-2.5 rounded-2xl border border-slate-200 bg-white px-3 py-1">
+          <PushToggle />
+        </div>
         <NotificationSettings />
 
         <p className="mb-2 mt-6 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">{t('profile.account')}</p>

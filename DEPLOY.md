@@ -38,6 +38,9 @@ Everything is environment variables. Only the first two are required.
 | `CORS_ORIGIN` | only if split | Leave unset when the API serves the web app |
 | `PGPOOL_MAX` | no | Connections per instance, default 10 |
 | `SERVE_WEB` | no | `false` to run API-only |
+| `VAPID_PUBLIC_KEY` | for push | Generate a pair: `npx web-push generate-vapid-keys`. Without both keys push is simply off, and the app's notification switch does not appear. |
+| `VAPID_PRIVATE_KEY` | for push | Keep it secret, like `JWT_SECRET`. Changing it invalidates every existing subscription, and every device has to be turned on again. |
+| `VAPID_SUBJECT` | for push | `mailto:` for whoever a push service should contact about this sender. Defaults to the DPO address. |
 | `UPLOAD_DIR` | **in a container** | Must be a mounted volume, or uploads are lost on deploy |
 | `CLAMAV_HOST` | **for public traffic** | clamd for scanning uploads. Unset = no scanning |
 | `SMTP_URL` | **for public traffic** | Password reset links go nowhere without it |

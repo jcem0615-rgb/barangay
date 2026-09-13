@@ -3,6 +3,9 @@ import { z } from 'zod'
 import { one, query } from '../db.ts'
 import { authenticate, requireRole } from '../auth.ts'
 
+import { pushEnabled } from '../push.ts'
+import { env } from '../env.ts'
+
 export const notificationsRouter = Router()
 notificationsRouter.use(authenticate, requireRole('resident'))
 
@@ -90,4 +93,74 @@ notificationsRouter.patch('/preferences', async (req, res) => {
     [req.user!.id]
   )
   res.json(row)
+})
+
+// ---------------------------------------------------------------------------
+// Push subscriptions
+//
+// One row per browser. The endpoint is the identity, so a browser that
+// re-subscribes replaces its own row rather than stacking a second one that
+// would ring twice.
+// ---------------------------------------------------------------------------
+
+const subscriptionBody = z.object({
+  endpoint: z.url().max(2000),
+  keys: z.object({
+    p256dh: z.string().min(1).max(200),
+    auth: z.string().min(1).max(200),
+  }),
+})
+
+/**
+ * What the browser needs before it can subscribe at all: the public half of the
+ * VAPID key pair. Public by definition — it is handed to every push service —
+ * but it still requires a session, because there is no reason for the app to
+ * describe its own push setup to someone who is not using it.
+ */
+notificationsRouter.get('/push-key', (_req, res) => {
+  res.json({ enabled: pushEnabled(), publicKey: pushEnabled() ? env.vapidPublicKey : null })
+})
+
+notificationsRouter.get('/push', async (req, res) => {
+  res.json(
+    await query(
+      `select id, user_agent as "userAgent", created_at as "createdAt",
+              last_used_at as "lastUsedAt"
+         from push_subscriptions where user_id = $1 order by created_at`,
+      [req.user!.id]
+    )
+  )
+})
+
+notificationsRouter.post('/push', async (req, res) => {
+  if (!pushEnabled()) {
+    return res.status(503).json({ error: 'Push is not configured on this server.' })
+  }
+  const parsed = subscriptionBody.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'That is not a push subscription.' })
+  const { endpoint, keys } = parsed.data
+
+  // A subscription belongs to whoever is signed in now. Two people sharing a
+  // phone means the second sign-in takes the browser over — which is right:
+  // the notifications that arrive should be the ones for the account using it.
+  const rows = await query(
+    `insert into push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
+     values ($1, $2, $3, $4, $5)
+     on conflict (endpoint) do update
+       set user_id = excluded.user_id, p256dh = excluded.p256dh,
+           auth = excluded.auth, user_agent = excluded.user_agent
+     returning id, user_agent as "userAgent", created_at as "createdAt"`,
+    [req.user!.id, endpoint, keys.p256dh, keys.auth, String(req.get('user-agent') ?? '').slice(0, 300)]
+  )
+  res.status(201).json(rows[0])
+})
+
+notificationsRouter.delete('/push', async (req, res) => {
+  const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint : ''
+  if (!endpoint) return res.status(400).json({ error: 'Say which subscription to remove.' })
+  await query(
+    `delete from push_subscriptions where user_id = $1 and endpoint = $2`,
+    [req.user!.id, endpoint]
+  )
+  res.status(204).end()
 })

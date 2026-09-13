@@ -553,6 +553,49 @@ The office tiles stay as the default view. Browsing is the right move for someon
 *not* know what they need, and an office list also tells a resident what the municipality
 actually does; search replaces it only while something is typed.
 
+## Push notifications
+
+The app tells residents it will let them know when a document is ready. Until this, that
+meant email and SMS — neither configured in a default install — so the promise was empty
+unless somebody wired a mail server.
+
+**The permission prompt is never shown on load.** A cold prompt on a first visit is the one
+thing every guide says not to do, and for good reason: a resident who has not filed anything
+has nothing to be notified about, so the honest answer is no — and browsers remember a no
+more or less forever. `PushToggle variant="prompt"` is offered on the submit-success screen,
+the first moment there is anything to be notified about, and a plain switch lives in Profile
+for turning it on later.
+
+**A lock screen is not private.** `PRIVATE_KINDS` in `server/src/push.ts` pushes the title
+and "Open the app to read it." for programme grants, revocations and complaint replies: "You
+have been enrolled in 4Ps" announced to whoever is holding the phone is a poverty-programme
+membership disclosed to the room, and the people this app serves are exactly the people for
+whom that is not a small thing. Request status and appointments carry their real text.
+
+**Subscriptions are per device**, keyed on the endpoint, so re-subscribing the same browser
+updates its row instead of stacking a second one that would ring twice. Signing in on a
+shared phone takes the browser over — the notifications that arrive should be for the
+account using it. A push service answering 404 or 410 means the browser is gone, and the row
+is deleted there and then; otherwise dead subscriptions accumulate and are retried for the
+life of the account.
+
+Push is off unless `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` are set (generate a pair with
+`npx web-push generate-vapid-keys`). Absent, `/notifications/push-key` reports `enabled:
+false` and the switch does not render at all — a toggle that cannot work is worse than no
+toggle.
+
+The service worker half is `public/push-sw.js`, pulled in by `workbox.importScripts`. That
+keeps the caching worker generated from the build manifest rather than hand-written, which
+switching to `injectManifest` for twenty lines of push handling would have cost.
+
+**What is verified here and what is not.** The suite checks subscription storage and
+scoping, the lock-screen rule, and the real VAPID signature and `aes128gcm` body that
+`web-push` produces. It does not check delivery: there is no reachable push service from
+the build environment, so the final hop to FCM and the 404/410 cleanup that depends on it
+are unexercised. The browser test stubs `pushManager.subscribe` for the same reason —
+headless Chromium has no push service to register with — so everything around that one call
+is the app's own code, and that call is not.
+
 ## Accessibility
 
 The app registers senior citizens and persons with disability, so legibility is a
@@ -636,6 +679,10 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   launch — a deadline the office never agreed to is worse than none, because the app reports
   them late against it. The rating is a single overall score rather than the prescribed
   Client Satisfaction Measurement dimensions.
+- **Push delivery is unverified in this repo.** The signing and encryption are real and
+  tested, but nothing here can reach a push service, so the last hop and the dead-subscription
+  cleanup it triggers have never actually run. Check them on a real deployment before relying
+  on push as the channel that tells a resident their document is ready.
 - **Sessions** are 12-hour JWTs with no refresh or general revocation list. Signing out
   clears the token client-side; it stays valid until it expires. The one exception is a
   password change, which `users.password_changed_at` enforces on every request.

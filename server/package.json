@@ -26,6 +26,7 @@
     "test:appointments": "node test/appointments.mjs",
     "test:feedback": "node test/feedback.mjs",
     "test:search": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/search.mjs",
+    "test:push": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/push.mjs",
     "test:id-verification": "node test/id-verification.mjs",
     "test:hotlines": "node test/hotlines.mjs",
     "test:portrait": "node test/portrait.mjs",
@@ -48,6 +49,7 @@
     "nodemailer": "^9.1.0",
     "pdfkit": "^0.20.2",
     "pg": "^8.16.3",
+    "web-push": "^3.6.7",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -56,6 +58,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.13.3",
     "@types/pg": "^8.15.5",
+    "@types/web-push": "^3.6.4",
     "tsx": "^4.20.6",
     "typescript": "~6.0.2"
   }
