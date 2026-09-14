@@ -180,6 +180,21 @@ export const en = {
   'push.offThisDevice': 'Off \u2014 tap to turn on',
   'push.blocked': 'This browser is blocking notifications for the portal. Turn them back on in your browser\u2019s site settings, then come back here.',
 
+  // install
+  'install.rowLabel': 'Install the app',
+  'install.rowBlurb': 'Adds it to your home screen',
+  'install.rowInstalled': 'Installed \u2014 you are using the app',
+  'install.bannerTitle': 'Keep the portal on your phone',
+  'install.bannerBlurb': 'Your ID and the emergency hotlines open with no signal, and the app starts where you left it.',
+  'install.action': 'Install',
+  'install.dismiss': 'Not now',
+  'install.iosTitle': 'Add to your Home Screen',
+  'install.iosStep1': 'Tap the Share button at the bottom of Safari.',
+  'install.iosStep2': 'Scroll down and tap \u201cAdd to Home Screen\u201d.',
+  'install.iosStep3': 'Tap \u201cAdd\u201d. The portal appears with your other apps.',
+  'install.iosShow': 'How to install',
+  'install.iosHide': 'Hide',
+
   // my data (Data Privacy Act)
   'mydata.title': 'My data',
   'mydata.subtitle': 'What the municipality holds, and what you can do about it',
@@ -586,6 +601,21 @@ export const fil: Record<StringKey, string> = {
   'push.onThisDevice': 'Naka-on \u2014 aabisuhan ang device na ito',
   'push.offThisDevice': 'Naka-off \u2014 pindutin para i-on',
   'push.blocked': 'Hinaharangan ng browser na ito ang abiso para sa portal. I-on itong muli sa site settings ng browser mo, saka bumalik dito.',
+
+  // install
+  'install.rowLabel': 'I-install ang app',
+  'install.rowBlurb': 'Idaragdag ito sa home screen mo',
+  'install.rowInstalled': 'Naka-install na \u2014 app ang ginagamit mo',
+  'install.bannerTitle': 'Itago ang portal sa telepono mo',
+  'install.bannerBlurb': 'Bubukas ang ID mo at ang mga emergency hotline kahit walang signal, at magbubukas ang app kung saan ka huminto.',
+  'install.action': 'I-install',
+  'install.dismiss': 'Hindi muna',
+  'install.iosTitle': 'Idagdag sa Home Screen',
+  'install.iosStep1': 'Pindutin ang Share sa ibaba ng Safari.',
+  'install.iosStep2': 'Mag-scroll pababa at pindutin ang \u201cAdd to Home Screen\u201d.',
+  'install.iosStep3': 'Pindutin ang \u201cAdd\u201d. Lilitaw ang portal kasama ng ibang app mo.',
+  'install.iosShow': 'Paano i-install',
+  'install.iosHide': 'Itago',
 
   // my data (Data Privacy Act)
   'mydata.title': 'Ang datos ko',

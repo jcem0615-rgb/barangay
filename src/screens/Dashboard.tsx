@@ -8,6 +8,7 @@ import { useNav } from '../lib/nav'
 import { useAppData } from '../lib/appData'
 import { useOnlineStatus } from '../lib/useOnlineStatus'
 import OfflineBanner from '../components/OfflineBanner'
+import InstallAppButton from '../components/InstallAppButton'
 import ApplicationCard from '../components/ApplicationCard'
 import { resolveIcon } from '../lib/icons'
 import { useT } from '../lib/i18n'
@@ -56,6 +57,12 @@ export default function Dashboard() {
       )}
 
       {resident && <IDCard profile={resident} onTap={() => push({ name: 'id-card' })} />}
+
+      {/* Under the ID rather than above it: the card is what they came for, and
+          the offer means more once they have seen what they would be keeping. */}
+      <div className="mt-4 empty:mt-0">
+        <InstallAppButton variant="banner" />
+      </div>
 
       <div className="mt-6 flex items-center justify-between">
         <h2 className="font-display text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">{t('home.quickServices')}</h2>

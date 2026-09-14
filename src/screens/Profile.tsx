@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import NotificationSettings from '../components/NotificationSettings'
 import LanguageToggle from '../components/LanguageToggle'
 import PushToggle from '../components/PushToggle'
+import InstallAppButton from '../components/InstallAppButton'
 import TextSizeToggle from '../components/TextSizeToggle'
 import { useNav } from '../lib/nav'
 import { useOnlineStatus } from '../lib/useOnlineStatus'
@@ -71,6 +72,10 @@ export default function Profile() {
           <PushToggle />
         </div>
         <NotificationSettings />
+
+        <div className="mt-6 empty:mt-0">
+          <InstallAppButton />
+        </div>
 
         <p className="mb-2 mt-6 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">{t('profile.account')}</p>
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">

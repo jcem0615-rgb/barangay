@@ -598,6 +598,39 @@ are unexercised. The browser test stubs `pushManager.subscribe` for the same rea
 headless Chromium has no push service to register with — so everything around that one call
 is the app's own code, and that call is not.
 
+## Installing the app
+
+The manifest and service worker made the portal installable from the first commit;
+nothing told a resident so. A browser's own install affordance is a menu item most
+people have never opened, so in practice the app was a web page.
+
+**The browser decides when this is possible, not us.** Chromium fires
+`beforeinstallprompt` once it judges the app installable and the visitor engaged;
+`src/lib/install.ts` holds that event and spends it when the resident taps. There is no
+way to conjure one, so where it has not fired there is no button. The listener is
+registered at module load rather than in a component, because the event arrives before
+React mounts and is never replayed — miss it and the offer is gone for the whole visit.
+
+**iOS has no such event and no install API.** Safari does it from the Share menu and
+nothing in the page can open that, so an iPhone gets the three steps instead of a button
+that would do nothing. This is the same rule as the QR that encoded a static seed: a
+control that cannot work is worse than none.
+
+**Two placements, because they answer different questions.** The dashboard banner is for
+someone who has not thought about it — it sits under the ID card, where they have just
+seen what they would be keeping — and is dismissible *for good*, since an install offer
+that returns every visit is an advertisement. The Profile row is for someone who went
+looking, so it is never dismissed and it confirms "Installed" once they have, which is
+the question anybody asks after tapping install.
+
+Installed state is read from `display-mode: standalone`, `navigator.standalone` and the
+`appinstalled` event together, because installing from the browser's own menu does not
+reliably fire the event in the tab you did it from.
+
+What it buys the resident is the thing the app already had and could not show off: the
+precached shell means an installed portal opens to the emergency hotlines and the digital
+ID with no signal at all.
+
 ## Data Privacy Act rights (RA 10173)
 
 The privacy notice says a resident has the right to see what is held about them, correct it,
