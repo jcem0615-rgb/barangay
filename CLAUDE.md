@@ -770,6 +770,11 @@ only a dev dependency. The container runs `node src/index.ts` directly rather
 than through a wrapper — a wrapper process swallows SIGTERM, which would defeat
 the graceful shutdown in `src/index.ts`.
 
+`vercel.json` is not part of that. It exists so a static host — which has no
+Postgres and no API — builds the **demo** (`VITE_DEMO=1`) rather than an app whose
+every screen fails its first request. Nothing in it applies to the container; see
+*The clickable demo* in `DEPLOY.md` for what that deployment is and is not.
+
 ## Commands
 
 Two processes: the API and the web app.
