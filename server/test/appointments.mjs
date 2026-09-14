@@ -17,14 +17,14 @@ const j = async (p, o = {}) => {
 const stamp = Date.now()
 const register = async (name) => (await j('/auth/register', { method: 'POST', body: {
   email: `appt.${name}.${stamp}@example.com`, password: 'tipanan-natin-2026', fullName: `Test ${name} ${stamp}`,
-  philSysId: '1234-5678-9012-3456', barangay: 'Poblacion', municipality: 'San Fernando', province: 'Pampanga',
+  philSysId: '1234-5678-9012-3456', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
 } })).json.token
 
 const resident = await register('a')
 const other = await register('b')
-const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const health = (await j('/auth/login', { method: 'POST', body: { email: 'health@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const health = (await j('/auth/login', { method: 'POST', body: { email: 'health@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 // The next open day the treasury will take, taken from the server's own answer
 // rather than worked out here — a fixture that computes the calendar itself can

@@ -28,8 +28,8 @@ const linkFor = async (email) => {
   return [...lines].reverse().find((m) => m.to === email)?.text.match(/https?:\/\/\S+/)?.[0]
 }
 
-const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const staff = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const staff = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const resident = (await j('/auth/register', { method: 'POST', body: { email: `res.${Date.now()}@example.com`, password: 'tamang-lakas-2026', fullName: 'A Resident' } })).json.token
 
 console.log('\n== only administrators reach this at all ==')
@@ -40,7 +40,7 @@ check('anonymous cannot', (await j('/admin/staff')).status === 401)
 check('staff cannot create an account', (await j('/admin/staff', { method: 'POST', token: staff, body: { email: 'x@y.ph', fullName: 'X Y', departments: ['lcr'] } })).status === 403)
 
 console.log('\n== creating a clerk ==')
-const email = `clerk.${Date.now()}@sanfernando.gov.ph`
+const email = `clerk.${Date.now()}@malasiqui.gov.ph`
 const created = await j('/admin/staff', { method: 'POST', token: admin, body: {
   email, fullName: 'Nilo Bautista', departments: ['lcr'], position: 'Registration Officer' } })
 check('created', created.status === 201, JSON.stringify(created.json))

@@ -16,7 +16,7 @@ export default function SignIn() {
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
     email: '', password: '', fullName: '',
-    barangay: '', municipality: 'Municipality of San Fernando', province: 'Cebu',
+    barangay: '', municipality: 'Municipality of Malasiqui', province: 'Pangasinan',
   })
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
@@ -147,11 +147,11 @@ export default function SignIn() {
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-slate-600">Treasury staff</dt>
-                <dd className="font-medium">treasury@sanfernando.gov.ph</dd>
+                <dd className="font-medium">treasury@malasiqui.gov.ph</dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-slate-600">Administrator</dt>
-                <dd className="font-medium">admin@sanfernando.gov.ph</dd>
+                <dd className="font-medium">admin@malasiqui.gov.ph</dd>
               </div>
               <div className="flex justify-between gap-3 border-t border-gold-500/30 pt-1">
                 <dt className="text-slate-600">Password (all)</dt>

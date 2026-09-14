@@ -194,10 +194,10 @@ function HotlineForm({
           <Input value={row.label} onChange={(v) => onChange({ ...row, label: v })} placeholder="Fire" />
         </Field>
         <Field label="Who answers it">
-          <Input value={row.agency} onChange={(v) => onChange({ ...row, agency: v })} placeholder="Bureau of Fire Protection — San Fernando" />
+          <Input value={row.agency} onChange={(v) => onChange({ ...row, agency: v })} placeholder="Bureau of Fire Protection — Malasiqui" />
         </Field>
         <Field label="Number">
-          <Input value={row.phone} onChange={(v) => onChange({ ...row, phone: v })} placeholder="(045) 961-2410" />
+          <Input value={row.phone} onChange={(v) => onChange({ ...row, phone: v })} placeholder="(075) 961-2410" />
         </Field>
       </div>
       <label className="mt-3 flex items-center gap-2 text-[13px] text-slate-700">
@@ -361,10 +361,10 @@ function OfficeRow({ row, onSave }: { row: OfficeContact; onSave: (patch: Partia
           <Input value={edit.hours ?? ''} onChange={(v) => setEdit({ ...edit, hours: v || null })} placeholder="Mon–Fri, 8:00 AM – 5:00 PM" />
         </Field>
         <Field label="Phone">
-          <Input value={edit.phone ?? ''} onChange={(v) => setEdit({ ...edit, phone: v || null })} placeholder="(045) 961-2400" />
+          <Input value={edit.phone ?? ''} onChange={(v) => setEdit({ ...edit, phone: v || null })} placeholder="(075) 961-2400" />
         </Field>
         <Field label="Email">
-          <Input value={edit.email ?? ''} onChange={(v) => setEdit({ ...edit, email: v || null })} placeholder="treasury@sanfernando.gov.ph" />
+          <Input value={edit.email ?? ''} onChange={(v) => setEdit({ ...edit, email: v || null })} placeholder="treasury@malasiqui.gov.ph" />
         </Field>
       </div>
       {dirty && (

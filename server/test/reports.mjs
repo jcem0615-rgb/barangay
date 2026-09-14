@@ -124,9 +124,9 @@ const j = async (p, o = {}) => {
   return { status: res.status, headers: res.headers, text, json: (() => { try { return JSON.parse(text) } catch { return null } })() }
 }
 const login = async (email) => (await (await fetch(`${API}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'elgu-demo-2026' }) })).json()).token
-const treasury = await login('treasury@sanfernando.gov.ph')
-const lcr = await login('lcr@sanfernando.gov.ph')
-const admin = await login('admin@sanfernando.gov.ph')
+const treasury = await login('treasury@malasiqui.gov.ph')
+const lcr = await login('lcr@malasiqui.gov.ph')
+const admin = await login('admin@malasiqui.gov.ph')
 const period = `from=${FROM}&to=${TO}`
 
 const mine = await j(`/staff/reports?${period}`, { token: treasury })

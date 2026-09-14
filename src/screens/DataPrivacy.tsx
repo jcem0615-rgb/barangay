@@ -55,10 +55,10 @@ export default function DataPrivacy() {
             {t('privacy.contactBody')}
           </p>
           <a
-            href="mailto:dpo@sanfernando.gov.ph"
+            href="mailto:dpo@malasiqui.gov.ph"
             className="mt-2 inline-block text-[calc(13.5px_*_var(--text-scale))] font-semibold text-navy-800 underline-offset-2 hover:underline"
           >
-            dpo@sanfernando.gov.ph
+            dpo@malasiqui.gov.ph
           </a>
         </div>
       </div>

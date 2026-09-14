@@ -97,7 +97,7 @@ check('a half-typed select is fine in a draft', (await j('/requests/drafts/boss-
 check('but a draft still cannot smuggle a field', (await j('/requests/drafts/boss-application', { method: 'PUT', token, body: { formValues: { smuggled: 'x' } } })).status === 400)
 
 console.log('\n== nothing incomplete reached the queue ==')
-const bpls = (await j('/auth/login', { method: 'POST', body: { email: 'bpls@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const bpls = (await j('/auth/login', { method: 'POST', body: { email: 'bpls@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const mine = (await j('/requests', { token })).json
 check('only the accepted submissions exist', mine.length === 5, `${mine.length}`)
 check('each has every required field', mine.every((r) => Object.keys(BOSS).every((k) => r.formValues[k] ?? r.serviceId !== 'boss-application')))

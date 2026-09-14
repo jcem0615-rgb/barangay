@@ -4,11 +4,11 @@ Handoff notes for continuing this project in Claude Code.
 
 ## What this is
 
-A mobile-first PWA for residents of a Philippine municipality to transact with the
-LGU's own offices: Business Permits & Licensing (BOSS), Social Welfare (CSWDO), the Local
-Civil Registrar, the Treasurer's Office, the Office of the Building Official, and the
-Municipal Health Office. Barangay-level services are deliberately out of scope — this is the
-municipal tier.
+A mobile-first PWA for residents of a Philippine municipality — the sample data is
+**Malasiqui, Pangasinan** — to transact with the LGU's own offices: Business Permits &
+Licensing (BOSS), Social Welfare (CSWDO), the Local Civil Registrar, the Treasurer's
+Office, the Office of the Building Official, and the Municipal Health Office.
+Barangay-level services are deliberately out of scope — this is the municipal tier.
 
 Both sides of the system live here: the resident PWA and the staff-facing department
 console, backed by a real Node + Postgres API with accounts and roles (`server/`).
@@ -223,10 +223,12 @@ somewhere with no signal, and a number that only works online is not a number to
 ID. The network copy still wins the moment it arrives.
 
 **911 and 143 are real and correct nationwide** — the National Emergency Hotline and the
-Philippine Red Cross. **Every municipal number is a placeholder** for this sample LGU;
-replace them all before deploying and re-check them whenever the offices reorganise. A
-hotline that rings nowhere is worse than none at all, because a resident will trust it in
-the moment they can least afford to.
+Philippine Red Cross. **Every Malasiqui number is invented.** The catalogue names a real
+town, which makes that worse rather than better: a resident who recognises their own
+municipality on the screen has every reason to believe the number under it. Replace them
+all before deploying, ring each one to confirm, and re-check whenever the offices
+reorganise. A hotline that rings nowhere is worse than none at all, because a resident
+will trust it in the moment they can least afford to.
 
 ## The ID portrait
 
@@ -413,7 +415,7 @@ the fields that actually moved on an edit — diffing two long office addresses 
 exactly the job the screen exists to spare someone.
 
 **Phone validation is deliberately loose** (`looksDialable`). Philippine numbers are
-written every which way — `(045) 961-2400`, `0917 123 4567`, `+63 2 8888 4000`, `911` — and
+written every which way — `(075) 961-2400`, `0917 123 4567`, `+63 2 8888 4000`, `911` — and
 a validator strict enough to have an opinion would reject a number that rings perfectly
 well. It rules out only the unusable. The real check is a person ringing it, which is what
 `DEPLOY.md` asks for.
@@ -793,7 +795,7 @@ echo "VITE_API_URL=http://localhost:4000/api" > .env.local
 npm run dev                   # http://localhost:5173
 ```
 
-Seeded staff logins are `<office>@sanfernando.gov.ph` (treasury, bpls, obo, lcr, cswdo,
+Seeded staff logins are `<office>@malasiqui.gov.ph` (treasury, bpls, obo, lcr, cswdo,
 health) with the password printed by `npm run seed`. Sign in as `cswdo@` to see the
 programme record on a request. Residents register in the app.
 

@@ -28,7 +28,7 @@ export const en = {
 
   // sign in
   'auth.title': 'eLGU Citizen Portal',
-  'auth.municipalityOf': 'Municipality of San Fernando',
+  'auth.municipalityOf': 'Municipality of Malasiqui',
   'auth.signIn': 'Sign in',
   'auth.createAccount': 'Create account',
   'auth.fullName': 'Full name',
@@ -440,7 +440,7 @@ export const fil: Record<StringKey, string> = {
   'common.offlineShort': 'Wala kang koneksyon. Naitatago sa device na ito ang mga binago mo.',
 
   'auth.title': 'eLGU Citizen Portal',
-  'auth.municipalityOf': 'Munisipyo ng San Fernando',
+  'auth.municipalityOf': 'Munisipyo ng Malasiqui',
   'auth.signIn': 'Mag-log in',
   'auth.createAccount': 'Gumawa ng account',
   'auth.fullName': 'Buong pangalan',

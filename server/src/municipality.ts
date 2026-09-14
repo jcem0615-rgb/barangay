@@ -39,7 +39,7 @@ export async function recordAudit(client: PoolClient, entry: AuditEntry): Promis
 /**
  * A phone number a resident can actually dial.
  *
- * Deliberately loose. Philippine numbers are written every which way — (045)
+ * Deliberately loose. Philippine numbers are written every which way — (075)
  * 961-2400, 0917 123 4567, +63 2 8888 4000, and a three-digit hotline like 911
  * — and a validator strict enough to have an opinion about which is correct
  * would reject a number that rings perfectly well. All this rules out is the

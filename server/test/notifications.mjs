@@ -34,7 +34,7 @@ const settle = () => new Promise((r) => setTimeout(r, 700))
 
 const email = `notify.${Date.now()}@example.com`
 const resident = (await j('/auth/register', { method: 'POST', body: { email, password: 'tamang-lakas-2026', fullName: 'Divina Ocampo' } })).json.token
-const mto = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const mto = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const id = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })).json.id
 
 console.log('\n== nothing before the office acts ==')

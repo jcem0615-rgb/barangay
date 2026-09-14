@@ -18,7 +18,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v11'
+const STORE_KEY = 'elgu-demo-state-v12'
 
 interface DemoUser {
   id: string
@@ -150,12 +150,12 @@ interface DemoAudit {
 const uid = () => crypto.randomUUID()
 
 const STAFF_SEED: Array<{ email: string; name: string; dept: string; position: string }> = [
-  { email: 'treasury@sanfernando.gov.ph', name: 'Ana R. Lim', dept: 'treasury', position: 'Revenue Officer II' },
-  { email: 'bpls@sanfernando.gov.ph', name: 'Rico M. Dela Cruz', dept: 'bpls', position: 'Licensing Officer' },
-  { email: 'obo@sanfernando.gov.ph', name: 'Eng. Jose P. Vega', dept: 'obo', position: 'Building Inspector' },
-  { email: 'lcr@sanfernando.gov.ph', name: 'Carmen S. Reyes', dept: 'lcr', position: 'Registration Officer' },
-  { email: 'cswdo@sanfernando.gov.ph', name: 'Grace T. Bautista', dept: 'cswdo', position: 'Social Welfare Officer' },
-  { email: 'health@sanfernando.gov.ph', name: 'Dr. Elena V. Cruz', dept: 'health', position: 'Sanitation Inspector' },
+  { email: 'treasury@malasiqui.gov.ph', name: 'Ana R. Lim', dept: 'treasury', position: 'Revenue Officer II' },
+  { email: 'bpls@malasiqui.gov.ph', name: 'Rico M. Dela Cruz', dept: 'bpls', position: 'Licensing Officer' },
+  { email: 'obo@malasiqui.gov.ph', name: 'Eng. Jose P. Vega', dept: 'obo', position: 'Building Inspector' },
+  { email: 'lcr@malasiqui.gov.ph', name: 'Carmen S. Reyes', dept: 'lcr', position: 'Registration Officer' },
+  { email: 'cswdo@malasiqui.gov.ph', name: 'Grace T. Bautista', dept: 'cswdo', position: 'Social Welfare Officer' },
+  { email: 'health@malasiqui.gov.ph', name: 'Dr. Elena V. Cruz', dept: 'health', position: 'Sanitation Inspector' },
 ]
 
 const DEMO_PASSWORD = 'elgu-demo-2026'
@@ -163,7 +163,7 @@ const DEMO_PASSWORD = 'elgu-demo-2026'
 function seed(): DemoState {
   const users: DemoUser[] = [
     {
-      id: uid(), email: 'admin@sanfernando.gov.ph', password: DEMO_PASSWORD,
+      id: uid(), email: 'admin@malasiqui.gov.ph', password: DEMO_PASSWORD,
       fullName: 'Office of the Mayor — Administrator', role: 'admin', departments: [],
       position: null, active: true, notifyEmail: true, notifySms: false,
       profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
@@ -187,7 +187,7 @@ function seed(): DemoState {
     active: true, notifyEmail: true, notifySms: false,
     profile: {
       philSysId: '6392-8841-0027-3311', barangay: 'Barangay San Isidro',
-      municipality: 'Municipality of San Fernando', province: 'Cebu',
+      municipality: 'Municipality of Malasiqui', province: 'Pangasinan',
       birthDate: '1994-03-18', address: 'Blk 4 Lot 12, Purok 3', phone: null,
     },
     photo: null,
@@ -734,7 +734,7 @@ function makePdf(lines: string[]): Blob {
 function documentFor(r: DemoRequest): Blob {
   const resident = state.users.find((u) => u.id === r.residentId)
   return makePdf([
-    'MUNICIPALITY OF SAN FERNANDO',
+    'MUNICIPALITY OF MALASIQUI',
     officeName(r.categoryId),
     '',
     r.serviceName.toUpperCase(),
@@ -817,8 +817,8 @@ async function route(
         notifyEmail: true, notifySms: false,
         profile: {
           philSysId: null, barangay: body.barangay ?? null,
-          municipality: body.municipality ?? 'Municipality of San Fernando',
-          province: body.province ?? 'Cebu', birthDate: null, address: body.address ?? null, phone: null,
+          municipality: body.municipality ?? 'Municipality of Malasiqui',
+          province: body.province ?? 'Pangasinan', birthDate: null, address: body.address ?? null, phone: null,
         },
         photo: null, photoUpdatedAt: null,
         programs: [],
@@ -1544,7 +1544,7 @@ async function route(
       const dump = {
         exportedAt: new Date().toISOString(),
         about:
-          'Everything the Municipality of San Fernando holds about you in this portal, provided ' +
+          'Everything the Municipality of Malasiqui holds about you in this portal, provided ' +
           'under your right to data portability (Republic Act 10173, the Data Privacy Act of 2012). ' +
           'Files you uploaded are listed under "attachments" and can be downloaded from each request.',
         account: {

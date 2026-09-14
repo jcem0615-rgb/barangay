@@ -29,7 +29,7 @@ const j = async (p, o = {}) => {
 const stamp = Date.now()
 const resident = (await j('/auth/register', { method: 'POST', body: {
   email: `page.${stamp}@example.com`, password: 'tamang-lakas-2026', fullName: `Paging Tester ${stamp}` } })).json.token
-const health = (await j('/auth/login', { method: 'POST', body: { email: 'health@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const health = (await j('/auth/login', { method: 'POST', body: { email: 'health@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 // health-certificate lands in the Health Office queue; 12 of them, in order.
 const created = []
@@ -81,7 +81,7 @@ check('finds a single request by reference number', one.json.items.length === 1 
 check('a search with no matches returns an empty page', (await j('/staff/queue?q=zzz-no-such-thing', { token: health })).json.items.length === 0)
 check('search is case-insensitive', (await j(`/staff/queue?q=${encodeURIComponent(mine.toLowerCase())}&limit=1`, { token: health })).json.total === 13)
 check('search still respects department scope',
-  (await j(`/staff/queue?q=${encodeURIComponent(mine)}`, { token: (await j('/auth/login', { method: 'POST', body: { email: 'lcr@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token })).json.items.length === 0)
+  (await j(`/staff/queue?q=${encodeURIComponent(mine)}`, { token: (await j('/auth/login', { method: 'POST', body: { email: 'lcr@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token })).json.items.length === 0)
 
 console.log('\n== limits and bad input ==')
 check('limit is capped', (await j('/staff/queue?limit=9999', { token: health })).json.items.length <= 100)

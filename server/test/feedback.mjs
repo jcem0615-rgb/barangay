@@ -17,14 +17,14 @@ const j = async (p, o = {}) => {
 const stamp = Date.now()
 const register = async (n) => (await j('/auth/register', { method: 'POST', body: {
   email: `fb.${n}.${stamp}@example.com`, password: 'sabihin-mo-2026', fullName: `Feedback ${n} ${stamp}`,
-  philSysId: '2233-4455-6677-8899', barangay: 'Poblacion', municipality: 'San Fernando', province: 'Pampanga',
+  philSysId: '2233-4455-6677-8899', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
 } })).json.token
 
 const resident = await register('a')
 const other = await register('b')
-const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const health = (await j('/auth/login', { method: 'POST', body: { email: 'health@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const health = (await j('/auth/login', { method: 'POST', body: { email: 'health@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 // A real, finished transaction to rate — built from the live catalogue so this
 // cannot drift from the service it fills in.

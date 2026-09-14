@@ -282,7 +282,7 @@ staffRouter.post('/requests/:id/advance', async (req, res) => {
       referenceNo: row.reference_no,
       serviceName: row.service_name ?? 'Municipal Document',
       officeName: context?.office_name ?? 'Municipal Office',
-      municipality: context?.municipality ?? 'Municipality of San Fernando',
+      municipality: context?.municipality ?? 'Municipality of Malasiqui',
       residentName: row.resident_name ?? '',
       residentAddress: context?.address ?? null,
       formValues: row.form_values,

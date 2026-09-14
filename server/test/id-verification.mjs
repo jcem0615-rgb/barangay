@@ -25,13 +25,13 @@ const j = async (p, o = {}) => {
 const formFor = await formFiller(API)
 const stamp = Date.now()
 
-const resident = (await j('/auth/register', { method: 'POST', body: { email: `idv.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Lourdes B. Aquino', philSysId: '6392-8841-0027-3311', barangay: 'Poblacion', municipality: 'San Fernando', province: 'Pampanga' } })).json.token
+const resident = (await j('/auth/register', { method: 'POST', body: { email: `idv.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Lourdes B. Aquino', philSysId: '6392-8841-0027-3311', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan' } })).json.token
 const other = (await j('/auth/register', { method: 'POST', body: { email: `idv2.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Iba Tao' } })).json.token
-const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const cswdo = (await j('/auth/login', { method: 'POST', body: { email: 'cswdo@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const cswdo = (await j('/auth/login', { method: 'POST', body: { email: 'cswdo@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 // An office that never checks this resident, for the negative cases: cswdo and
 // treasury both verify them above, which is exactly what the guard allows.
-const uninvolved = (await j('/auth/login', { method: 'POST', body: { email: 'lcr@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const uninvolved = (await j('/auth/login', { method: 'POST', body: { email: 'lcr@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const issue = (token) => j('/auth/me/verification', { method: 'POST', token })
 const verify = (token, code) => j('/staff/verify-id', { method: 'POST', token, body: { code } })
 
@@ -48,7 +48,7 @@ console.log('\n== a clerk checks it ==')
 const ok = await verify(treasury, first.json.code)
 check('accepted', ok.status === 200, JSON.stringify(ok.json)?.slice(0, 140))
 check('names the holder', ok.json.fullName === 'Lourdes B. Aquino')
-check('and where they live', ok.json.barangay === 'Poblacion' && ok.json.municipality === 'San Fernando')
+check('and where they live', ok.json.barangay === 'Poblacion' && ok.json.municipality === 'Malasiqui')
 check('any office may check, not just one', (await verify(cswdo, (await issue(resident)).json.code)).status === 200)
 
 console.log('\n== it answers only the question a counter asks ==')
@@ -118,7 +118,7 @@ check('a clerk who did not check cannot', stranger.status === 404, `${stranger.s
 check('and neither can a resident', (await fetch(`${API}/staff/verify-id/${checked.json.residentId}/photo`, { headers: { Authorization: `Bearer ${other}` } })).status === 403)
 
 console.log('\n== a deactivated account does not verify ==')
-const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 check('staff accounts are the only ones an admin can deactivate', (await j('/admin/staff', { token: admin })).status === 200)
 
 api.kill('SIGTERM')

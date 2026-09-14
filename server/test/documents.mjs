@@ -18,9 +18,9 @@ const formFor = await formFiller(API)
 const resident = (await j('/auth/register', { method: 'POST', body: {
   email: `docs.${Date.now()}@example.com`, password: 'tamang-lakas-2026',
   fullName: 'Elena Mendoza', address: 'Blk 7 Lot 3, Purok 2',
-  municipality: 'Municipality of San Fernando' } })).json.token
-const mto = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const lcr = (await j('/auth/login', { method: 'POST', body: { email: 'lcr@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+  municipality: 'Municipality of Malasiqui' } })).json.token
+const mto = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const lcr = (await j('/auth/login', { method: 'POST', body: { email: 'lcr@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 const sub = await j('/requests', { method: 'POST', token: resident, body: {
   serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment', occupation: 'Store owner' }) } })

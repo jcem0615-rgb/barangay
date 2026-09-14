@@ -20,12 +20,12 @@ const j = async (p, o = {}) => {
 const stamp = Date.now()
 const register = async (n) => (await j('/auth/register', { method: 'POST', body: {
   email: `push.${n}.${stamp}@example.com`, password: 'abisuhan-mo-2026', fullName: `Push ${n} ${stamp}`,
-  philSysId: '6677-8899-0011-2233', barangay: 'Poblacion', municipality: 'San Fernando', province: 'Pampanga',
+  philSysId: '6677-8899-0011-2233', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
 } })).json.token
 
 const resident = await register('a')
 const other = await register('b')
-const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 console.log('\n== the key the browser needs ==')
 const key = await j('/notifications/push-key', { token: resident })
@@ -105,7 +105,7 @@ console.log('\n== the push itself is signed and encrypted, for real ==')
 // way they would be on the way to a real push service.
 // The signature needs a key pair in this process too; the server has its own.
 const testKeys = webpush.generateVAPIDKeys()
-webpush.setVapidDetails('mailto:dpo@sanfernando.gov.ph', testKeys.publicKey, testKeys.privateKey)
+webpush.setVapidDetails('mailto:dpo@malasiqui.gov.ph', testKeys.publicKey, testKeys.privateKey)
 const details = webpush.generateRequestDetails(
   { endpoint: `${ENDPOINT_BASE}/crypto`, keys: browserKeys() },
   JSON.stringify({ title: 'Your Cedula is ready', body: 'Collect it from the app.' }),

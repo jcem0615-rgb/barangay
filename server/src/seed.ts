@@ -24,15 +24,15 @@ const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? 'elgu-demo-2026'
 
 // The administrator manages staff accounts from inside the app; without one,
 // onboarding a new clerk means editing the database by hand.
-const ADMIN = { email: 'admin@sanfernando.gov.ph', name: 'Office of the Mayor — Administrator' }
+const ADMIN = { email: 'admin@malasiqui.gov.ph', name: 'Office of the Mayor — Administrator' }
 
 const STAFF: Array<{ email: string; name: string; department: string; position: string }> = [
-  { email: 'treasury@sanfernando.gov.ph', name: 'Ana R. Lim', department: 'treasury', position: 'Revenue Officer II' },
-  { email: 'bpls@sanfernando.gov.ph', name: 'Rico M. Dela Cruz', department: 'bpls', position: 'Licensing Officer' },
-  { email: 'obo@sanfernando.gov.ph', name: 'Eng. Jose P. Vega', department: 'obo', position: 'Building Inspector' },
-  { email: 'lcr@sanfernando.gov.ph', name: 'Carmen S. Reyes', department: 'lcr', position: 'Registration Officer' },
-  { email: 'cswdo@sanfernando.gov.ph', name: 'Grace T. Bautista', department: 'cswdo', position: 'Social Welfare Officer' },
-  { email: 'health@sanfernando.gov.ph', name: 'Dr. Elena V. Cruz', department: 'health', position: 'Sanitation Inspector' },
+  { email: 'treasury@malasiqui.gov.ph', name: 'Ana R. Lim', department: 'treasury', position: 'Revenue Officer II' },
+  { email: 'bpls@malasiqui.gov.ph', name: 'Rico M. Dela Cruz', department: 'bpls', position: 'Licensing Officer' },
+  { email: 'obo@malasiqui.gov.ph', name: 'Eng. Jose P. Vega', department: 'obo', position: 'Building Inspector' },
+  { email: 'lcr@malasiqui.gov.ph', name: 'Carmen S. Reyes', department: 'lcr', position: 'Registration Officer' },
+  { email: 'cswdo@malasiqui.gov.ph', name: 'Grace T. Bautista', department: 'cswdo', position: 'Social Welfare Officer' },
+  { email: 'health@malasiqui.gov.ph', name: 'Dr. Elena V. Cruz', department: 'health', position: 'Sanitation Inspector' },
 ]
 
 async function main() {

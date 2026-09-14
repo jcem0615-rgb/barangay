@@ -24,7 +24,7 @@ const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1
 const stamp = Date.now()
 const resident = (await j('/auth/register', { method: 'POST', body: { email: `pt.${stamp}@example.com`, password: 'larawan-ko-2026', fullName: 'Aurora M. Villamor' } })).json.token
 const stranger = (await j('/auth/register', { method: 'POST', body: { email: `pt2.${stamp}@example.com`, password: 'larawan-ko-2026', fullName: 'Iba Tao' } })).json.token
-const staff = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const staff = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 console.log('\n== a resident starts with no photo ==')
 const before = (await j('/auth/me', { token: resident })).json

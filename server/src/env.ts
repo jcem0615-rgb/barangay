@@ -53,7 +53,7 @@ export const env = {
     'console' | 'file' | 'smtp',
   smtpUrl: process.env.SMTP_URL || undefined,
   mailOutbox: process.env.MAIL_OUTBOX || undefined,
-  mailFrom: process.env.MAIL_FROM ?? 'eLGU Citizen Portal <no-reply@sanfernando.gov.ph>',
+  mailFrom: process.env.MAIL_FROM ?? 'eLGU Citizen Portal <no-reply@malasiqui.gov.ph>',
   /**
    * Public base URL of the web app, used to build the reset link. Must be the
    * address residents actually reach, not the server's own hostname.
@@ -66,7 +66,7 @@ export const env = {
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? '',
   // Who a push service should contact about a misbehaving sender.
-  vapidSubject: process.env.VAPID_SUBJECT ?? 'mailto:dpo@sanfernando.gov.ph',
+  vapidSubject: process.env.VAPID_SUBJECT ?? 'mailto:dpo@malasiqui.gov.ph',
 
   /** 'off' | 'log' | 'http'. SMS costs money per message, so it is opt-in. */
   smsTransport: (process.env.SMS_TRANSPORT ?? 'off') as 'off' | 'log' | 'http',

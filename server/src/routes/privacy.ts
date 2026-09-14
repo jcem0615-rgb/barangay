@@ -107,7 +107,7 @@ privacyRouter.get('/export', async (req, res) => {
   const body = {
     exportedAt: new Date().toISOString(),
     about:
-      'Everything the Municipality of San Fernando holds about you in this portal, ' +
+      'Everything the Municipality of Malasiqui holds about you in this portal, ' +
       'provided under your right to data portability (Republic Act 10173, the Data Privacy Act of 2012). ' +
       'Files you uploaded are listed under "attachments" and can be downloaded from each request in the app.',
     account,

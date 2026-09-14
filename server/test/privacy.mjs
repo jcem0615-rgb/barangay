@@ -23,14 +23,14 @@ const make = async (n) => {
   const email = `priv.${n}.${stamp}@example.com`
   const token = (await j('/auth/register', { method: 'POST', body: {
     email, password: 'karapatan-ko-2026', fullName: `Privacy ${n} ${stamp}`,
-    philSysId: '1010-2020-3030-4040', barangay: 'Poblacion', municipality: 'San Fernando', province: 'Pampanga',
+    philSysId: '1010-2020-3030-4040', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
   } })).json.token
   return { email, token }
 }
 
 const subject = await make('a')
 const other = await make('b')
-const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 // Give them a history worth exporting.
 const cat = await (await fetch(`${API}/catalogue`)).json()
@@ -99,11 +99,11 @@ check('the session is dead immediately', (await j('/requests', { token: subject.
 check('and the password no longer signs in', (await j('/auth/login', { method: 'POST', body: { email: subject.email, password: 'karapatan-ko-2026' } })).status >= 400)
 check('the email is released for a fresh registration', (await j('/auth/register', { method: 'POST', body: {
   email: subject.email, password: 'bagong-simula-2026', fullName: 'Someone New',
-  philSysId: '5050-6060-7070-8080', barangay: 'Poblacion', municipality: 'San Fernando', province: 'Pampanga' } })).status === 201)
+  philSysId: '5050-6060-7070-8080', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan' } })).status === 201)
 check('closing twice is refused', (await j('/privacy/close', { method: 'POST', token: subject.token })).status === 401)
 
 console.log('\n== what really went, and what really stayed ==')
-const staff = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const staff = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const stillThere = await j(`/staff/requests/${request.id}`, { token: staff })
 check('the request survives, because it is the office’s record', stillThere.status === 200, `${stillThere.status}`)
 check('with the applicant still on it', (stillThere.json.residentName ?? '').includes(`${stamp}`), stillThere.json.residentName)

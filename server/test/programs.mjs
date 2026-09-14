@@ -28,9 +28,9 @@ const stamp = Date.now()
 
 const email = `prog.${stamp}@example.com`
 const resident = (await j('/auth/register', { method: 'POST', body: { email, password: 'programa-2026-ok', fullName: 'Lourdes B. Aquino', philSysId: `1234-${stamp % 100000}`, barangay: 'Poblacion' } })).json.token
-const cswdo = (await j('/auth/login', { method: 'POST', body: { email: 'cswdo@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const cswdo = (await j('/auth/login', { method: 'POST', body: { email: 'cswdo@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 console.log('\n== the catalogue describes every programme ==')
 const cat = (await j('/catalogue')).json

@@ -198,7 +198,7 @@ existed, onboarding a clerk meant editing the database by hand.
 - A staff account must serve at least one office; one with none would sign in to
   an empty queue.
 
-The seed creates `admin@sanfernando.gov.ph`. Change its password immediately in
+The seed creates `admin@malasiqui.gov.ph`. Change its password immediately in
 any real deployment.
 
 ## Password reset

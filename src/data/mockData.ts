@@ -1,7 +1,10 @@
 // Catalogue of municipal offices and the services they provide.
 //
-// Office addresses, hours and numbers are seed placeholders for this sample
-// municipality; replace them with the real ones before deploying.
+// The municipality is Malasiqui, Pangasinan — a real town, which makes the
+// placeholders below more dangerous rather than less: every office address,
+// phone number and email here is invented, and naming a real LGU is exactly what
+// makes a resident believe them. Replace all of them with the real ones before
+// deploying, or deploy under a name nobody can mistake for their own municipality.
 // The API seeds from this file (server/src/seed.ts), and the app reads the
 // catalogue back from the server at runtime — this is the authoring source.
 import type {
@@ -15,10 +18,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: 'Business One-Stop Shop',
     description: 'Apply, assess taxes, and pay for your business permit',
     icon: 'store',
-    address: 'Municipal Hall, Poblacion, San Fernando — Ground Floor, BOSS counter',
+    address: 'Municipal Hall, Poblacion, Malasiqui — Ground Floor, BOSS counter',
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM (no noon break)',
-    phone: '(045) 961-2345',
-    email: 'boss@sanfernando.gov.ph',
+    phone: '(075) 961-2345',
+    email: 'boss@malasiqui.gov.ph',
   },
   {
     id: 'cswdo',
@@ -26,10 +29,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: 'Municipal Social Welfare & Development Office',
     description: 'Financial aid, Senior Citizen and PWD ID',
     icon: 'hand-heart',
-    address: 'Municipal Hall, Poblacion, San Fernando — Second Floor, CSWDO',
+    address: 'Municipal Hall, Poblacion, Malasiqui — Second Floor, CSWDO',
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM',
-    phone: '(045) 961-2350',
-    email: 'cswdo@sanfernando.gov.ph',
+    phone: '(075) 961-2350',
+    email: 'cswdo@malasiqui.gov.ph',
   },
   {
     id: 'lcr',
@@ -37,10 +40,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: 'Office of the Local Civil Registrar',
     description: 'Birth, marriage, and death certificates',
     icon: 'scroll-text',
-    address: 'Municipal Hall, Poblacion, San Fernando — Ground Floor, Civil Registry',
+    address: 'Municipal Hall, Poblacion, Malasiqui — Ground Floor, Civil Registry',
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM (no noon break)',
-    phone: '(045) 961-2338',
-    email: 'lcr@sanfernando.gov.ph',
+    phone: '(075) 961-2338',
+    email: 'lcr@malasiqui.gov.ph',
   },
   {
     id: 'treasury',
@@ -48,10 +51,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: "Municipal Treasurer's Office",
     description: 'Cedula, real property tax, and tax clearance',
     icon: 'coins',
-    address: 'Municipal Hall, Poblacion, San Fernando — Ground Floor, Treasury',
+    address: 'Municipal Hall, Poblacion, Malasiqui — Ground Floor, Treasury',
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM (no noon break)',
-    phone: '(045) 961-2320',
-    email: 'treasury@sanfernando.gov.ph',
+    phone: '(075) 961-2320',
+    email: 'treasury@malasiqui.gov.ph',
   },
   {
     id: 'obo',
@@ -59,10 +62,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     officeName: 'Office of the Building Official',
     description: 'Building, occupancy, and locational clearances',
     icon: 'hard-hat',
-    address: 'Municipal Hall, Poblacion, San Fernando — Third Floor, Engineering',
+    address: 'Municipal Hall, Poblacion, Malasiqui — Third Floor, Engineering',
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM',
-    phone: '(045) 961-2361',
-    email: 'obo@sanfernando.gov.ph',
+    phone: '(075) 961-2361',
+    email: 'obo@malasiqui.gov.ph',
   },
   {
     id: 'health',
@@ -72,8 +75,8 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     icon: 'stethoscope',
     address: 'Rural Health Unit I, Barangay Sto. Niño',
     hours: 'Monday to Saturday, 7:00 AM – 4:00 PM',
-    phone: '(045) 961-2377',
-    email: 'health@sanfernando.gov.ph',
+    phone: '(075) 961-2377',
+    email: 'health@malasiqui.gov.ph',
   },
 ]
 
@@ -364,7 +367,7 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Community Tax Certificate (Cedula)', 'Health Certificate', 'Certificate of employment'],
     searchTerms: ['occupational permit', 'working permit', 'worker permit', 'employment permit', 'trabaho'],
     fields: [
-      { id: 'employer', label: 'Employer', type: 'text', placeholder: 'e.g. San Fernando Trading Corp.', required: true },
+      { id: 'employer', label: 'Employer', type: 'text', placeholder: 'e.g. Malasiqui Trading Corp.', required: true },
       { id: 'position', label: 'Position', type: 'text', placeholder: 'e.g. Sales Associate', required: true },
       { id: 'applicationKind', label: 'Application kind', type: 'select', options: ['New Application', 'Renewal'], required: true },
     ],
@@ -551,9 +554,10 @@ export const HOLIDAYS: Array<{ date: string; name: string; local?: boolean }> = 
  * Emergency hotlines shown on the digital ID.
  *
  * The national numbers are real and correct nationwide: 911 is the National
- * Emergency Hotline and 143 reaches the Philippine Red Cross. **The municipal
- * numbers below are placeholders for this sample LGU** — replace every one of
- * them with the real ones before deploying, and check them again whenever the
+ * Emergency Hotline and 143 reaches the Philippine Red Cross. **Not one of the
+ * Malasiqui numbers below is real** — they are invented placeholders on a real
+ * town's name, which is the worst combination there is. Replace every one of them
+ * before deploying, ring each one to confirm, and check them again whenever the
  * offices reorganise. A hotline that rings nowhere is worse than none at all,
  * because a resident will trust it in the moment they can least afford to.
  */
@@ -562,28 +566,28 @@ export const EMERGENCY_CONTACTS: EmergencyContact[] = [
     id: 'mdrrmo',
     label: 'Disaster & rescue',
     agency: 'Municipal Disaster Risk Reduction and Management Office (MDRRMO)',
-    phone: '(045) 961-2400',
+    phone: '(075) 961-2400',
     isNational: false,
   },
   {
     id: 'police',
     label: 'Police',
-    agency: 'San Fernando Municipal Police Station (PNP)',
-    phone: '(045) 961-2911',
+    agency: 'Malasiqui Municipal Police Station (PNP)',
+    phone: '(075) 961-2911',
     isNational: false,
   },
   {
     id: 'fire',
     label: 'Fire',
-    agency: 'Bureau of Fire Protection — San Fernando',
-    phone: '(045) 961-2410',
+    agency: 'Bureau of Fire Protection — Malasiqui',
+    phone: '(075) 961-2410',
     isNational: false,
   },
   {
     id: 'ambulance',
     label: 'Ambulance',
     agency: 'Municipal Health Office — emergency dispatch',
-    phone: '(045) 961-2377',
+    phone: '(075) 961-2377',
     isNational: false,
   },
   {

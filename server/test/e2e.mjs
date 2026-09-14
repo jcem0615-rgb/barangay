@@ -28,7 +28,7 @@ console.log('\n== resident registration + login ==')
 const email = `maria.${Date.now()}@example.com`
 const reg = await call('/auth/register', { method: 'POST', body: {
   email, password: 'tamang-lakas-2026', fullName: 'Maria Clara D. Santos',
-  barangay: 'Barangay San Isidro', municipality: 'Municipality of San Fernando', province: 'Cebu' } })
+  barangay: 'Barangay San Isidro', municipality: 'Municipality of Malasiqui', province: 'Pangasinan' } })
 check('register returns 201', reg.status === 201, reg.status)
 check('register issues a token', typeof reg.json?.token === 'string')
 check('self-registration is always a resident', reg.json?.user?.role === 'resident')
@@ -55,8 +55,8 @@ check('fee copied from catalogue (1500)', submit.json?.fee === 1500, submit.json
 check('anonymous cannot submit', (await call('/requests', { method: 'POST', body: { serviceId: 'cedula' } })).status === 401)
 
 console.log('\n== department isolation ==')
-const oboTok = (await call('/auth/login', { method: 'POST', body: { email: 'obo@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const lcrTok = (await call('/auth/login', { method: 'POST', body: { email: 'lcr@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const oboTok = (await call('/auth/login', { method: 'POST', body: { email: 'obo@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const lcrTok = (await call('/auth/login', { method: 'POST', body: { email: 'lcr@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 // The queue is oldest-first and paged, so a request just submitted sits at the
 // back — look it up the way a clerk with the reference in hand would.
 const oboQueue = await call(`/staff/queue?q=${submit.json.referenceNo}`, { token: oboTok })
@@ -95,7 +95,7 @@ check('other resident list is empty', (await call('/requests', { token: other })
 
 console.log('\n== rejection path ==')
 const cedula = await call('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })
-const mtoTok = (await call('/auth/login', { method: 'POST', body: { email: 'treasury@sanfernando.gov.ph', password: 'elgu-demo-2026' } })).json.token
+const mtoTok = (await call('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 check('empty rejection reason refused', (await call(`/staff/requests/${cedula.json.id}/reject`, { method: 'POST', token: mtoTok, body: { reason: '' } })).status === 400)
 const rejected = await call(`/staff/requests/${cedula.json.id}/reject`, { method: 'POST', token: mtoTok, body: { reason: 'Declared income does not match submitted payslip.' } })
 check('treasury rejects its own request', rejected.json?.status === 'rejected', JSON.stringify(rejected.json))

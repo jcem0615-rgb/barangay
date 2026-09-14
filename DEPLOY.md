@@ -92,7 +92,7 @@ usually `1` behind a single load balancer or ingress.
 
 - [ ] `JWT_SECRET` is a fresh random value from a secret store, not a file
 - [ ] `TRUST_PROXY` matches the real proxy count
-- [ ] Seeded staff passwords have been changed, `admin@sanfernando.gov.ph` first
+- [ ] Seeded staff passwords have been changed, `admin@malasiqui.gov.ph` first
 - [ ] Staff onboarding goes through the Accounts tab, not the database
 - [ ] Postgres has automated backups with a tested restore
 - [ ] TLS is enforced and HTTP redirects
@@ -100,6 +100,12 @@ usually `1` behind a single load balancer or ingress.
 - [ ] `UPLOAD_DIR` points at persistent storage, not the container filesystem
 - [ ] `CLAMAV_HOST` is set and `/api/health` reports `virusScanning: enabled`
 - [ ] `SMTP_URL` and `PUBLIC_URL` are set, and a test reset email actually arrives
+- [ ] Every municipal hotline has been **rung** and answered by the office it names —
+      the seed ships invented numbers under a real town's name, and 911 and 143 are the
+      only two that are correct as published
+- [ ] Office addresses, hours, phones and emails are the municipality's own, not the
+      seeded placeholders (fix them in the **Municipality** tab, not by reseeding)
+- [ ] The holiday calendar matches this year's proclamation and carries the local days
 
 ## Scaling
 
