@@ -108,6 +108,22 @@ Postgres — so running several instances behind a load balancer works with no
 extra coordination. Raise `PGPOOL_MAX` only alongside Postgres's own
 `max_connections`: instances × `PGPOOL_MAX` must stay under it.
 
+## The clickable demo (Vercel)
+
+`vercel.json` builds the **demo**, not the real app: `VITE_DEMO=1 npm run build`
+produces a bundle that answers every API call in the visitor's own browser
+(`src/lib/demoServer.ts`), so it needs no Postgres, no API and no secrets. That is
+the only thing this repository can put on a static host — the real deployment is
+the container above, and nothing in `vercel.json` applies to it.
+
+What a demo visitor gets is a private copy: state lives in that browser's
+localStorage, so nothing one visitor does is visible to the next, switching
+between the resident app and the staff console means signing out rather than
+opening a second window, and uploads exist only until the browser is cleared.
+Treat it as a walkthrough, never as a pilot — a municipality evaluating this
+should run the container against a real database before putting a resident near
+it.
+
 ## Still simulated
 
 Deploying does not make these real, and residents will notice:
