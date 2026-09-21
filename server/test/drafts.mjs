@@ -27,8 +27,8 @@ const stamp = Date.now()
 const MARKER = `Mercado Hardware ${stamp}`
 
 const email = `draft.${stamp}@example.com`
-const resident = (await j('/auth/register', { method: 'POST', body: { email, password: 'draft-mo-muna-2026', fullName: 'Teodoro V. Mercado' } })).json.token
-const other = (await j('/auth/register', { method: 'POST', body: { email: `d2.${stamp}@example.com`, password: 'draft-mo-muna-2026', fullName: 'Iba Tao' } })).json.token
+const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email, password: 'draft-mo-muna-2026', fullName: 'Teodoro V. Mercado' } })).json.token
+const other = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `d2.${stamp}@example.com`, password: 'draft-mo-muna-2026', fullName: 'Iba Tao' } })).json.token
 const bpls = (await j('/auth/login', { method: 'POST', body: { email: 'bpls@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 

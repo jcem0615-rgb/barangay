@@ -19,6 +19,7 @@ import { scanBuffer } from '../antivirus.ts'
 import {
   issueVerificationCode, purgeStaleCodes, VERIFICATION_TTL_SECONDS,
 } from '../idVerification.ts'
+import { identityKey, identityTaken, servedMunicipality } from '../identity.ts'
 
 export const authRouter = Router()
 
@@ -29,12 +30,20 @@ const registerSchema = z.object({
   password: z.string().min(10, 'Use at least 10 characters.').max(200),
   fullName: z.string().min(2).max(120),
   barangay: z.string().max(120).optional(),
-  municipality: z.string().max(120).optional(),
-  province: z.string().max(120).optional(),
   address: z.string().max(300).optional(),
   philSysId: z.string().max(60).optional(),
-  birthDate: z.iso.date().optional(),
+  // Required now, and not for decoration: with the mother's maiden name these
+  // are what tell two residents of the same name apart.
+  birthDate: z.iso.date(),
+  motherMaidenName: z.string().min(2, "Enter your mother's maiden name.").max(120),
+  // The resident's own statement that they live here. The portal cannot verify
+  // it — the office does that at the counter — but registering someone into a
+  // municipality's register without ever asking them is worse than asking.
+  residesHere: z.literal(true, 'This portal is only for residents of this municipality.'),
 })
+// municipality and province are deliberately absent. They are facts about the
+// deployment, not claims for the browser to make, and are stamped from the
+// server's own record below.
 
 authRouter.post('/register', async (req, res) => {
   const parsed = registerSchema.safeParse(req.body)
@@ -59,24 +68,45 @@ authRouter.post('/register', async (req, res) => {
     return res.status(409).json({ error: 'That email is already registered. Try signing in.' })
   }
 
+  const municipality = await servedMunicipality()
+  const identity = identityKey(body.fullName, body.birthDate, body.motherMaidenName)
+
+  // One person, one account. A second registration under a new email address
+  // would split their requests across two records, and an office looking one of
+  // them up would find half their history.
+  //
+  // This does tell whoever asks that an account exists for that person — but
+  // only someone who already knows their name, birth date and mother's maiden
+  // name can ask, and at that point the existence of an account is the least of
+  // what they know. The alternative, letting the duplicate through and finding
+  // out at a counter, costs a resident a trip.
+  if (await identityTaken(identity)) {
+    await recordLoginAttempt(body.email, ip, false)
+    return res.status(409).json({
+      error:
+        'An account already exists for these details. If it is yours, sign in or reset your ' +
+        'password. If it is not, the Local Civil Registrar can sort it out.',
+    })
+  }
+
   // Self-registration only ever creates residents. Staff accounts are issued by
   // an administrator, so this endpoint can't be used to mint one.
   const passwordHash = await hashPassword(body.password)
   const user = await transaction(async (client) => {
     const inserted = await client.query<{ id: string; email: string; role: string; full_name: string }>(
-      `insert into users (email, password_hash, role, full_name)
-       values ($1, $2, 'resident', $3)
+      `insert into users (email, password_hash, role, full_name, municipality_code)
+       values ($1, $2, 'resident', $3, $4)
        returning id, email, role, full_name`,
-      [body.email, passwordHash, body.fullName]
+      [body.email, passwordHash, body.fullName, municipality.code]
     )
     const created = inserted.rows[0]!
     await client.query(
       `insert into resident_profiles
-         (user_id, philsys_id, barangay, municipality, province, birth_date, address)
-       values ($1, $2, $3, $4, $5, $6, $7)`,
+         (user_id, philsys_id, barangay, municipality, province, birth_date, address, identity_key)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
-        created.id, body.philSysId ?? null, body.barangay ?? null, body.municipality ?? null,
-        body.province ?? null, body.birthDate ?? null, body.address ?? null,
+        created.id, body.philSysId ?? null, body.barangay ?? null, municipality.name,
+        municipality.province, body.birthDate, body.address ?? null, identity,
       ]
     )
     return created
@@ -109,8 +139,8 @@ authRouter.post('/login', async (req, res) => {
     })
   }
 
-  const user = await one<{ id: string; email: string; password_hash: string; role: 'resident' | 'staff' | 'admin'; full_name: string }>(
-    `select id, email, password_hash, role, full_name
+  const user = await one<{ id: string; email: string; password_hash: string; role: 'resident' | 'staff' | 'admin'; full_name: string; municipality_code: string | null }>(
+    `select id, email, password_hash, role, full_name, municipality_code
        from users
       where lower(email) = lower($1) and deactivated_at is null`,
     [email]
@@ -127,6 +157,27 @@ authRouter.post('/login', async (req, res) => {
     // whether or not the account exists.
     await recordLoginAttempt(email, ip, false)
     return res.status(401).json({ error: 'Email or password is incorrect.' })
+  }
+
+  // An account belongs to the register that issued it. This only ever fires
+  // where a database outlived the deployment that filled it — restored onto
+  // another municipality's portal, or one instance pointed at the wrong one —
+  // and in that case letting people in would hand another town's staff a queue
+  // of residents they have no business seeing.
+  //
+  // Checked after the password, so it cannot be used to discover which
+  // municipality an address belongs to without already holding the password.
+  //
+  // A null code predates the residency migration; those accounts were created by
+  // this deployment, which has only ever served one municipality.
+  const municipality = await servedMunicipality()
+  if (user.municipality_code !== null && user.municipality_code !== municipality.code) {
+    await recordLoginAttempt(email, ip, false)
+    return res.status(403).json({
+      error:
+        `This account is registered with another municipality. Sign in at that municipality's ` +
+        `portal, or register here if you have moved to ${municipality.name}.`,
+    })
   }
 
   // A correct password clears the address's failures, so an honest user who

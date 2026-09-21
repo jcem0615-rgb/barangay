@@ -33,7 +33,7 @@ const mailsTo = async (email) => {
 const settle = () => new Promise((r) => setTimeout(r, 700))
 
 const email = `notify.${Date.now()}@example.com`
-const resident = (await j('/auth/register', { method: 'POST', body: { email, password: 'tamang-lakas-2026', fullName: 'Divina Ocampo' } })).json.token
+const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email, password: 'tamang-lakas-2026', fullName: 'Divina Ocampo' } })).json.token
 const mto = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const id = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })).json.id
 
@@ -80,7 +80,7 @@ check('mark all read', (await j('/notifications/read-all', { method: 'POST', tok
 check('none unread', (await j('/notifications', { token: resident })).json.unread === 0)
 
 console.log('\n== they belong to one resident only ==')
-const stranger = (await j('/auth/register', { method: 'POST', body: { email: `str.${Date.now()}@example.com`, password: 'ibang-tao-2026', fullName: 'Iba Tao' } })).json.token
+const stranger = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `str.${Date.now()}@example.com`, password: 'ibang-tao-2026', fullName: 'Iba Tao' } })).json.token
 check('a stranger sees none of them', (await j('/notifications', { token: stranger })).json.notifications.length === 0)
 check('and cannot mark one read', (await j(`/notifications/${one}/read`, { method: 'POST', token: stranger })).status === 404)
 check('staff have no resident inbox', (await j('/notifications', { token: mto })).status === 403)

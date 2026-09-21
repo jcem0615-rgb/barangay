@@ -30,7 +30,7 @@ const linkFor = async (email) => {
 
 const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const staff = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
-const resident = (await j('/auth/register', { method: 'POST', body: { email: `res.${Date.now()}@example.com`, password: 'tamang-lakas-2026', fullName: 'A Resident' } })).json.token
+const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `res.${Date.now()}@example.com`, password: 'tamang-lakas-2026', fullName: 'A Resident' } })).json.token
 
 console.log('\n== only administrators reach this at all ==')
 check('admin can list accounts', (await j('/admin/staff', { token: admin })).status === 200)

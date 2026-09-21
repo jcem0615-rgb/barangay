@@ -22,7 +22,7 @@ const j = async (p, o = {}) => {
   return { status: res.status, json: text ? JSON.parse(text) : null }
 }
 const stamp = Date.now()
-const token = (await j('/auth/register', { method: 'POST', body: { email: `fr.${stamp}@example.com`, password: 'kumpleto-ang-form-2026', fullName: 'Nena B. Cortez' } })).json.token
+const token = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `fr.${stamp}@example.com`, password: 'kumpleto-ang-form-2026', fullName: 'Nena B. Cortez' } })).json.token
 
 const BOSS = {
   businessName: 'Cortez Hardware',

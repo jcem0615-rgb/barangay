@@ -8,6 +8,7 @@ import { resetEmail, sendMail } from '../mailer.ts'
 import { env } from '../env.ts'
 import { isRealDate, looksDialable, recordAudit } from '../municipality.ts'
 import { clearHolidayCache } from '../schedule.ts'
+import { servedMunicipality } from '../identity.ts'
 
 export const adminRouter = Router()
 adminRouter.use(authenticate, requireRole('admin'))
@@ -90,11 +91,15 @@ adminRouter.post('/staff', async (req, res) => {
   // Unusable by design — sign-in only becomes possible once they set their own.
   const placeholder = await hashPassword(randomBytes(32).toString('base64url'))
 
+  // A clerk issued here works for this municipality; without the stamp their
+  // account would be the one kind that signs in anywhere.
+  const municipality = await servedMunicipality()
+
   const created = await transaction(async (client) => {
     const inserted = await client.query<{ id: string }>(
-      `insert into users (email, password_hash, role, full_name)
-       values ($1, $2, $3, $4) returning id`,
-      [body.email, placeholder, body.role, body.fullName]
+      `insert into users (email, password_hash, role, full_name, municipality_code)
+       values ($1, $2, $3, $4, $5) returning id`,
+      [body.email, placeholder, body.role, body.fullName, municipality.code]
     )
     const id = inserted.rows[0]!.id
     for (const department of body.departments) {

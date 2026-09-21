@@ -22,8 +22,8 @@ const HTML = Buffer.from('<html><script>alert(1)</script></html>')
 const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
 
 const stamp = Date.now()
-const resident = (await j('/auth/register', { method: 'POST', body: { email: `pt.${stamp}@example.com`, password: 'larawan-ko-2026', fullName: 'Aurora M. Villamor' } })).json.token
-const stranger = (await j('/auth/register', { method: 'POST', body: { email: `pt2.${stamp}@example.com`, password: 'larawan-ko-2026', fullName: 'Iba Tao' } })).json.token
+const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `pt.${stamp}@example.com`, password: 'larawan-ko-2026', fullName: 'Aurora M. Villamor' } })).json.token
+const stranger = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `pt2.${stamp}@example.com`, password: 'larawan-ko-2026', fullName: 'Iba Tao' } })).json.token
 const staff = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 console.log('\n== a resident starts with no photo ==')

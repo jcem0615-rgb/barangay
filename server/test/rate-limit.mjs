@@ -12,7 +12,7 @@ async function call(path, body, headers = {}) {
 // Register a real account to prove a locked-out account rejects the CORRECT password too.
 const email = `rl.${Date.now()}@example.com`
 const pw = 'tamang-lakas-2026'
-const reg = await call('/auth/register', { email, password: pw, fullName: 'Rate Limit Test' })
+const reg = await call('/auth/register', { email, password: pw, fullName: 'Rate Limit Test', birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true })
 check('setup: account created', reg.status === 201, reg.status)
 
 console.log('\n== per-account lockout ==')
@@ -35,14 +35,14 @@ check('unknown address locks out identically', ghostCodes[5] === 429, ghostCodes
 
 console.log('\n== a different account is unaffected ==')
 const other = `other.${Date.now()}@example.com`
-const oreg = await call('/auth/register', { email: other, password: pw, fullName: 'Other Person' })
+const oreg = await call('/auth/register', { email: other, password: pw, fullName: 'Other Person', birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true })
 check('different account can still register', oreg.status === 201, JSON.stringify(oreg.json))
 const ok = await call('/auth/login', { email: other, password: pw })
 check('different account can still sign in', ok.status === 200, ok.status)
 
 console.log('\n== a correct password clears the counter ==')
 const email2 = `clear.${Date.now()}@example.com`
-await call('/auth/register', { email: email2, password: pw, fullName: 'Clear Test' })
+await call('/auth/register', { email: email2, password: pw, fullName: 'Clear Test', birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true })
 for (let i = 0; i < 3; i++) await call('/auth/login', { email: email2, password: 'wrong-password-xx' })
 check('sign-in succeeds after 3 misses', (await call('/auth/login', { email: email2, password: pw })).status === 200)
 const afterClear = []

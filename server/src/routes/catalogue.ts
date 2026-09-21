@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { query } from '../db.ts'
 import { WORKFLOW_STEPS } from '../workflow.ts'
 import { toPesos } from '../serialize.ts'
+import { servedMunicipality } from '../identity.ts'
 
 export const catalogueRouter = Router()
 
@@ -36,7 +37,12 @@ catalogueRouter.get('/', async (_req, res) => {
        from emergency_contacts order by is_national, sort_order, label`
   )
 
+  // Public, and it has to be: the sign-up screen needs to say which
+  // municipality it is registering someone into before they have an account.
+  const municipality = await servedMunicipality()
+
   res.json({
+    municipality,
     departments,
     emergencyContacts,
     programs,

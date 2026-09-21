@@ -6,7 +6,7 @@ interface AuthValue {
   profile: ResidentProfileData | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (body: Record<string, string>) => Promise<void>
+  register: (body: Record<string, string | boolean>) => Promise<void>
   /** Re-reads the profile after something changed it, such as the ID portrait. */
   refresh: () => Promise<void>
   logout: () => void
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(me?.profile ?? null)
   }, [])
 
-  const register = useCallback(async (body: Record<string, string>) => {
+  const register = useCallback(async (body: Record<string, string | boolean>) => {
     const { token, user: u } = await api.register(body)
     setToken(token)
     setUser(u)

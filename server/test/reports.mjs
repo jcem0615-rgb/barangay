@@ -155,7 +155,7 @@ check('with nosniff', download.headers.get('x-content-type-options') === 'nosnif
 check('and real rows', download.text.split('\r\n').length >= 2)
 
 console.log('\n== residents have no reports ==')
-const who = await fetch(`${API}/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: `repres.${stamp}@example.com`, password: 'ulat-lang-2026', fullName: 'Iba Tao' }) })
+const who = await fetch(`${API}/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: `repres.${stamp}@example.com`, password: 'ulat-lang-2026', fullName: 'Iba Tao', birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true }) })
 const residentToken = (await who.json()).token
 check('a resident is refused', (await j(`/staff/reports?${period}`, { token: residentToken })).status === 403)
 check('anonymous is refused', (await j(`/staff/reports?${period}`)).status === 401)

@@ -74,6 +74,13 @@ export type WorkflowStepLabel = (typeof WORKFLOW_STEPS)[number]
  * it. Only payment is theirs; everything else is the office's, which is also
  * exactly why the ready-date clock pauses at that step and nowhere else.
  */
+/** The municipality a deployment serves; published on the public catalogue. */
+export interface Municipality {
+  code: string
+  name: string
+  province: string
+}
+
 export const STEP_OWNER: Record<WorkflowStepLabel, 'office' | 'resident'> = {
   'Submitted': 'office',
   'Municipal Treasury Assessment': 'office',

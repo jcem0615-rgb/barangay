@@ -598,6 +598,55 @@ are unexercised. The browser test stubs `pushManager.subscribe` for the same rea
 headless Chromium has no push service to register with — so everything around that one call
 is the app's own code, and that call is not.
 
+## Who a portal is for, and who is already in it
+
+Two facts had no owner. A resident typed their municipality into a free-text box
+nothing ever read back, and a person could register as many times as they had email
+addresses — which meant one resident's requests split across two records, and an
+office looking one of them up finding half their history.
+
+**The municipality is the deployment's, never the browser's.** `MUNICIPALITY`
+(`src/data/mockData.ts`) is seeded into a single-row `municipality` table — one row,
+enforced by the primary key, because "which municipality is this?" cannot have two
+answers. Registration stamps `users.municipality_code` and the profile's town and
+province from that row and ignores anything the request body says about it. This is
+the payment lesson applied to identity: the server establishes facts about itself.
+
+**Sign-in refuses an account from another register.** It only ever fires where a
+database outlived the deployment that filled it — restored onto another
+municipality's portal, or an instance pointed at the wrong one — and there, letting
+people in would hand another town's staff a queue of residents they have no business
+seeing. Checked *after* the password, so it cannot be used to discover which
+municipality an address belongs to. A null code predates the rule and still signs in:
+those accounts were made here.
+
+**Living here is asked, not assumed.** The portal cannot verify an address — the
+office does that at the counter — but binding an account to a municipality without
+ever asking is worse than asking, so `residesHere` is a required declaration and the
+sign-up screen names the town before taking it. Until the catalogue answers, the
+screen says so and the button is disabled rather than naming a town it is guessing
+at.
+
+**A duplicate is name + date of birth + mother's maiden name** — the triple a
+Philippine civil registry matches people on. Each alone fails: a hundred residents
+are called Juan Santos; birth date and mother together would refuse *twins*, who
+share both and are two people. Names are folded for case, accents and punctuation,
+and single letters are dropped, because a middle initial is on half the forms in any
+office and missing from the other half. The cost is a genuine one-letter given name
+being dropped from the key, which is the rarer case.
+
+**Only the hash is stored** (`server/src/identity.ts`), like reset tokens and ID
+verification codes. A mother's maiden name is a security answer half the country
+over; this app needs to compare it, never to read it. Being an index makes it
+deterministic and therefore unsalted and fast, so someone holding the table — who
+already has each resident's name and birth date from the same row — could confirm a
+guessed maiden name. What it stops is the table *reading* as a list of them.
+
+Refusing a duplicate does tell whoever asks that an account exists for that person.
+Only someone who already knows all three facts can ask, and at that point the
+existence of an account is the least of what they know; the alternative is a resident
+discovering the collision at a counter.
+
 ## Installing the app
 
 The manifest and service worker made the portal installable from the first commit;
@@ -759,6 +808,14 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   and the automatic erasure happens immediately, but there is no screen for the Data
   Protection Officer to work through the retained items and erase what the retention period
   has expired on. That review is a real obligation, and right now it happens in the database.
+- **A resident who moves is not handled.** Their account stays stamped with the
+  municipality that issued it, and there is no transfer: the sign-in refusal tells
+  them to register with their new LGU, which loses their history here. A real
+  deployment wants an office-initiated transfer, which is a new authorization surface.
+- **The duplicate check cannot see across municipalities**, by design — each
+  deployment has its own database — so the same person may hold an account in two
+  towns. That is correct for residency and wrong for a national register; PhilSys is
+  what would settle it, and PhilSys here is still visual only.
 - **Sessions** are 12-hour JWTs with no refresh or general revocation list. Signing out
   clears the token client-side; it stays valid until it expires. The one exception is a
   password change, which `users.password_changed_at` enforces on every request.

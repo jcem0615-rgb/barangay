@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { api, ApiError, IS_DEMO } from '../lib/api'
 import LanguageToggle from '../components/LanguageToggle'
 import { useT } from '../lib/i18n'
+import { useCatalogue } from '../lib/catalogue'
 
 type Mode = 'login' | 'register' | 'forgot'
 
@@ -14,10 +15,15 @@ export default function SignIn() {
   const [mode, setMode] = useState<Mode>('login')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Municipality and province are not in here on purpose. They are facts about
+  // the deployment, which the server stamps on the account; a form field for
+  // them would be asking the browser to assert something it does not decide.
   const [form, setForm] = useState({
     email: '', password: '', fullName: '',
-    barangay: '', municipality: 'Municipality of Malasiqui', province: 'Pangasinan',
+    barangay: '', birthDate: '', motherMaidenName: '',
   })
+  const [residesHere, setResidesHere] = useState(false)
+  const { municipality } = useCatalogue()
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -32,7 +38,7 @@ export default function SignIn() {
       else if (mode === 'forgot') {
         const { message } = await api.forgotPassword(form.email)
         setNotice(message)
-      } else await register(form)
+      } else await register({ ...form, residesHere: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
     } finally {
@@ -48,7 +54,9 @@ export default function SignIn() {
             <Building2 size={26} strokeWidth={1.9} />
           </span>
           <h1 className="font-display text-[calc(22px_*_var(--text-scale))] font-extrabold text-navy-950">eLGU Citizen Portal</h1>
-          <p className="mt-1 text-[calc(14px_*_var(--text-scale))] text-slate-500">{t('auth.municipalityOf')}</p>
+          <p className="mt-1 text-[calc(14px_*_var(--text-scale))] text-slate-500">
+            {municipality ? t('auth.municipalityOf', { name: municipality.name }) : '\u00a0'}
+          </p>
         </div>
 
         <div className="mb-3">
@@ -94,7 +102,59 @@ export default function SignIn() {
             />
           )}
           {mode === 'register' && (
-            <Field label={t('auth.barangay')} value={form.barangay} onChange={set('barangay')} autoComplete="address-level4" />
+            <>
+              <Field label={t('auth.barangay')} value={form.barangay} onChange={set('barangay')} autoComplete="address-level4" />
+              {/* With the mother's maiden name, this is what separates two
+                  residents of the same name — so both are required, and the
+                  server refuses a second account matching an existing one. */}
+              <Field
+                label={t('auth.birthDate')}
+                type="date"
+                value={form.birthDate}
+                onChange={set('birthDate')}
+                required
+                max={new Date().toISOString().slice(0, 10)}
+                autoComplete="bday"
+              />
+              <Field
+                label={t('auth.motherMaidenName')}
+                value={form.motherMaidenName}
+                onChange={set('motherMaidenName')}
+                required
+                helper={t('auth.motherHint')}
+              />
+
+              {/* The portal cannot verify where somebody lives — the office does
+                  that at the counter — but binding an account to a municipality
+                  without ever asking them would be worse than asking.
+
+                  Until the catalogue answers we do not know which town to name,
+                  and submitting is blocked below rather than here: a checkbox
+                  that names the wrong municipality is worse than a short wait. */}
+              {municipality ? (
+                <div className="rounded-xl bg-slate-50 p-3.5">
+                  <label className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={residesHere}
+                      onChange={(e) => setResidesHere(e.target.checked)}
+                      className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-navy-800"
+                    />
+                    <span className="text-[calc(13.5px_*_var(--text-scale))] font-medium leading-snug text-navy-950">
+                      {t('auth.residesHere', { name: municipality.name, province: municipality.province })}
+                    </span>
+                  </label>
+                  <p className="mt-2 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-500">
+                    {t('auth.residesElsewhere', { name: municipality.name })}
+                  </p>
+                </div>
+              ) : (
+                <p className="rounded-xl bg-slate-50 px-3.5 py-3 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-500">
+                  {t('auth.loadingMunicipality')}
+                </p>
+              )}
+            </>
           )}
 
           {error && (
@@ -110,7 +170,7 @@ export default function SignIn() {
 
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || (mode === 'register' && !municipality)}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-white transition active:bg-navy-900 disabled:opacity-70"
           >
             {busy && <Loader2 size={16} className="animate-spin" />}

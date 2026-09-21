@@ -17,7 +17,7 @@ async function call(path, { method = 'GET', token, body } = {}) {
 const formFor = await formFiller(API)
 
 const email = `harden.${Date.now()}@example.com`
-const token = (await call('/auth/register', { method: 'POST', body: {
+const token = (await call('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
   email, password: 'tamang-lakas-2026', fullName: 'Hardening Test' } })).json.token
 
 console.log('\n== reference numbers survive concurrent submission ==')

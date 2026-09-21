@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { api } from './api'
 import type {
-  EmergencyContact, SectoralProgram, ServiceCategory, ServiceDefinition,
+  EmergencyContact, Municipality, SectoralProgram, ServiceCategory, ServiceDefinition,
 } from '../types'
 
 /**
@@ -15,6 +15,7 @@ import type {
 const CACHE_KEY = 'elgu-catalogue-v1'
 
 interface CachedCatalogue {
+  municipality: Municipality | null
   departments: ServiceCategory[]
   services: ServiceDefinition[]
   programs: SectoralProgram[]
@@ -41,6 +42,13 @@ function writeCache(value: CachedCatalogue) {
 }
 
 interface CatalogueValue {
+  /**
+   * The municipality this portal serves. Null until the catalogue has been
+   * fetched once — the sign-up screen waits rather than guessing, because naming
+   * the wrong town on the screen that binds an account to one would be worse
+   * than a moment of blank space.
+   */
+  municipality: Municipality | null
   departments: ServiceCategory[]
   services: ServiceDefinition[]
   /** Sectoral registries and poverty-reduction programmes, in display order. */
@@ -62,6 +70,7 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
   // Seeded from the cache so the first paint already has something, rather
   // than an empty shell that fills in once the network answers.
   const cached = readCache()
+  const [municipality, setMunicipality] = useState<Municipality | null>(cached?.municipality ?? null)
   const [departments, setDepartments] = useState<ServiceCategory[]>(cached?.departments ?? [])
   const [services, setServices] = useState<ServiceDefinition[]>(cached?.services ?? [])
   const [programs, setPrograms] = useState<SectoralProgram[]>(cached?.programs ?? [])
@@ -76,12 +85,14 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
       .catalogue()
       .then((c) => {
         const holidayDates = (c.holidays ?? []).map((h) => h.date)
+        setMunicipality(c.municipality ?? null)
         setDepartments(c.departments)
         setServices(c.services)
         setPrograms(c.programs ?? [])
         setEmergencyContacts(c.emergencyContacts ?? [])
         setHolidays(new Set(holidayDates))
         writeCache({
+          municipality: c.municipality ?? null,
           departments: c.departments,
           services: c.services,
           programs: c.programs ?? [],
@@ -97,6 +108,7 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
   return (
     <CatalogueContext.Provider
       value={{
+        municipality,
         departments,
         services,
         programs,

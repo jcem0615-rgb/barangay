@@ -21,7 +21,7 @@ const j = async (p, o = {}) => {
 const stamp = Date.now()
 const make = async (n) => {
   const email = `priv.${n}.${stamp}@example.com`
-  const token = (await j('/auth/register', { method: 'POST', body: {
+  const token = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
     email, password: 'karapatan-ko-2026', fullName: `Privacy ${n} ${stamp}`,
     philSysId: '1010-2020-3030-4040', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
   } })).json.token
@@ -97,7 +97,7 @@ check('it closes', closed.status === 200 && typeof closed.json.closedAt === 'str
 check('and reports what it did', typeof closed.json.erased === 'object' && typeof closed.json.retained === 'object')
 check('the session is dead immediately', (await j('/requests', { token: subject.token })).status === 401)
 check('and the password no longer signs in', (await j('/auth/login', { method: 'POST', body: { email: subject.email, password: 'karapatan-ko-2026' } })).status >= 400)
-check('the email is released for a fresh registration', (await j('/auth/register', { method: 'POST', body: {
+check('the email is released for a fresh registration', (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
   email: subject.email, password: 'bagong-simula-2026', fullName: 'Someone New',
   philSysId: '5050-6060-7070-8080', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan' } })).status === 201)
 check('closing twice is refused', (await j('/privacy/close', { method: 'POST', token: subject.token })).status === 401)

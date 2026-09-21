@@ -4,7 +4,7 @@
  * Safe to re-run: catalogue rows are upserted, demo accounts are skipped if present.
  */
 import {
-  EMERGENCY_CONTACTS, HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
+  EMERGENCY_CONTACTS, HOLIDAYS, MUNICIPALITY, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
 } from '../../src/data/mockData.ts'
 import { hashPassword } from './auth.ts'
 import { one, pool, query, transaction } from './db.ts'
@@ -108,6 +108,36 @@ async function main() {
       )
     }
 
+    // Every office starts bookable. 018_appointments.sql seeds these too, but
+    // migrations run before this file has inserted a single department, so on a
+    // freshly provisioned database that insert selects from an empty table and
+    // appointments are dead until somebody notices. Here the departments exist.
+    await client.query(
+      `insert into office_booking (department_id)
+       select id from departments on conflict do nothing`
+    )
+
+    // The municipality this deployment serves. Upserted onto the single row, so
+    // re-seeding corrects a name or province without ever creating a second.
+    //
+    // The code is left alone once set: changing it would orphan every account
+    // already stamped with the old one, which is a migration somebody has to
+    // decide on, not something a re-seed should do quietly.
+    await client.query(
+      `insert into municipality (only_row, code, name, province)
+       values (true, $1, $2, $3)
+       on conflict (only_row) do update set
+         name = excluded.name, province = excluded.province`,
+      [MUNICIPALITY.code, MUNICIPALITY.name, MUNICIPALITY.province]
+    )
+
+    // Accounts made before residency scoping existed. This deployment has only
+    // ever served one municipality, so that is the one they belong to.
+    await client.query(
+      `update users set municipality_code = $1 where municipality_code is null`,
+      [MUNICIPALITY.code]
+    )
+
     for (const holiday of HOLIDAYS) {
       await client.query(
         `insert into holidays (observed_on, name, is_local) values ($1, $2, $3)
@@ -118,7 +148,8 @@ async function main() {
     }
   })
   console.log(
-    `catalogue: ${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services, ` +
+    `catalogue: ${MUNICIPALITY.name}, ${MUNICIPALITY.province} — ` +
+      `${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services, ` +
       `${SECTORAL_PROGRAMS.length} programmes, ${HOLIDAYS.length} holidays, ` +
       `${EMERGENCY_CONTACTS.length} hotlines`
   )
@@ -134,8 +165,9 @@ async function main() {
     kept++
   } else {
     await query(
-      `insert into users (email, password_hash, role, full_name) values ($1, $2, 'admin', $3)`,
-      [ADMIN.email, passwordHash, ADMIN.name]
+      `insert into users (email, password_hash, role, full_name, municipality_code)
+       values ($1, $2, 'admin', $3, $4)`,
+      [ADMIN.email, passwordHash, ADMIN.name, MUNICIPALITY.code]
     )
     created++
   }
@@ -154,9 +186,9 @@ async function main() {
     }
     await transaction(async (client) => {
       const inserted = await client.query<{ id: string }>(
-        `insert into users (email, password_hash, role, full_name)
-         values ($1, $2, 'staff', $3) returning id`,
-        [staff.email, passwordHash, staff.name]
+        `insert into users (email, password_hash, role, full_name, municipality_code)
+         values ($1, $2, 'staff', $3, $4) returning id`,
+        [staff.email, passwordHash, staff.name, MUNICIPALITY.code]
       )
       await client.query(
         `insert into staff_assignments (user_id, department_id, position) values ($1, $2, $3)`,

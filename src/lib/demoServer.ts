@@ -10,7 +10,7 @@
  * nothing here is used by the production build.
  */
 import {
-  EMERGENCY_CONTACTS, HOLIDAYS, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
+  EMERGENCY_CONTACTS, HOLIDAYS, MUNICIPALITY, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
 } from '../data/mockData'
 import { addWorkingDays } from './schedule'
 import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../types'
@@ -31,6 +31,15 @@ interface DemoUser {
   active: boolean
   notifyEmail: boolean
   notifySms: boolean
+  /** The register this account belongs to; null on the seeded demo accounts. */
+  municipalityCode?: string | null
+  /**
+   * Name, date of birth and mother's maiden name, folded together. The real
+   * server stores a SHA-256 of those; the demo keeps the folded form, which is
+   * one more reason the demo is not a place to type anything true about
+   * yourself.
+   */
+  identityKey?: string | null
   profile: {
     philSysId: string | null; barangay: string | null; municipality: string | null
     province: string | null; birthDate: string | null; address: string | null; phone: string | null
@@ -148,6 +157,25 @@ interface DemoAudit {
 }
 
 const uid = () => crypto.randomUUID()
+
+/**
+ * The same three facts the server hashes — name, date of birth, mother's maiden
+ * name — folded the same way, so a duplicate the real server would refuse is
+ * refused here too. Single-letter tokens go, because a middle initial is on half
+ * the forms in any office and missing from the other half.
+ */
+function demoIdentityKey(fullName: string, birthDate: string, motherMaidenName: string): string {
+  const fold = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length > 1)
+      .join(' ')
+  return [fold(fullName), birthDate.trim(), fold(motherMaidenName)].join('\u0000')
+}
 
 const STAFF_SEED: Array<{ email: string; name: string; dept: string; position: string }> = [
   { email: 'treasury@malasiqui.gov.ph', name: 'Ana R. Lim', dept: 'treasury', position: 'Revenue Officer II' },
@@ -791,6 +819,7 @@ async function route(
     return {
       status: 200,
       body: {
+        municipality: MUNICIPALITY,
         // Offices merge their editable contact details over the seeded
         // catalogue, so an address corrected in the console shows up here.
         departments: SERVICE_CATEGORIES.map((c) => ({ ...c, ...(state.offices[c.id] ?? {}) })),
@@ -811,14 +840,37 @@ async function route(
         throw new DemoError(409, 'That email is already registered. Try signing in.')
       }
       if (String(body.password ?? '').length < 10) throw new DemoError(400, 'Use at least 10 characters.')
+      if (!body.birthDate) throw new DemoError(400, 'Enter your date of birth.')
+      if (!String(body.motherMaidenName ?? '').trim()) {
+        throw new DemoError(400, "Enter your mother's maiden name.")
+      }
+      if (body.residesHere !== true) {
+        throw new DemoError(400, 'This portal is only for residents of this municipality.')
+      }
+      // One person, one account — the same rule the server enforces, on the same
+      // three facts, so the demo does not teach a registration the real system
+      // would refuse.
+      const identity = demoIdentityKey(
+        String(body.fullName), String(body.birthDate), String(body.motherMaidenName)
+      )
+      if (state.users.some((u) => u.identityKey === identity)) {
+        throw new DemoError(
+          409,
+          'An account already exists for these details. If it is yours, sign in or reset your ' +
+            'password. If it is not, the Local Civil Registrar can sort it out.'
+        )
+      }
       const user: DemoUser = {
         id: uid(), email: body.email, password: body.password, fullName: body.fullName,
         role: 'resident', departments: [], position: null, active: true,
         notifyEmail: true, notifySms: false,
+        // Stamped from the deployment's own record, never from the request.
+        municipalityCode: MUNICIPALITY.code,
+        identityKey: identity,
         profile: {
           philSysId: null, barangay: body.barangay ?? null,
-          municipality: body.municipality ?? 'Municipality of Malasiqui',
-          province: body.province ?? 'Pangasinan', birthDate: null, address: body.address ?? null, phone: null,
+          municipality: MUNICIPALITY.name,
+          province: MUNICIPALITY.province, birthDate: body.birthDate, address: body.address ?? null, phone: null,
         },
         photo: null, photoUpdatedAt: null,
         programs: [],
@@ -831,6 +883,15 @@ async function route(
         (u) => u.email.toLowerCase() === String(body.email).toLowerCase() && u.password === body.password && u.active
       )
       if (!user) throw new DemoError(401, 'Email or password is incorrect.')
+      // An account belongs to the register that issued it. Null predates the
+      // rule, exactly as on the server.
+      if (user.municipalityCode != null && user.municipalityCode !== MUNICIPALITY.code) {
+        throw new DemoError(
+          403,
+          `This account is registered with another municipality. Sign in at that municipality's ` +
+            `portal, or register here if you have moved to ${MUNICIPALITY.name}.`
+        )
+      }
       return { status: 200, body: { token: user.id, user: publicUser(user) } }
     }
     if (parts[1] === 'me' && !parts[2]) {

@@ -26,7 +26,7 @@ check('workflow has 4 steps', cat.json?.workflowSteps?.length === 4)
 
 console.log('\n== resident registration + login ==')
 const email = `maria.${Date.now()}@example.com`
-const reg = await call('/auth/register', { method: 'POST', body: {
+const reg = await call('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
   email, password: 'tamang-lakas-2026', fullName: 'Maria Clara D. Santos',
   barangay: 'Barangay San Isidro', municipality: 'Municipality of Malasiqui', province: 'Pangasinan' } })
 check('register returns 201', reg.status === 201, reg.status)
@@ -35,9 +35,9 @@ check('self-registration is always a resident', reg.json?.user?.role === 'reside
 const resident = reg.json.token
 
 check('weak password rejected', (await call('/auth/register', { method: 'POST',
-  body: { email: `x.${Date.now()}@e.com`, password: 'short', fullName: 'X Y' } })).status === 400)
+  body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `x.${Date.now()}@e.com`, password: 'short', fullName: 'X Y' } })).status === 400)
 check('duplicate email rejected', (await call('/auth/register', { method: 'POST',
-  body: { email, password: 'tamang-lakas-2026', fullName: 'Impostor' } })).status === 409)
+  body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email, password: 'tamang-lakas-2026', fullName: 'Impostor' } })).status === 409)
 check('wrong password rejected', (await call('/auth/login', { method: 'POST',
   body: { email, password: 'wrong-password-here' } })).status === 401)
 const unknown = await call('/auth/login', { method: 'POST', body: { email: 'nobody@nowhere.ph', password: 'whatever123' } })
@@ -89,7 +89,7 @@ check('audit trail recorded every actor', mine.json?.events?.length >= 3, JSON.s
 check('events include assessed + paid', ['assessed','paid'].every(t => mine.json?.events?.some(e => e.eventType === t)))
 
 console.log('\n== another resident cannot read it ==')
-const other = (await call('/auth/register', { method: 'POST', body: { email: `juan.${Date.now()}@example.com`, password: 'ibang-tao-2026', fullName: 'Juan Cruz' } })).json.token
+const other = (await call('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `juan.${Date.now()}@example.com`, password: 'ibang-tao-2026', fullName: 'Juan Cruz' } })).json.token
 check('other resident gets 404 on the request', (await call(`/requests/${reqId}`, { token: other })).status === 404)
 check('other resident list is empty', (await call('/requests', { token: other })).json?.length === 0)
 

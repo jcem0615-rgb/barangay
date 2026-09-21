@@ -21,7 +21,7 @@ const formFor = await formFiller(API)
 const PDF = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(600, 0x20), Buffer.from('\n%%EOF')])
 const PNG = Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]), Buffer.alloc(400, 1)])
 
-const resident = (await j('/auth/register', { method: 'POST', body: {
+const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
   email: `att.${Date.now()}@example.com`, password: 'tamang-lakas-2026', fullName: 'Pedro Ramos' } })).json.token
 const mto = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const lcr = (await j('/auth/login', { method: 'POST', body: { email: 'lcr@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
@@ -59,7 +59,7 @@ const nasty = await put(`/requests/${id}/attachments`, resident, PDF, '../../../
 check('path segments stripped from the name', nasty.status === 201 && !nasty.json.fileName.includes('/'), nasty.json?.fileName)
 
 console.log('\n== only the right people reach it ==')
-const other = (await j('/auth/register', { method: 'POST', body: { email: `o.${Date.now()}@example.com`, password: 'ibang-tao-2026', fullName: 'Ana Lopez' } })).json.token
+const other = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `o.${Date.now()}@example.com`, password: 'ibang-tao-2026', fullName: 'Ana Lopez' } })).json.token
 check('another resident cannot list', (await j(`/requests/${id}/attachments`, { token: other })).status === 404)
 check('another resident cannot download', (await fetch(`${API}/requests/${id}/attachments/${attId}`, { headers: { Authorization: `Bearer ${other}` } })).status === 404)
 check('another department cannot list', (await j(`/staff/requests/${id}/attachments`, { token: lcr })).status === 404)

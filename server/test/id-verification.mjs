@@ -25,8 +25,8 @@ const j = async (p, o = {}) => {
 const formFor = await formFiller(API)
 const stamp = Date.now()
 
-const resident = (await j('/auth/register', { method: 'POST', body: { email: `idv.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Lourdes B. Aquino', philSysId: '6392-8841-0027-3311', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan' } })).json.token
-const other = (await j('/auth/register', { method: 'POST', body: { email: `idv2.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Iba Tao' } })).json.token
+const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `idv.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Lourdes B. Aquino', philSysId: '6392-8841-0027-3311', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan' } })).json.token
+const other = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `idv2.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Iba Tao' } })).json.token
 const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const cswdo = (await j('/auth/login', { method: 'POST', body: { email: 'cswdo@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 // An office that never checks this resident, for the negative cases: cswdo and

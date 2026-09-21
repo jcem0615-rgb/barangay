@@ -71,7 +71,7 @@ async function put(path, token, bytes, name) {
 }
 
 const PDF = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(500, 0x20), Buffer.from('\n%%EOF')])
-const token = (await j('/auth/register', { method: 'POST', body: { email: `av.${Date.now()}@example.com`, password: 'tamang-lakas-2026', fullName: 'Scan Tester' } })).json.token
+const token = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `av.${Date.now()}@example.com`, password: 'tamang-lakas-2026', fullName: 'Scan Tester' } })).json.token
 const id = (await j('/requests', { method: 'POST', token, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })).json.id
 
 console.log('\n== scanning is reported as on ==')

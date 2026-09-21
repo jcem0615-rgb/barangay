@@ -36,7 +36,7 @@ async function linkFor(email) {
 const email = `reset.${Date.now()}@example.com`
 const OLD = 'lumang-password-2026'
 const NEW = 'bagong-password-2026'
-const first = await j('/auth/register', { method: 'POST', body: { email, password: OLD, fullName: 'Lourdes Aquino' } })
+const first = await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email, password: OLD, fullName: 'Lourdes Aquino' } })
 const oldSession = first.json.token
 
 console.log('\n== requesting a link says nothing about who exists ==')

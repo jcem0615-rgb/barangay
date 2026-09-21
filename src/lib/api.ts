@@ -1,6 +1,6 @@
 import type {
-  Application, EmergencyContact, ResidentProgram, SectoralProgram, ServiceCategory,
-  ServiceDefinition,
+  Application, EmergencyContact, Municipality, ResidentProgram, SectoralProgram,
+  ServiceCategory, ServiceDefinition,
 } from '../types'
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'
@@ -425,6 +425,7 @@ export interface NotificationPreferences {
 export const api = {
   catalogue: () =>
     request<{
+      municipality: Municipality
       departments: ServiceCategory[]
       services: ServiceDefinition[]
       programs: SectoralProgram[]
@@ -433,7 +434,7 @@ export const api = {
       workflowSteps: string[]
     }>('/catalogue'),
 
-  register: (body: Record<string, string>) =>
+  register: (body: Record<string, string | boolean>) =>
     request<{ token: string; user: AuthUser }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(body),

@@ -15,7 +15,7 @@ const raw = (p, token) => fetch(API + p, { headers: token ? { Authorization: `Be
 
 const formFor = await formFiller(API)
 
-const resident = (await j('/auth/register', { method: 'POST', body: {
+const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
   email: `docs.${Date.now()}@example.com`, password: 'tamang-lakas-2026',
   fullName: 'Elena Mendoza', address: 'Blk 7 Lot 3, Purok 2',
   municipality: 'Municipality of Malasiqui' } })).json.token
@@ -47,7 +47,7 @@ check('offered as a named download', /filename=".*MTO-\d{4}-\d{5}\.pdf"/.test(dl
 check('bytes are a real PDF', buf.subarray(0, 5).toString() === '%PDF-' && buf.length > 1000, `${buf.length} bytes`)
 
 console.log('\n== only the right people can fetch it ==')
-const other = (await j('/auth/register', { method: 'POST', body: { email: `other.${Date.now()}@example.com`, password: 'ibang-tao-2026', fullName: 'Juan Cruz' } })).json.token
+const other = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `other.${Date.now()}@example.com`, password: 'ibang-tao-2026', fullName: 'Juan Cruz' } })).json.token
 check('another resident cannot', (await raw(`/requests/${id}/document`, other)).status === 404)
 check('anonymous cannot', (await raw(`/requests/${id}/document`)).status === 401)
 check('another department cannot', (await raw(`/staff/requests/${id}/document`, lcr)).status === 404)

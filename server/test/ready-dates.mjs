@@ -49,7 +49,7 @@ const j = async (p, o = {}) => {
   return { status: res.status, json: text ? JSON.parse(text) : null }
 }
 const stamp = Date.now()
-const resident = (await j('/auth/register', { method: 'POST', body: { email: `ready.${stamp}@example.com`, password: 'kailan-handa-2026', fullName: 'Perla D. Aguilar' } })).json.token
+const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `ready.${stamp}@example.com`, password: 'kailan-handa-2026', fullName: 'Perla D. Aguilar' } })).json.token
 const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 
 const cat = (await j('/catalogue')).json

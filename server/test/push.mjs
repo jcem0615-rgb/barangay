@@ -18,7 +18,7 @@ const j = async (p, o = {}) => {
 }
 
 const stamp = Date.now()
-const register = async (n) => (await j('/auth/register', { method: 'POST', body: {
+const register = async (n) => (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
   email: `push.${n}.${stamp}@example.com`, password: 'abisuhan-mo-2026', fullName: `Push ${n} ${stamp}`,
   philSysId: '6677-8899-0011-2233', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
 } })).json.token

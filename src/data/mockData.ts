@@ -11,6 +11,24 @@ import type {
   EmergencyContact, SectoralProgram, ServiceCategory, ServiceCategoryId, ServiceDefinition,
 } from '../types'
 
+/**
+ * The municipality this deployment serves.
+ *
+ * One portal, one LGU. Every account is stamped with this at registration —
+ * from here, never from anything the browser sent — and sign-in refuses an
+ * account stamped with a different one. A neighbouring municipality running its
+ * own deployment changes these three fields and nothing else.
+ *
+ * The code is the identity the database keeps; the name and province are what a
+ * resident reads. Changing the code on a live deployment strands every account
+ * already registered under the old one, so it is not something to edit casually.
+ */
+export const MUNICIPALITY = {
+  code: 'malasiqui-pangasinan',
+  name: 'Malasiqui',
+  province: 'Pangasinan',
+} as const
+
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'bpls',

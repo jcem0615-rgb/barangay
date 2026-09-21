@@ -28,7 +28,14 @@ export const en = {
 
   // sign in
   'auth.title': 'eLGU Citizen Portal',
-  'auth.municipalityOf': 'Municipality of Malasiqui',
+  'auth.municipalityOf': 'Municipality of {name}',
+  'auth.birthDate': 'Date of birth',
+  'auth.motherMaidenName': "Mother's maiden name",
+  'auth.motherHint': 'Used only to tell apart residents with the same name. Staff never see it.',
+  'auth.residesHere': 'I live in {name}, {province}',
+  'auth.residesElsewhere':
+    'This portal serves {name} only. If you live in another municipality, register on that municipality\u2019s own portal \u2014 an account here would not reach the offices that hold your records.',
+  'auth.loadingMunicipality': 'Checking which municipality this portal serves\u2026',
   'auth.signIn': 'Sign in',
   'auth.createAccount': 'Create account',
   'auth.fullName': 'Full name',
@@ -455,7 +462,14 @@ export const fil: Record<StringKey, string> = {
   'common.offlineShort': 'Wala kang koneksyon. Naitatago sa device na ito ang mga binago mo.',
 
   'auth.title': 'eLGU Citizen Portal',
-  'auth.municipalityOf': 'Munisipyo ng Malasiqui',
+  'auth.municipalityOf': 'Munisipyo ng {name}',
+  'auth.birthDate': 'Petsa ng kapanganakan',
+  'auth.motherMaidenName': 'Pangalan ng ina bago ikasal',
+  'auth.motherHint': 'Ginagamit lamang para mapaghiwalay ang magkapareho ang pangalan. Hindi ito nakikita ng staff.',
+  'auth.residesHere': 'Naninirahan ako sa {name}, {province}',
+  'auth.residesElsewhere':
+    'Ang portal na ito ay para sa {name} lamang. Kung sa ibang bayan ka nakatira, magparehistro sa sariling portal ng bayan mo \u2014 hindi aabot sa mga opisinang may hawak ng rekord mo ang account dito.',
+  'auth.loadingMunicipality': 'Tinitingnan kung aling munisipyo ang sinusuportahan ng portal na ito\u2026',
   'auth.signIn': 'Mag-log in',
   'auth.createAccount': 'Gumawa ng account',
   'auth.fullName': 'Buong pangalan',
