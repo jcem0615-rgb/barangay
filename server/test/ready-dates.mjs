@@ -1,7 +1,7 @@
 // Expected ready dates: working-day arithmetic that skips weekends and
 // holidays, and a clock that stops while a request waits on the resident.
 import { spawn } from 'node:child_process'
-import { formFiller } from './fixtures.mjs'
+import { formFiller, payRequest } from './fixtures.mjs'
 import { addWorkingDays } from '../src/schedule.ts'
 
 const API_PORT = 4113
@@ -78,7 +78,8 @@ const assessed = (await j(`/requests/${pid}`, { token: resident })).json
 check('no date while the fee is unpaid', assessed.expectedReady === null, JSON.stringify(assessed.expectedReady))
 check('and it says why', assessed.awaitingResident === true)
 
-const paid = (await j(`/requests/${pid}/pay`, { method: 'POST', token: resident, body: { method: 'GCash' } })).json
+await payRequest(API, resident, pid)
+const paid = (await j(`/requests/${pid}`, { token: resident })).json
 check('paying produces a date', Boolean(paid.expectedReady), JSON.stringify(paid.expectedReady))
 check('and clears the waiting flag', paid.awaitingResident === false)
 

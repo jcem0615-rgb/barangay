@@ -29,6 +29,23 @@ export const env = {
    * setting it too high lets a client forge the address the IP limit counts.
    */
   trustProxy: Number(process.env.TRUST_PROXY ?? 0),
+  /**
+   * The payment gateway. `mock` is the development provider: it signs and
+   * verifies like a real one but takes no money, and it exposes a route that
+   * settles a payment without one being made — so a production deployment must
+   * set this to a real implementation.
+   */
+  paymentProvider: process.env.PAYMENT_PROVIDER ?? 'mock',
+  /**
+   * The shared secret the gateway signs its callbacks with. Development falls
+   * back to a fixed string so the flow is clickable out of the box; production
+   * must set a real one, and the server refuses to start without it.
+   */
+  paymentSecret:
+    process.env.PAYMENT_SECRET ??
+    (process.env.NODE_ENV === 'production'
+      ? required('PAYMENT_SECRET')
+      : 'development-payment-secret'),
   isProduction: process.env.NODE_ENV === 'production',
   /**
    * Serve the built web app from this server. Same-origin means no CORS to get

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { authenticate, canActOnDepartment, requireRole } from '../auth.ts'
-import { REQUEST_SELECT, serializeWithReady, toCentavos, withReadyDates, type RequestRow } from '../serialize.ts'
+import { REQUEST_SELECT, serializeWithReady, toCentavos, toPesos, withReadyDates, type RequestRow } from '../serialize.ts'
 import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
 import { documentFileName, makeVerificationCode, renderDocument } from '../documents.ts'
 import { sendAttachment } from '../attachments.ts'
@@ -897,4 +897,89 @@ staffRouter.post('/complaints/:id/respond', async (req, res) => {
   if ('error' in outcome) return res.status(outcome.code!).json({ error: outcome.error })
   void deliverNotification(outcome.notice!)
   res.json(outcome.complaint)
+})
+
+const paymentsBookSchema = z.object({ from: z.iso.date(), to: z.iso.date() })
+
+/**
+ * The treasurer's book, for reconciliation.
+ *
+ * Somebody working through a bank statement needs to find *this* row from
+ * *that* line, so every line carries the gateway's own reference and the total
+ * leads.
+ *
+ * Only the treasury and admins: a payment ledger is not something every office
+ * needs, and the staff console scopes by department everywhere else.
+ */
+staffRouter.get('/payments', async (req, res) => {
+  const user = req.user!
+  const isAdmin = user.role === 'admin'
+  if (!isAdmin && !user.departments.includes('treasury')) {
+    return res.status(403).json({ error: 'The payment book is the treasury\'s.' })
+  }
+
+  const parsed = paymentsBookSchema.safeParse(req.query)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Give a from and to date, as YYYY-MM-DD.' })
+  }
+  const { from, to } = parsed.data
+  if (from > to) return res.status(400).json({ error: 'The start date is after the end date.' })
+
+  const settled = await query<{
+    reference: string; provider: string; provider_ref: string | null; method: string | null
+    amount_centavos: number; settled_at: string; reference_no: string; service_name: string
+  }>(
+    `select p.reference, p.provider, p.provider_ref, p.method, p.amount_centavos,
+            p.settled_at, r.reference_no, s.name as service_name
+       from payments p
+       join requests r on r.id = p.request_id
+       join services s on s.id = r.service_id
+      where p.status = 'settled'
+        and p.settled_at >= $1::date and p.settled_at < ($2::date + interval '1 day')
+      order by p.settled_at desc`,
+    [from, to]
+  )
+
+  // Deliberately not limited to the period. A payment stuck since last week is
+  // exactly what a daily reconciliation exists to surface, and it would not
+  // appear in a window that starts this morning.
+  const unsettled = await query<{
+    reference: string; provider: string; provider_ref: string | null; status: string
+    amount_centavos: number; created_at: string; note: string | null; reference_no: string
+  }>(
+    `select p.reference, p.provider, p.provider_ref, p.status, p.amount_centavos,
+            p.created_at, p.note, r.reference_no
+       from payments p
+       join requests r on r.id = p.request_id
+      where p.status in ('mismatched', 'failed')
+      order by p.created_at desc
+      limit 200`
+  )
+
+  res.json({
+    from,
+    to,
+    total: toPesos(settled.reduce((sum, row) => sum + row.amount_centavos, 0)),
+    count: settled.length,
+    settled: settled.map((row) => ({
+      reference: row.reference,
+      provider: row.provider,
+      providerRef: row.provider_ref,
+      method: row.method,
+      amount: toPesos(row.amount_centavos),
+      settledAt: row.settled_at,
+      requestRef: row.reference_no,
+      serviceName: row.service_name,
+    })),
+    unsettled: unsettled.map((row) => ({
+      reference: row.reference,
+      provider: row.provider,
+      providerRef: row.provider_ref,
+      status: row.status,
+      amount: toPesos(row.amount_centavos),
+      createdAt: row.created_at,
+      note: row.note,
+      requestRef: row.reference_no,
+    })),
+  })
 })

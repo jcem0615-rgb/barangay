@@ -127,17 +127,15 @@ export function useApplications(enabled: boolean) {
     [refresh]
   )
 
-  const pay = useCallback(
-    async (id: string, method: string) => {
-      const updated = await api.pay(id, method)
-      await refresh()
-      return updated
-    },
-    [refresh]
-  )
+  /**
+   * Nothing here marks anything paid. It asks the server for an intent priced
+   * off the assessment; the payment screen then polls until the server's own
+   * record says the provider settled it.
+   */
+  const startPayment = useCallback(async (id: string) => api.startPayment(id), [])
 
   return {
     applications, drafts, loaded, isOnline, error,
-    refresh, refreshDrafts, submit, pay, flushOutbox,
+    refresh, refreshDrafts, submit, startPayment, flushOutbox,
   }
 }

@@ -1,6 +1,6 @@
 // Document release: the thing a resident actually came for.
 const API = process.env.API_URL ?? 'http://127.0.0.1:4000/api'
-import { formFiller } from './fixtures.mjs'
+import { formFiller, payRequest } from './fixtures.mjs'
 let pass = 0, fail = 0
 const check = (n, c, x = '') => { if (c) { pass++; console.log(`  PASS  ${n}`) } else { fail++; console.log(`  FAIL  ${n} ${x}`) } }
 async function j(p, o = {}) {
@@ -34,7 +34,7 @@ console.log('\n== a paid request can actually be completed ==')
 // act on a request already at the final step — so it could never complete and
 // no document was ever released.
 await j(`/staff/requests/${id}/assess`, { method: 'POST', token: mto, body: { fee: 55 } })
-await j(`/requests/${id}/pay`, { method: 'POST', token: resident, body: { method: 'GCash' } })
+await payRequest(API, resident, id)
 const done = await j(`/staff/requests/${id}/advance`, { method: 'POST', token: mto })
 check('advancing a paid request completes it', done.json?.status === 'completed', JSON.stringify(done.json))
 

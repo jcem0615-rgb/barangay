@@ -18,7 +18,21 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v12'
+const STORE_KEY = 'elgu-demo-state-v14'
+
+interface DemoPayment {
+  reference: string
+  requestId: string
+  residentId: string
+  provider: string
+  providerRef: string | null
+  method: string | null
+  amountCentavos: number
+  status: 'pending' | 'settled' | 'failed' | 'mismatched'
+  createdAt: string
+  settledAt: string | null
+  note: string | null
+}
 
 interface DemoUser {
   id: string
@@ -102,6 +116,7 @@ interface DemoState {
   drafts: DemoDraft[]
   verifications: DemoVerification[]
   notifications: DemoNotification[]
+  payments: DemoPayment[]
   counters: Record<string, number>
   /**
    * The municipal facts an administrator can edit. Held in state rather than
@@ -230,7 +245,7 @@ function seed(): DemoState {
   users.push(resident)
 
   const state: DemoState = {
-    users, requests: [], drafts: [], verifications: [], notifications: [], counters: {},
+    users, requests: [], drafts: [], verifications: [], notifications: [], payments: [], counters: {},
     // Copied out of the catalogue rather than referenced, so editing them in
     // the console changes this browser's copy and not the authoring source.
     hotlines: EMERGENCY_CONTACTS.map((c, i) => ({
@@ -833,6 +848,113 @@ async function route(
     }
   }
 
+  // ---- payments ----
+  //
+  // The same shape as the server: an intent priced from the request, a separate
+  // step that stands in for the provider, and a status the screen polls. The
+  // demo has no signature to check — there is no network here to forge one
+  // across — but nothing marks a request paid because the browser asked it to.
+  if (parts[0] === 'payments') {
+    const user = need('resident')
+
+    if (parts[1] === 'intents' && method === 'POST' && !parts[2]) {
+      const target = state.requests.find((r) => r.id === body.requestId && r.residentId === user.id)
+      if (!target) throw new DemoError(404, 'Request not found.')
+      if (target.paid) throw new DemoError(409, 'This request is already paid.')
+      if (target.currentStepIndex < 1) {
+        throw new DemoError(409, 'Wait for the treasury assessment before paying.')
+      }
+      if (target.fee <= 0) throw new DemoError(409, 'This request has nothing to pay.')
+
+      // Reused rather than stacked, so a resident who taps twice lands on the
+      // same payment instead of leaving the treasury two to reconcile.
+      const open = state.payments.find((p) => p.requestId === target.id && p.status === 'pending')
+      const payment: DemoPayment = open ?? {
+        reference: `PAY-${uid().replace(/-/g, '').slice(0, 10).toUpperCase()}`,
+        requestId: target.id,
+        residentId: user.id,
+        provider: 'mock',
+        providerRef: null,
+        method: null,
+        // The server's figure, read off the request — not anything sent here.
+        amountCentavos: Math.round(target.fee * 100),
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        settledAt: null,
+        note: null,
+      }
+      if (!open) {
+        payment.providerRef = `mock_${payment.reference}`
+        state.payments.push(payment)
+        persist()
+      }
+      return {
+        status: 201,
+        body: {
+          reference: payment.reference,
+          amount: payment.amountCentavos / 100,
+          provider: 'mock',
+          redirectUrl: `${location.origin}/?reference=${payment.reference}`,
+          status: payment.status,
+        },
+      }
+    }
+
+    if (parts[1] === 'intents' && parts[2] && method === 'GET') {
+      const payment = state.payments.find((p) => p.reference === parts[2] && p.residentId === user.id)
+      if (!payment) throw new DemoError(404, 'Payment not found.')
+      return {
+        status: 200,
+        body: {
+          reference: payment.reference,
+          status: payment.status,
+          amount: payment.amountCentavos / 100,
+          providerRef: payment.providerRef,
+          method: payment.method,
+          requestId: payment.requestId,
+          note: payment.note,
+        },
+      }
+    }
+
+    if (parts[1] === 'mock' && parts[3] === 'complete' && method === 'POST') {
+      const payment = state.payments.find((p) => p.reference === parts[2] && p.residentId === user.id)
+      if (!payment) throw new DemoError(404, 'Payment not found.')
+      // Settling twice is what a retrying gateway does. It must not pay a
+      // request twice, here or on the server.
+      if (payment.status === 'settled') return { status: 200, body: { delivered: true } }
+
+      const target = state.requests.find((r) => r.id === payment.requestId)
+      if (!target) throw new DemoError(404, 'Request not found.')
+
+      payment.status = 'settled'
+      payment.settledAt = new Date().toISOString()
+      payment.method = typeof body.method === 'string' ? body.method : 'gcash'
+      target.paid = true
+      target.paymentMethod = payment.method ?? undefined
+      // The office's clock starts here, as on the real server.
+      target.paidAt = new Date().toISOString()
+      target.status = 'in_progress'
+      target.currentStepIndex = WORKFLOW_STEPS.length - 1
+      target.events.push({
+        eventType: 'paid',
+        note: `Paid ${(payment.amountCentavos / 100).toFixed(2)} via ${payment.method}`,
+        createdAt: new Date().toISOString(),
+        actorName: user.fullName,
+      })
+      state.notifications.unshift({
+        id: uid(), userId: user.id, requestId: target.id, kind: 'request_paid',
+        title: 'Payment received',
+        body: `We have received ${(payment.amountCentavos / 100).toFixed(2)} for ${target.referenceNo}.`,
+        readAt: null, createdAt: new Date().toISOString(),
+      })
+      persist()
+      return { status: 200, body: { delivered: true } }
+    }
+
+    throw new DemoError(404, 'Not found.')
+  }
+
   // ---- auth ----
   if (parts[0] === 'auth') {
     if (parts[1] === 'register' && method === 'POST') {
@@ -1045,18 +1167,10 @@ async function route(
 
     if (!parts[2] && method === 'GET') return { status: 200, body: { ...serialize(target), events: target.events } }
 
+    // Paying moved to /payments, where the server prices the intent and only a
+    // signed callback settles it. Gone rather than redirected, as on the server.
     if (parts[2] === 'pay' && method === 'POST') {
-      if (target.paid) throw new DemoError(409, 'This request is already paid.')
-      if (target.currentStepIndex < 1) throw new DemoError(409, 'Wait for the treasury assessment before paying.')
-      target.paid = true
-      target.paymentMethod = body.method
-      // The office's clock starts here, as on the real server.
-      target.paidAt = new Date().toISOString()
-      target.status = 'in_progress'
-      target.currentStepIndex = WORKFLOW_STEPS.length - 1
-      target.events.push({ eventType: 'paid', note: `Paid via ${body.method}`, createdAt: new Date().toISOString(), actorName: user.fullName })
-      persist()
-      return { status: 200, body: serialize(target) }
+      throw new DemoError(410, 'Payment has moved. Reload the app and try again.')
     }
 
     if (parts[2] === 'document') {
@@ -1207,6 +1321,45 @@ async function route(
     // ---- reports ----
     // Same two clocks and the same scoping as server/src/reports.ts, on a
     // working-day count rather than calendar days.
+    // The treasurer's book. Scoped the same way the server scopes it: the
+    // treasury and admins, and nobody else — a demo that showed every office the
+    // payment ledger would teach something the real system refuses.
+    if (parts[1] === 'payments' && method === 'GET') {
+      const staff = need('staff', 'admin')
+      if (staff.role !== 'admin' && !staff.departments.includes('treasury')) {
+        throw new DemoError(403, "The payment book is the treasury's.")
+      }
+      const from = query.get('from') ?? ''
+      const to = query.get('to') ?? ''
+      const settled = state.payments
+        .filter((p) => p.status === 'settled' && p.settledAt && p.settledAt.slice(0, 10) >= from && p.settledAt.slice(0, 10) <= to)
+        .sort((a, b) => (b.settledAt ?? '').localeCompare(a.settledAt ?? ''))
+      const requestFor = (id: string) => state.requests.find((r) => r.id === id)
+      return {
+        status: 200,
+        body: {
+          from, to,
+          total: settled.reduce((sum, p) => sum + p.amountCentavos, 0) / 100,
+          count: settled.length,
+          settled: settled.map((p) => ({
+            reference: p.reference, provider: p.provider, providerRef: p.providerRef,
+            method: p.method, amount: p.amountCentavos / 100, settledAt: p.settledAt,
+            requestRef: requestFor(p.requestId)?.referenceNo ?? '—',
+            serviceName: requestFor(p.requestId)?.serviceName ?? '—',
+          })),
+          // Not limited to the period, as on the server: a payment stuck since
+          // last week is exactly what this list exists to surface.
+          unsettled: state.payments
+            .filter((p) => p.status === 'mismatched' || p.status === 'failed')
+            .map((p) => ({
+              reference: p.reference, provider: p.provider, providerRef: p.providerRef,
+              status: p.status, amount: p.amountCentavos / 100, createdAt: p.createdAt,
+              note: p.note, requestRef: requestFor(p.requestId)?.referenceNo ?? '—',
+            })),
+        },
+      }
+    }
+
     if (parts[1] === 'reports') {
       const from = query.get('from') ?? ''
       const to = query.get('to') ?? ''

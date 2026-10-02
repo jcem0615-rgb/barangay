@@ -1,7 +1,7 @@
 // Resident notifications: recorded with the change they describe, delivered
 // outward afterwards, and readable only by the person they belong to.
 import { spawn } from 'node:child_process'
-import { formFiller } from './fixtures.mjs'
+import { formFiller, payRequest } from './fixtures.mjs'
 import { readFile, rm } from 'node:fs/promises'
 
 const API_PORT = 4104
@@ -56,13 +56,15 @@ check('an email went out', mails.length === 1, `${mails.length} mails`)
 check('the email carries the same wording', mails[0]?.text.includes('1,234.50'))
 
 console.log('\n== the rest of the workflow reports too ==')
-await j(`/requests/${id}/pay`, { method: 'POST', token: resident, body: { method: 'GCash' } })
+await payRequest(API, resident, id)
 await j(`/staff/requests/${id}/advance`, { method: 'POST', token: mto })
 await settle()
 const afterRelease = await j('/notifications', { token: resident })
 check('release notified', afterRelease.json.notifications.some(n => n.kind === 'released'), JSON.stringify(afterRelease.json.notifications.map(n => n.kind)))
 check('and says it can be downloaded', afterRelease.json.notifications.find(n => n.kind === 'released')?.body.includes('download'))
-check('unread now two', afterRelease.json.unread === 2)
+check('paying notified as well', afterRelease.json.notifications.some(n => n.kind === 'request_paid'),
+  JSON.stringify(afterRelease.json.notifications.map(n => n.kind)))
+check('unread now three — assessed, paid, released', afterRelease.json.unread === 3, afterRelease.json.unread)
 
 console.log('\n== rejection explains itself ==')
 const other = (await j('/requests', { method: 'POST', token: resident, body: { serviceId: 'cedula', formValues: formFor('cedula', { purpose: 'Employment' }) } })).json.id
@@ -75,7 +77,7 @@ check('carries the reason', afterReject?.body.includes('payslip'), afterReject?.
 console.log('\n== marking as read ==')
 const one = afterAssess.json.notifications[0].id
 check('mark one read', (await j(`/notifications/${one}/read`, { method: 'POST', token: resident })).status === 204)
-check('unread drops', (await j('/notifications', { token: resident })).json.unread === 2)
+check('unread drops', (await j('/notifications', { token: resident })).json.unread === 3)
 check('mark all read', (await j('/notifications/read-all', { method: 'POST', token: resident })).status === 204)
 check('none unread', (await j('/notifications', { token: resident })).json.unread === 0)
 

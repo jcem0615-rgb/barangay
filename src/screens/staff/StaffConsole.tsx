@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, Building2, CalendarClock, Inbox, Landmark, LogOut, MessageSquareWarning, RefreshCw, ScanLine, Search, Users } from 'lucide-react'
+import { BarChart3, Building2, CalendarClock, Inbox, Landmark, LogOut, MessageSquareWarning, RefreshCw, ScanLine, Search, Users, Wallet } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { Application, ServiceCategory } from '../../types'
@@ -7,6 +7,7 @@ import StaffRequestPanel from './StaffRequestPanel'
 import StaffAccounts from './StaffAccounts'
 import StaffVerifyId from './StaffVerifyId'
 import StaffReports from './StaffReports'
+import StaffTreasury from './StaffTreasury'
 import StaffMunicipality from './StaffMunicipality'
 import StaffDay from './StaffDay'
 import StaffComplaints from './StaffComplaints'
@@ -31,7 +32,7 @@ export default function StaffConsole() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // A clerk who arrived by scanning a resident's ID opens on the check, not the
   // queue — that scan is the errand.
-  const [view, setView] = useState<'queue' | 'day' | 'verify' | 'complaints' | 'reports' | 'accounts' | 'municipality'>(
+  const [view, setView] = useState<'queue' | 'day' | 'verify' | 'complaints' | 'reports' | 'payments' | 'accounts' | 'municipality'>(
     hasScannedCode() ? 'verify' : 'queue'
   )
   const [loading, setLoading] = useState(true)
@@ -134,6 +135,11 @@ export default function StaffConsole() {
                 ['verify', 'Verify ID', ScanLine],
                 ['complaints', 'Complaints', MessageSquareWarning],
                 ['reports', 'Reports', BarChart3],
+                // The payment book is the treasury's, so only they and admins
+                // see the tab — and the API refuses it to anyone else anyway.
+                ...(user?.role === 'admin' || user?.departments?.includes('treasury')
+                  ? [['payments', 'Payments', Wallet] as const]
+                  : []),
                 ...(user?.role === 'admin'
                   ? [['accounts', 'Accounts', Users] as const, ['municipality', 'Municipality', Landmark] as const]
                   : []),
@@ -162,6 +168,8 @@ export default function StaffConsole() {
       <div className="mx-auto max-w-6xl px-6 py-6">
         {view === 'verify' ? (
           <StaffVerifyId />
+        ) : view === 'payments' ? (
+          <StaffTreasury />
         ) : view === 'reports' ? (
           <StaffReports
             departments={departments}

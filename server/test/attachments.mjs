@@ -1,6 +1,6 @@
 // Resident-supplied requirement files, and the rules around them.
 const API = process.env.API_URL ?? 'http://127.0.0.1:4000/api'
-import { formFiller } from './fixtures.mjs'
+import { formFiller, payRequest } from './fixtures.mjs'
 let pass = 0, fail = 0
 const check = (n, c, x = '') => { if (c) { pass++; console.log(`  PASS  ${n}`) } else { fail++; console.log(`  FAIL  ${n} ${x}`) } }
 async function j(p, o = {}) {
@@ -74,7 +74,7 @@ check('another resident cannot delete', (await fetch(`${API}/requests/${id}/atta
 
 console.log('\n== a closed request stops accepting files ==')
 await j(`/staff/requests/${id}/assess`, { method: 'POST', token: mto, body: { fee: 55 } })
-await j(`/requests/${id}/pay`, { method: 'POST', token: resident, body: { method: 'GCash' } })
+await payRequest(API, resident, id)
 await j(`/staff/requests/${id}/advance`, { method: 'POST', token: mto })
 check('upload refused once completed', (await put(`/requests/${id}/attachments`, resident, PDF, 'late.pdf')).status === 409)
 check('delete refused once completed', (await fetch(`${API}/requests/${id}/attachments/${attId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${resident}` } })).status === 409)

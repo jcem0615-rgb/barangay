@@ -44,6 +44,8 @@ Everything is environment variables. Only the first two are required.
 | `UPLOAD_DIR` | **in a container** | Must be a mounted volume, or uploads are lost on deploy |
 | `CLAMAV_HOST` | **for public traffic** | clamd for scanning uploads. Unset = no scanning |
 | `SMTP_URL` | **for public traffic** | Password reset links go nowhere without it |
+| `PAYMENT_PROVIDER` | **to take money** | The gateway. `mock` is the development provider and **must not** be deployed — it exposes a route that settles a payment without one being made |
+| `PAYMENT_SECRET` | **to take money** | The secret the gateway signs callbacks with. The server refuses to start in production without it |
 | `PUBLIC_URL` | **yes, if mailing** | Address residents reach; reset and notification links use it |
 | `SMS_TRANSPORT` | optional | `http` plus `SMS_URL`/`SMS_API_KEY` to text residents |
 
@@ -100,6 +102,10 @@ usually `1` behind a single load balancer or ingress.
 - [ ] `UPLOAD_DIR` points at persistent storage, not the container filesystem
 - [ ] `CLAMAV_HOST` is set and `/api/health` reports `virusScanning: enabled`
 - [ ] `SMTP_URL` and `PUBLIC_URL` are set, and a test reset email actually arrives
+- [ ] `PAYMENT_PROVIDER` is a real gateway, **not** `mock`, and `PAYMENT_SECRET` comes
+      from a secret store
+- [ ] A test payment has been taken end to end, and the treasury's **Payments** tab shows
+      it with the gateway's own reference beside it
 - [ ] Every municipal hotline has been **rung** and answered by the office it names —
       the seed ships invented numbers under a real town's name, and 911 and 143 are the
       only two that are correct as published
@@ -134,9 +140,12 @@ it.
 
 Deploying does not make these real, and residents will notice:
 
-- **Payment** records a chosen method and marks the request paid. There is no
-  gateway, redirect, or webhook. Wiring a real one means verifying the webhook
-  server-side — never mark a request paid from the client.
+- **Payment** has the whole architecture — server-priced intents, signed webhooks,
+  idempotent settlement, amount checking, a reconciliation view — but the only
+  provider implemented is the development mock, which takes no money. Implement
+  `PaymentProvider` for your gateway and set `PAYMENT_PROVIDER` and `PAYMENT_SECRET`.
+  **Deploying with `PAYMENT_PROVIDER=mock` makes every permit free**, because the
+  mock's own route settles a payment nobody made.
 - **PhilSys verification** and the ID **QR code** are visual only.
 - **Sessions** are 12-hour JWTs with no refresh or revocation list. Signing out
   clears the token client-side; it stays valid until it expires.

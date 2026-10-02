@@ -10,6 +10,7 @@ import { isDatabaseReachable, pool } from './db.ts'
 import { authRouter } from './routes/auth.ts'
 import { catalogueRouter } from './routes/catalogue.ts'
 import { requestsRouter } from './routes/requests.ts'
+import { paymentsRouter, paymentWebhookRouter } from './routes/payments.ts'
 import { appointmentsRouter } from './routes/appointments.ts'
 import { feedbackRouter } from './routes/feedback.ts'
 import { privacyRouter } from './routes/privacy.ts'
@@ -62,6 +63,12 @@ app.use(
     exposedHeaders: ['Content-Disposition'],
   })
 )
+// Ahead of the JSON parser on purpose. A signed callback has to be checked
+// against the bytes that were actually sent: re-serialising parsed JSON will
+// disagree with the sender about key order or whitespace sooner or later, and
+// then every real payment fails verification with no visible cause.
+app.use('/api/payments/webhook', paymentWebhookRouter)
+
 app.use(express.json({ limit: '256kb' }))
 
 /**
@@ -82,6 +89,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth', authRouter)
 app.use('/api/catalogue', catalogueRouter)
 app.use('/api/requests', requestsRouter)
+app.use('/api/payments', paymentsRouter)
 app.use('/api/appointments', appointmentsRouter)
 app.use('/api/feedback', feedbackRouter)
 app.use('/api/privacy', privacyRouter)

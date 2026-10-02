@@ -118,6 +118,35 @@ is the resident's to complete, and `advance` refuses to step over an unpaid fee.
 Every transition is appended to `request_events` with the actor who made it, so
 a request's history is auditable rather than inferred.
 
+## Payments
+
+```
+POST /api/payments/intents              resident; the server prices it
+GET  /api/payments/intents/:reference   resident; what the screen polls
+POST /api/payments/webhook/:provider    the gateway; signed, and the only thing that settles
+GET  /api/staff/payments?from=&to=      treasury and admins; the reconciliation book
+```
+
+The amount is never in the request body — it is read off the request's assessment.
+`POST /api/requests/:id/pay` is gone (410): it marked a request paid because the browser
+said so.
+
+The webhook is mounted **before** `express.json()` so the signature is checked against
+the bytes that were sent. Re-serialising parsed JSON to verify a signature disagrees with
+the sender about key order or whitespace eventually, and then every real payment fails
+with no visible cause.
+
+`payment_events` is unique on `(provider, event_id)` and a partial unique index allows one
+settled payment per request, so a gateway retrying — which is normal, not an attack —
+settles once. A callback for an amount that is not the one assessed is marked `mismatched`
+and left for a human rather than settled.
+
+`PAYMENT_PROVIDER=mock` is the development provider. It signs and verifies exactly as a
+real gateway does, and exposes `POST /api/payments/mock/:reference/complete` to send the
+callback a real one would — which is why it must never be deployed: that route settles a
+payment nobody made. Adding a real gateway means implementing `PaymentProvider` in
+`src/payments.ts` and setting `PAYMENT_PROVIDER` and `PAYMENT_SECRET`.
+
 ## Document release
 
 Completing a request renders a PDF and stores it against that request. It

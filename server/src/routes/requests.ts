@@ -291,47 +291,22 @@ requestsRouter.get('/:id', async (req, res) => {
   res.json({ ...(await serializeWithReady(row)), events })
 })
 
-const paySchema = z.object({ method: z.enum(['GCash', 'Maya', 'Landbank Online']) })
-
-requestsRouter.post('/:id/pay', async (req, res) => {
-  const parsed = paySchema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: 'Choose a payment method.' })
-
-  const row = await one<RequestRow>(
-    `select * from requests where id = $1 and resident_id = $2`,
-    [req.params.id, req.user!.id]
-  )
-  if (!row) return res.status(404).json({ error: 'Request not found.' })
-  if (row.paid) return res.status(409).json({ error: 'This request is already paid.' })
-  if (row.current_step_index < STEP_ASSESSMENT) {
-    return res.status(409).json({ error: 'Wait for the treasury assessment before paying.' })
-  }
-
-  const updated = await transaction(async (client) => {
-    const result = await client.query<RequestRow>(
-      `update requests
-          set paid = true, payment_method = $2, status = 'in_progress',
-              current_step_index = $3, updated_at = now(),
-              -- The office's clock starts here, not at submission: it has only
-              -- now been handed work it can act on.
-              paid_at = coalesce(paid_at, now())
-        where id = $1
-        returning *`,
-      [row.id, parsed.data.method, STEP_RELEASE]
-    )
-    await client.query(
-      `insert into request_events (request_id, actor_id, event_type, from_step, to_step, note)
-       values ($1, $2, 'paid', $3, $4, $5)`,
-      [row.id, req.user!.id, row.current_step_index, STEP_RELEASE, `Paid via ${parsed.data.method}`]
-    )
-    return result.rows[0]!
+/**
+ * Paying used to happen here, and it marked a request paid because the browser
+ * said so — which made a permit free to anyone who could open a developer
+ * console. The amount and the fact of payment are the server's to establish, so
+ * the flow moved to /api/payments: the server prices an intent, the resident
+ * pays at the provider, and a signed callback settles it.
+ *
+ * Gone rather than silently redirected: a client still calling this is running
+ * code old enough that its idea of paying is wrong, and 410 with somewhere to go
+ * is more useful than a 404.
+ */
+requestsRouter.post('/:id/pay', async (_req, res) => {
+  res.status(410).json({
+    error: 'Payment has moved. Reload the app and try again.',
+    payAt: '/api/payments/intents',
   })
-
-  const withName = await one<RequestRow>(
-    `select ${REQUEST_SELECT} from requests r join services s on s.id = r.service_id where r.id = $1`,
-    [updated.id]
-  )
-  res.json(await serializeWithReady(withName!))
 })
 
 /** The released document, downloadable only by the resident who filed it. */

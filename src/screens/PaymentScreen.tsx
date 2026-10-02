@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, ChevronRight, Loader2, ShieldCheck } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
-import { ApiError } from '../lib/api'
+import { api, ApiError, IS_DEMO } from '../lib/api'
 import { formatPeso } from '../lib/money'
 import { useT } from '../lib/i18n'
 import type { StringKey } from '../i18n/strings'
@@ -17,30 +17,70 @@ const METHODS: { id: Method; label: string; blurb: StringKey; bg: string; fg: st
 ]
 
 export default function PaymentScreen({ id }: { id: string }) {
-  const { applications, pay } = useAppData()
+  const { applications, startPayment, refresh } = useAppData()
   const { replace } = useNav()
   const app = applications.find((a) => a.id === id)
 
   const [selected, setSelected] = useState<Method | null>(null)
   const [step, setStep] = useState<'select' | 'confirm' | 'processing' | 'done'>('select')
   const [error, setError] = useState<string | null>(null)
+  const [reference, setReference] = useState<string | null>(null)
   const { t } = useT()
 
-  if (!app) return null
+  // Polling, rather than trusting our own return from the provider. The
+  // server's record is the only thing that decides whether money arrived: a
+  // resident who closed the tab at the gateway is still paid up, and one who
+  // forges the return trip is not.
+  const settled = useRef(false)
+  useEffect(() => {
+    if (!reference || step !== 'processing') return
+    let live = true
+    const tick = async () => {
+      try {
+        const state = await api.paymentStatus(reference)
+        if (!live) return
+        if (state.status === 'settled') {
+          settled.current = true
+          await refresh()
+          if (live) setStep('done')
+        } else if (state.status === 'failed' || state.status === 'mismatched') {
+          setError(state.note ?? t('pay.failed'))
+          setStep('confirm')
+        }
+      } catch {
+        // A dropped poll is not a failed payment. Keep asking.
+      }
+    }
+    void tick()
+    const timer = setInterval(() => void tick(), 1500)
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
+  }, [reference, step, refresh, t])
 
-  const handlePay = async () => {
-    if (!selected) return
+  const handlePay = useCallback(async () => {
+    if (!selected || !app) return
     setStep('processing')
     setError(null)
     try {
-      // The server records the payment and moves the request forward.
-      await pay(app.id, selected)
-      setStep('done')
+      const intent = await startPayment(app.id)
+      setReference(intent.reference)
+      // Where a real gateway takes over. The development provider has no page
+      // to show, so the app asks it to send the callback a real one would —
+      // which the server still has to verify before anything is settled.
+      if (IS_DEMO || intent.provider === 'mock') {
+        await api.mockCompletePayment(intent.reference, selected)
+      } else {
+        window.location.assign(intent.redirectUrl)
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('pay.failed'))
       setStep('confirm')
     }
-  }
+  }, [app, selected, startPayment, t])
+
+  if (!app) return null
 
   if (step === 'done') {
     return (
@@ -137,7 +177,7 @@ export default function PaymentScreen({ id }: { id: string }) {
             >
               {step === 'processing' ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Processing payment…
+                  <Loader2 size={16} className="animate-spin" /> {t('pay.waiting')}
                 </>
               ) : (
                 `${t('pay.confirmAndPay')} ${formatPeso(app.fee)}`

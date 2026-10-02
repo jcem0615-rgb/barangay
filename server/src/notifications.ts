@@ -16,7 +16,7 @@ import { pushBodyFor, pushToResident } from './push.ts'
  */
 
 /** Notices about a request's progress. */
-export type RequestNotificationKind = 'assessed' | 'advanced' | 'released' | 'rejected'
+export type RequestNotificationKind = 'assessed' | 'advanced' | 'released' | 'rejected' | 'request_paid'
 
 /** Everything a notification row can be, including notices tied to no request. */
 export type NotificationKind =

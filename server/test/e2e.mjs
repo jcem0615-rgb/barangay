@@ -1,5 +1,5 @@
 const API = 'http://127.0.0.1:4000/api'
-import { formFiller } from './fixtures.mjs'
+import { formFiller, payRequest } from './fixtures.mjs'
 let pass = 0, fail = 0
 const check = (name, cond, extra = '') => {
   if (cond) { pass++; console.log(`  PASS  ${name}`) }
@@ -71,16 +71,18 @@ check('resident cannot reach the staff queue', (await call('/staff/queue', { tok
 check('staff cannot use the resident endpoint', (await call('/requests', { token: oboTok })).status === 403)
 
 console.log('\n== workflow, driven by the office ==')
-check('cannot pay before assessment', (await call(`/requests/${reqId}/pay`, { method: 'POST', token: resident, body: { method: 'GCash' } })).status === 409)
+check('the old client-trusted pay route is gone', (await call(`/requests/${reqId}/pay`, { method: 'POST', token: resident, body: { method: 'GCash' } })).status === 410)
+check('cannot start a payment before assessment', (await call('/payments/intents', { method: 'POST', token: resident, body: { requestId: reqId } })).status === 409)
 const assessed = await call(`/staff/requests/${reqId}/assess`, { method: 'POST', token: oboTok, body: { fee: 1850.5, note: 'Includes zoning fee' } })
 check('assess sets fee exactly (1850.50)', assessed.json?.fee === 1850.5, assessed.json?.fee)
 check('assess moves to for_payment', assessed.json?.status === 'for_payment')
 check('assess sits on the Payment step', assessed.json?.currentStepIndex === 2)
 check('office cannot advance past unpaid payment', (await call(`/staff/requests/${reqId}/advance`, { method: 'POST', token: oboTok })).status === 409)
-const paid = await call(`/requests/${reqId}/pay`, { method: 'POST', token: resident, body: { method: 'GCash' } })
+await payRequest(API, resident, reqId)
+const paid = await call(`/requests/${reqId}`, { token: resident })
 check('resident pays', paid.json?.paid === true)
 check('payment advances to release step', paid.json?.currentStepIndex === 3)
-check('double payment rejected', (await call(`/requests/${reqId}/pay`, { method: 'POST', token: resident, body: { method: 'Maya' } })).status === 409)
+check('a second payment for the same request is refused', (await call('/payments/intents', { method: 'POST', token: resident, body: { requestId: reqId } })).status === 409)
 
 console.log('\n== resident sees the office\'s work ==')
 const mine = await call(`/requests/${reqId}`, { token: resident })

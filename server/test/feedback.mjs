@@ -1,5 +1,7 @@
 // Feedback and complaints — the RA 11032 mechanism. Who may rate what, who may
 // see a complaint, the working-day deadline, and the figures it feeds.
+import { payRequest } from './fixtures.mjs'
+
 const API = process.env.API_URL ?? 'http://127.0.0.1:4000/api'
 let pass = 0, fail = 0
 const check = (n, c, x = '') => { if (c) { pass++; console.log(`  PASS  ${n}`) } else { fail++; console.log(`  FAIL  ${n} ${x}`) } }
@@ -39,7 +41,7 @@ const tooEarly = await j(`/feedback/${open.id}`, { method: 'PUT', token: residen
 check('an open request cannot be rated', tooEarly.status === 409, JSON.stringify(tooEarly.json))
 
 await j(`/staff/requests/${open.id}/assess`, { method: 'POST', token: treasury, body: { fee: 230 } })
-await j(`/requests/${open.id}/pay`, { method: 'POST', token: resident, body: { method: 'GCash' } })
+await payRequest(API, resident, open.id)
 await j(`/staff/requests/${open.id}/advance`, { method: 'POST', token: treasury })
 
 const rated = await j(`/feedback/${open.id}`, { method: 'PUT', token: resident, body: { rating: 4, comment: `Quick enough ${stamp}` } })

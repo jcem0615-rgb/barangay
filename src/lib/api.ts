@@ -580,11 +580,63 @@ export const api = {
       `/verify/${encodeURIComponent(code)}`
     ),
 
-  pay: (id: string, method: string) =>
-    request<Application>(`/requests/${id}/pay`, {
-      method: 'POST',
-      body: JSON.stringify({ method }),
-    }),
+  /**
+   * Start a payment. The amount is not in the body on purpose: the server reads
+   * it off the request's assessment, because the browser does not decide what
+   * something costs.
+   */
+  startPayment: (requestId: string) =>
+    request<{
+      reference: string
+      amount: number
+      provider: string
+      redirectUrl: string
+      status: string
+    }>('/payments/intents', { method: 'POST', body: JSON.stringify({ requestId }) }),
+
+  /**
+   * What the payment screen polls. The server's record is the only thing that
+   * decides whether money arrived — a resident who closed the tab at the gateway
+   * is still paid up, and one who forges the return trip is not.
+   */
+  paymentStatus: (reference: string) =>
+    request<{
+      reference: string
+      status: 'pending' | 'settled' | 'failed' | 'mismatched'
+      amount: number
+      providerRef: string | null
+      method: string | null
+      requestId: string
+      note: string | null
+    }>(`/payments/intents/${encodeURIComponent(reference)}`),
+
+  /**
+   * Development only. The server refuses this unless PAYMENT_PROVIDER is `mock`,
+   * and it settles nothing itself — it sends the same signed callback a real
+   * gateway would.
+   */
+  mockCompletePayment: (reference: string, method: string) =>
+    request<{ delivered: boolean }>(
+      `/payments/mock/${encodeURIComponent(reference)}/complete`,
+      { method: 'POST', body: JSON.stringify({ method }) }
+    ),
+
+  /** The treasurer's book, for reconciliation. */
+  paymentsBook: (from: string, to: string) =>
+    request<{
+      from: string
+      to: string
+      total: number
+      count: number
+      settled: Array<{
+        reference: string; provider: string; providerRef: string | null; method: string | null
+        amount: number; settledAt: string; requestRef: string; serviceName: string
+      }>
+      unsettled: Array<{
+        reference: string; provider: string; providerRef: string | null; status: string
+        amount: number; createdAt: string; note: string | null; requestRef: string
+      }>
+    }>(`/staff/payments?from=${from}&to=${to}`),
 
   listStaff: () => request<StaffAccount[]>('/admin/staff'),
 

@@ -26,3 +26,37 @@ export async function formFiller(API) {
     return { ...values, ...overrides }
   }
 }
+
+/**
+ * Pay a request the way the app does: ask the server for an intent, then let
+ * the development provider send the signed callback a real gateway would.
+ *
+ * Tests used to POST /requests/:id/pay, which is exactly the route that is gone
+ * — it marked a request paid because the caller said so. Going through the real
+ * flow here means a suite that only needs a paid request cannot accidentally
+ * keep the old shortcut alive.
+ */
+export async function payRequest(API, token, requestId, method = 'GCash') {
+  const call = async (path, options = {}) => {
+    const res = await fetch(API + path, {
+      method: options.method ?? 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    })
+    const text = await res.text()
+    return { status: res.status, json: text ? JSON.parse(text) : null }
+  }
+
+  const intent = await call('/payments/intents', { method: 'POST', body: { requestId } })
+  if (intent.status !== 201) {
+    throw new Error(`could not start payment: ${intent.status} ${JSON.stringify(intent.json)}`)
+  }
+  const done = await call(`/payments/mock/${intent.json.reference}/complete`, {
+    method: 'POST',
+    body: { method },
+  })
+  if (done.status !== 200) {
+    throw new Error(`payment did not settle: ${done.status} ${JSON.stringify(done.json)}`)
+  }
+  return intent.json.reference
+}

@@ -717,6 +717,62 @@ What stays: the requests (the office's records), the complaints (a complaints re
 office can delete on request is not a complaints record), and programme memberships, which
 belong to the register that issued them rather than to this app.
 
+## Payments
+
+This was the one place in the app where the client told the server something the
+server should have established itself — and it was the place where it mattered most,
+because the thing being asserted was money. `POST /requests/:id/pay` marked a request
+paid because the browser said so, which made a permit free to anyone who could open a
+developer console.
+
+The flow is now the one every provider expects, and the reason it looks like this
+everywhere is that every other shape is broken:
+
+1. The server creates an **intent** for an amount *it* read off the request's assessment.
+2. The resident pays at the provider. The app is not involved.
+3. The provider calls back, **signed**. The server verifies, then settles.
+
+Nothing the browser sends moves a peso. A resident who closes the tab at the gateway is
+still paid up; one who forges the return trip is not. The payment screen polls the server
+rather than trusting its own return, because the server's record is the only thing that
+decides.
+
+**The signature is over the raw bytes.** The webhook is mounted *ahead of* `express.json()`
+for exactly this reason — re-serialising parsed JSON to check a signature will disagree
+about key order or whitespace sooner or later, at which point every real payment starts
+failing verification and the cause is invisible. Comparison is constant-time, and a
+timestamp outside `WEBHOOK_TOLERANCE_SECONDS` is refused as a replay.
+
+**Idempotency is the provider's normal behaviour, not an attack.** A gateway retries until
+it gets a 2xx, so the same event arrives more than once as a matter of course.
+`payment_events` is unique on `(provider, event_id)`, and a partial index makes one settled
+payment per request a database guarantee rather than a thing the code remembers.
+
+**The amount is the server's.** A callback for a different figure is marked `mismatched`
+and left for a human: settling it either short-changes the municipality or overcharges the
+resident, and both are worse than a flagged row that a treasurer sees the same day. It
+still answers 2xx — telling the gateway to retry would bury the mismatch under duplicates.
+
+**Rejected callbacks are recorded too.** A run of them is either a misconfigured provider
+or somebody trying it on, and neither is visible if the server quietly drops them.
+
+A `MockProvider` signs and verifies exactly as a real one does — same headers, same HMAC
+over the raw body, same replay window — so what runs in development is what runs in
+production; what it does not do is take money. Its "the resident paid" route is refused
+outright unless `PAYMENT_PROVIDER` is `mock`, and it settles nothing itself: it sends the
+same signed callback a real gateway would. Adding GCash, Maya or Landbank means
+implementing `PaymentProvider` and setting two environment variables.
+
+The treasurer's **Payments** tab is for reconciliation, so it leads with the total and
+carries the gateway reference on every line — somebody working through a bank statement
+needs to find *this* row from *that* line. Anything that did not end cleanly is listed
+separately and is deliberately *not* limited to the period: a payment stuck since last week
+is exactly what a daily reconciliation exists to surface. Only the treasury and admins can
+see it.
+
+Server test fixtures pay through the real flow (`payRequest` in `server/test/fixtures.mjs`),
+so a suite that merely needs a paid request cannot keep the old shortcut alive.
+
 ## Accessibility
 
 The app registers senior citizens and persons with disability, so legibility is a
@@ -768,9 +824,13 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
 
 - **PhilSys sync** is visual only. A production build would call a real PhilSys
   verification API; the ID's own verification code is real and checked server-side.
-- **Payment** records that a resident chose a method and marks the request paid. There is no
-  gateway integration: no redirect, no webhook, no settlement. Wiring a real one means
-  server-side webhook verification — never mark a request paid from the client.
+- **No real payment gateway is wired yet.** The architecture is complete and tested —
+  intents priced by the server, signed webhooks, idempotent settlement, amount checking,
+  reconciliation — but the only provider implemented is the development mock. A real
+  deployment implements `PaymentProvider` for its gateway and sets `PAYMENT_PROVIDER` and
+  `PAYMENT_SECRET`; nothing else about the flow changes. **Do not deploy with
+  `PAYMENT_PROVIDER=mock`:** it exposes a route that settles a payment without one being
+  made.
 - **Document release** produces a real PDF with a verification code, but it is not
   digitally signed. A production system would sign it so tampering is detectable
   rather than relying on the code lookup alone.
