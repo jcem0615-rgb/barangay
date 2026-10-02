@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell } from 'lucide-react'
+import { Bell, ShieldAlert } from 'lucide-react'
 import { api } from '../lib/api'
 import { useCatalogue } from '../lib/catalogue'
 import { useResidentProfile } from '../lib/resident'
@@ -55,6 +55,31 @@ export default function Dashboard() {
           <OfflineBanner compact />
         </div>
       )}
+
+      {/*
+        Above the ID card, and the only red thing on the screen. Somebody who
+        needs this is not reading — they are looking for the one control that is
+        obviously it, and a row in a list further down is not that. It opens the
+        hotlines rather than dialling anything itself: which number to ring is
+        the resident's choice, and an app that places a call on a tap is an app
+        that calls the fire brigade from a pocket.
+      */}
+      <button
+        onClick={() => push({ name: 'emergency' })}
+        className="tap-target mb-5 flex w-full items-center gap-3 rounded-2xl bg-rose-600 px-4 py-3.5 text-left shadow-sm shadow-rose-900/10 active:bg-rose-700"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15">
+          <ShieldAlert size={20} className="text-white" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-[calc(15.5px_*_var(--text-scale))] font-extrabold text-white">
+            {t('sos.dashboardTitle')}
+          </span>
+          <span className="block text-[calc(12.5px_*_var(--text-scale))] leading-snug text-rose-50">
+            {t('sos.dashboardBlurb')}
+          </span>
+        </span>
+      </button>
 
       {resident && <IDCard profile={resident} onTap={() => push({ name: 'id-card' })} />}
 

@@ -25,6 +25,8 @@ import Appointments from './screens/Appointments'
 import BookAppointment from './screens/BookAppointment'
 import Complaints from './screens/Complaints'
 import MyData from './screens/MyData'
+import Emergency from './screens/Emergency'
+import ReportIncident from './screens/ReportIncident'
 import DataPrivacy from './screens/DataPrivacy'
 
 function ScreenRouter() {
@@ -63,6 +65,10 @@ function ScreenRouter() {
       return <DataPrivacy />
     case 'my-data':
       return <MyData />
+    case 'emergency':
+      return <Emergency />
+    case 'report-incident':
+      return <ReportIncident />
     default:
       return <Dashboard />
   }

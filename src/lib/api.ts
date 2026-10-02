@@ -621,6 +621,81 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ method }) }
     ),
 
+  // ---- incident reports ----
+
+  reportIncident: (body: {
+    kind: string
+    description: string
+    location?: string
+  }) =>
+    request<{ id: string; referenceNo: string; reportedAt: string; status: string }>(
+      '/incidents',
+      { method: 'POST', body: JSON.stringify(body) }
+    ),
+
+  myIncidents: () =>
+    request<Array<{
+      id: string; referenceNo: string; kind: string; description: string
+      location: string | null; status: string; reportedAt: string
+      officeNote: string | null; handledAt: string | null; evidenceCount: number
+    }>>('/incidents'),
+
+  /**
+   * Evidence goes up one file at a time, after the report exists, so a failed
+   * upload leaves a filed report rather than losing the whole thing. The
+   * duration the browser read off the video rides along — the server bounds it
+   * rather than trusting it.
+   */
+  addIncidentEvidence: async (
+    incidentId: string,
+    file: File,
+    durationSeconds: number | null
+  ) => {
+    if (DEMO) {
+      const { handleDemoRequest } = await import('./demoServer')
+      const out = await handleDemoRequest(
+        'POST', `/incidents/${incidentId}/evidence`, getToken(),
+        { durationSeconds }, file
+      )
+      if (out.status >= 400) {
+        throw new ApiError((out.body as { error?: string })?.error ?? 'Could not attach that file.', out.status)
+      }
+      return out.body as { id: string }
+    }
+    const form = new FormData()
+    form.append('file', file)
+    if (durationSeconds !== null) form.append('durationSeconds', String(Math.round(durationSeconds)))
+    const token = getToken()
+    const res = await fetch(`${BASE}/incidents/${incidentId}/evidence`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+    const body = await res.json().catch(() => null)
+    if (!res.ok) throw new ApiError(body?.error ?? 'Could not attach that file.', res.status)
+    return body as { id: string }
+  },
+
+  /** The administrator's queue of what residents have reported. */
+  staffIncidents: (status?: string) =>
+    request<Array<{
+      id: string; referenceNo: string; kind: string; description: string
+      location: string | null; latitude: number | null; longitude: number | null
+      status: string; reportedAt: string; reportedBy: string
+      officeNote: string | null; handledAt: string | null; handledBy: string | null
+      evidence: Array<{
+        id: string; contentType: string; byteSize: number
+        durationSeconds: number | null; uploadedAt: string
+      }>
+    }>>(`/staff/incidents${status ? `?status=${status}` : ''}`),
+
+  updateIncident: (id: string, body: { status: string; note?: string }) =>
+    request<{ ok: true }>(`/staff/incidents/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  /** Evidence as a blob, because <video src> cannot carry the bearer token. */
+  incidentEvidence: (incidentId: string, evidenceId: string) =>
+    fetchBlob(`/staff/incidents/${incidentId}/evidence/${evidenceId}`),
+
   /** The treasurer's book, for reconciliation. */
   paymentsBook: (from: string, to: string) =>
     request<{

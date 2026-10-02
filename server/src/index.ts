@@ -11,6 +11,7 @@ import { authRouter } from './routes/auth.ts'
 import { catalogueRouter } from './routes/catalogue.ts'
 import { requestsRouter } from './routes/requests.ts'
 import { paymentsRouter, paymentWebhookRouter } from './routes/payments.ts'
+import { incidentsRouter } from './routes/incidents.ts'
 import { appointmentsRouter } from './routes/appointments.ts'
 import { feedbackRouter } from './routes/feedback.ts'
 import { privacyRouter } from './routes/privacy.ts'
@@ -90,6 +91,7 @@ app.use('/api/auth', authRouter)
 app.use('/api/catalogue', catalogueRouter)
 app.use('/api/requests', requestsRouter)
 app.use('/api/payments', paymentsRouter)
+app.use('/api/incidents', incidentsRouter)
 app.use('/api/appointments', appointmentsRouter)
 app.use('/api/feedback', feedbackRouter)
 app.use('/api/privacy', privacyRouter)

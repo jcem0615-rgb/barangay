@@ -18,7 +18,31 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v14'
+const STORE_KEY = 'elgu-demo-state-v15'
+
+interface DemoIncident {
+  id: string
+  referenceNo: string
+  reporterId: string
+  reporterName: string
+  kind: string
+  description: string
+  location: string | null
+  status: 'new' | 'acknowledged' | 'resolved' | 'closed'
+  reportedAt: string
+  officeNote: string | null
+  handledAt: string | null
+  handledBy: string | null
+  evidence: Array<{
+    id: string
+    contentType: string
+    byteSize: number
+    durationSeconds: number | null
+    uploadedAt: string
+    /** A data URL. The demo has nowhere else to put bytes. */
+    data: string
+  }>
+}
 
 interface DemoPayment {
   reference: string
@@ -117,6 +141,7 @@ interface DemoState {
   verifications: DemoVerification[]
   notifications: DemoNotification[]
   payments: DemoPayment[]
+  incidents: DemoIncident[]
   counters: Record<string, number>
   /**
    * The municipal facts an administrator can edit. Held in state rather than
@@ -245,7 +270,7 @@ function seed(): DemoState {
   users.push(resident)
 
   const state: DemoState = {
-    users, requests: [], drafts: [], verifications: [], notifications: [], payments: [], counters: {},
+    users, requests: [], drafts: [], verifications: [], notifications: [], payments: [], incidents: [], counters: {},
     // Copied out of the catalogue rather than referenced, so editing them in
     // the console changes this browser's copy and not the authoring source.
     hotlines: EMERGENCY_CONTACTS.map((c, i) => ({
@@ -848,6 +873,87 @@ async function route(
     }
   }
 
+  // ---- incident reports ----
+  //
+  // The same rules the server enforces: a video over thirty minutes is refused,
+  // the queue is the administrator's, and updating one tells the resident.
+  if (parts[0] === 'incidents') {
+    const user = need('resident')
+
+    if (!parts[1] && method === 'POST') {
+      const description = String(body.description ?? '').trim()
+      if (description.length < 10) {
+        throw new DemoError(400, 'Say what happened, in a sentence or two.')
+      }
+      const year = new Date().getFullYear()
+      state.counters[`incident-${year}`] = (state.counters[`incident-${year}`] ?? 0) + 1
+      const incident: DemoIncident = {
+        id: uid(),
+        referenceNo: `INC-${year}-${String(state.counters[`incident-${year}`]).padStart(5, '0')}`,
+        reporterId: user.id,
+        reporterName: user.fullName,
+        kind: String(body.kind ?? 'other'),
+        description,
+        location: body.location ? String(body.location) : null,
+        status: 'new',
+        reportedAt: new Date().toISOString(),
+        officeNote: null,
+        handledAt: null,
+        handledBy: null,
+        evidence: [],
+      }
+      state.incidents.unshift(incident)
+      persist()
+      return {
+        status: 201,
+        body: {
+          id: incident.id, referenceNo: incident.referenceNo,
+          reportedAt: incident.reportedAt, status: incident.status, evidence: [],
+        },
+      }
+    }
+
+    if (!parts[1] && method === 'GET') {
+      return {
+        status: 200,
+        body: state.incidents
+          .filter((i) => i.reporterId === user.id)
+          .map((i) => ({
+            id: i.id, referenceNo: i.referenceNo, kind: i.kind, description: i.description,
+            location: i.location, status: i.status, reportedAt: i.reportedAt,
+            officeNote: i.officeNote, handledAt: i.handledAt, evidenceCount: i.evidence.length,
+          })),
+      }
+    }
+
+    if (parts[2] === 'evidence' && method === 'POST') {
+      const incident = state.incidents.find((i) => i.id === parts[1] && i.reporterId === user.id)
+      if (!incident) throw new DemoError(404, 'Report not found.')
+      if (incident.status === 'closed' || incident.status === 'resolved') {
+        throw new DemoError(409, 'This report is closed and no longer accepts files.')
+      }
+      if (incident.evidence.length >= 6) throw new DemoError(409, 'At most 6 files per report.')
+      if (!file) throw new DemoError(400, 'Choose a photo or video.')
+      const duration = Number(body?.durationSeconds)
+      const seconds = Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null
+      if (file.type.startsWith('video/') && seconds !== null && seconds > 30 * 60) {
+        throw new DemoError(413, 'Videos can be up to 30 minutes.')
+      }
+      return asDataUrl(file).then((data) => {
+        const stored = {
+          id: uid(), contentType: file.type || 'application/octet-stream',
+          byteSize: file.size, durationSeconds: seconds,
+          uploadedAt: new Date().toISOString(), data,
+        }
+        incident.evidence.push(stored)
+        persist()
+        return { status: 201, body: { id: stored.id } }
+      })
+    }
+
+    throw new DemoError(404, 'Not found.')
+  }
+
   // ---- payments ----
   //
   // The same shape as the server: an intent priced from the request, a separate
@@ -1321,6 +1427,60 @@ async function route(
     // ---- reports ----
     // Same two clocks and the same scoping as server/src/reports.ts, on a
     // working-day count rather than calendar days.
+    // Incident reports, the administrator's queue. Admin only, as on the
+    // server: a demo that showed every office these would teach something the
+    // real system refuses.
+    if (parts[1] === 'incidents') {
+      const staff = need('staff', 'admin')
+      if (staff.role !== 'admin') throw new DemoError(403, 'Forbidden.')
+
+      if (parts[2] && parts[3] === 'evidence' && parts[4] && method === 'GET') {
+        const incident = state.incidents.find((i) => i.id === parts[2])
+        const found = incident?.evidence.find((e) => e.id === parts[4])
+        if (!found) throw new DemoError(404, 'Evidence not found.')
+        return { status: 200, blob: dataUrlToBlob(found.data, found.contentType), fileName: 'evidence' }
+      }
+
+      if (parts[2] && method === 'PATCH') {
+        const incident = state.incidents.find((i) => i.id === parts[2])
+        if (!incident) throw new DemoError(404, 'Report not found.')
+        incident.status = body.status
+        if (body.note) incident.officeNote = String(body.note)
+        incident.handledAt = new Date().toISOString()
+        incident.handledBy = staff.fullName
+        state.notifications.unshift({
+          id: uid(), userId: incident.reporterId, requestId: null, kind: 'incident_updated',
+          title: `Report ${incident.referenceNo} — ${incident.status}`,
+          body: incident.officeNote ?? `The municipality has marked your report ${incident.status}.`,
+          readAt: null, createdAt: new Date().toISOString(),
+        })
+        persist()
+        return { status: 200, body: { ok: true } }
+      }
+
+      if (method === 'GET') {
+        const wanted = query.get('status')
+        const rank = (i: DemoIncident) => (i.status === 'new' || i.status === 'acknowledged' ? 0 : 1)
+        return {
+          status: 200,
+          body: state.incidents
+            .filter((i) => !wanted || i.status === wanted)
+            .slice()
+            .sort((a, b) => rank(a) - rank(b) || a.reportedAt.localeCompare(b.reportedAt))
+            .map((i) => ({
+              id: i.id, referenceNo: i.referenceNo, kind: i.kind, description: i.description,
+              location: i.location, latitude: null, longitude: null, status: i.status,
+              reportedAt: i.reportedAt, reportedBy: i.reporterName, officeNote: i.officeNote,
+              handledAt: i.handledAt, handledBy: i.handledBy,
+              evidence: i.evidence.map((e) => ({
+                id: e.id, contentType: e.contentType, byteSize: e.byteSize,
+                durationSeconds: e.durationSeconds, uploadedAt: e.uploadedAt,
+              })),
+            })),
+        }
+      }
+    }
+
     // The treasurer's book. Scoped the same way the server scopes it: the
     // treasury and admins, and nobody else — a demo that showed every office the
     // payment ledger would teach something the real system refuses.

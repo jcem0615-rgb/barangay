@@ -230,6 +230,71 @@ all before deploying, ring each one to confirm, and re-check whenever the office
 reorganise. A hotline that rings nowhere is worse than none at all, because a resident
 will trust it in the moment they can least afford to.
 
+## Reporting an incident
+
+The hotlines answer the thing happening *now*. This is the other half: a flooded road,
+a downed line, uncollected rubbish — something the municipality needs to know about and
+send somebody to, but which nobody is going to be dispatched for this minute.
+
+**The emergency button is on the dashboard and is the only red thing on it.** Somebody
+who needs it is not reading the screen, they are looking for the one control that is
+obviously it, and a row in a list further down is not that. It opens the hotlines rather
+than dialling anything itself — which number to ring is the resident's choice, and an app
+that places a call on a tap is an app that rings the fire brigade from a pocket. Every row
+is a real `tel:` link with a phone icon, so the call itself is one tap.
+
+**Reporting sits under the hotlines, never above them.** A report is not an emergency
+call, and a resident watching a fire should be dialling. The report screen says so in its
+first line, and says it again on the confirmation: nobody has been dispatched by this.
+
+**It is deliberately not a request.** Nobody applied for anything, there is no fee, no
+workflow and no document at the end, so `incident_reports` is its own table — folding it
+into `requests` would put a thing with none of those in every department's queue.
+Reference numbers come from a counter like every other number here, so a deleted report
+never frees its number for a second one.
+
+**Evidence is a photo or a video, and the camera is the phone's own**
+(`capture="environment"`), the same reasoning as photographing a requirement: the native
+camera focuses, uses the flash and applies the phone's processing.
+
+**Video is the one upload that does not fit in memory.** Everything else here is a
+photograph or a PDF; half an hour of phone video is a gigabyte or more, so evidence is
+streamed to disk by multer and taken into the store by `putFileFromPath`, which hashes by
+streaming and never holds the file. Reading one into a Buffer to checksum it would make a
+single upload capable of taking the server down.
+
+**The thirty-minute ceiling and the byte cap are different rules, and they do not line
+up.** Duration is checked in the browser, from the file's own metadata, because that is
+the only place it is cheaply knowable — finding out a clip was too long after pushing it
+over mobile data is not a usable answer, and the server bounds the number it is told
+rather than trusting it. What the server actually enforces is `MAX_EVIDENCE_BYTES`
+(`MAX_EVIDENCE_MB`, 512 MB by default). Thirty minutes at a modern phone's 1080p bitrate
+is roughly 1–2 GB, so **a full-length, full-quality recording will hit the byte cap before
+the time limit.** Raise the cap if the deployment's storage and connection can take it,
+but a resident uploading a gigabyte over mobile data at the scene of something is not a
+thing that completes; the honest fix for long video is resumable upload straight to object
+storage, which is a larger piece of work than a bigger number.
+
+**Type is decided by magic bytes**, like every other upload — a PDF renamed `photo.jpg` is
+refused. Only pictures and video are accepted: a document is not evidence of a flooded
+road, and accepting one would put it in a player that cannot play it.
+
+**Evidence is watched in the console, not downloaded.** This is the one place a stored
+upload is served inline, and what makes it safe here is the type set: evidence is only
+ever an image or a video sniffed from its own bytes, neither of which can carry script the
+way a resident-supplied PDF can, and `nosniff` still stands. Ranged, so a long video can
+be scrubbed rather than watched through to find the ten seconds that matter. Virus
+scanning covers photos only — a video goes through on its type and size alone, which is
+worth saying rather than implying it was checked.
+
+**Reports land with the administrator**, because an incident is not any one office's work:
+a downed line is the cooperative's, a flooded road is engineering's, and somebody has to
+look and decide. A deployment with an MDRRMO would route these there instead, which is a
+department row and one changed role check. The queue is open-first then oldest-first, so it
+reads as the order somebody should work it. Acting on a report notifies the resident in the
+same transaction as the change — the point of giving them a reference is that it goes
+somewhere they can see.
+
 ## The ID portrait
 
 The digital ID carries the resident's face, because a card a counter clerk cannot check
@@ -864,6 +929,16 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   tested, but nothing here can reach a push service, so the last hop and the dead-subscription
   cleanup it triggers have never actually run. Check them on a real deployment before relying
   on push as the channel that tells a resident their document is ready.
+- **Long incident video is capped by bytes, not by the thirty minutes residents are
+  told.** The duration ceiling is real and enforced in the browser, but the server's
+  limit is `MAX_EVIDENCE_MB` (512 by default), which a full-quality half-hour recording
+  exceeds. Either raise it to match the storage and bandwidth available, or accept that
+  long clips must be recorded at lower quality — and know that a reliable gigabyte upload
+  from a phone needs resumable upload to object storage, which this does not have.
+- **Incident reports go to the administrator**, not to a disaster office, because the
+  catalogue has no MDRRMO. That is the right default for a six-office municipality and the
+  wrong one for a municipality that has an MDRRMO; moving it is a department row and the
+  `requireRole('admin')` check on the incident routes.
 - **Account closure is not reviewed by anyone yet.** The `privacy_closures` row is written
   and the automatic erasure happens immediately, but there is no screen for the Data
   Protection Officer to work through the retained items and erase what the retention period

@@ -602,6 +602,19 @@ export const EMERGENCY_CONTACTS: EmergencyContact[] = [
     isNational: false,
   },
   {
+    id: 'electric',
+    label: 'Power outage & live wires',
+    // A downed line is an emergency the municipality cannot answer: the
+    // cooperative owns the poles and is the only one who can cut the power.
+    // **Check which cooperative actually serves the municipality before
+    // deploying** — Pangasinan is split between more than one, and sending a
+    // resident standing under a sparking line to the wrong one costs the
+    // minutes that matter.
+    agency: 'PANELCO I \u2014 electric cooperative, 24-hour line',
+    phone: '(075) 961-2420',
+    isNational: false,
+  },
+  {
     id: 'ambulance',
     label: 'Ambulance',
     agency: 'Municipal Health Office — emergency dispatch',

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, Building2, CalendarClock, Inbox, Landmark, LogOut, MessageSquareWarning, RefreshCw, ScanLine, Search, Users, Wallet } from 'lucide-react'
+import { BarChart3, Building2, CalendarClock, Inbox, Landmark, LogOut, MessageSquareWarning, RefreshCw, ScanLine, Search, ShieldAlert, Users, Wallet } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { Application, ServiceCategory } from '../../types'
@@ -8,6 +8,7 @@ import StaffAccounts from './StaffAccounts'
 import StaffVerifyId from './StaffVerifyId'
 import StaffReports from './StaffReports'
 import StaffTreasury from './StaffTreasury'
+import StaffIncidents from './StaffIncidents'
 import StaffMunicipality from './StaffMunicipality'
 import StaffDay from './StaffDay'
 import StaffComplaints from './StaffComplaints'
@@ -32,7 +33,7 @@ export default function StaffConsole() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // A clerk who arrived by scanning a resident's ID opens on the check, not the
   // queue — that scan is the errand.
-  const [view, setView] = useState<'queue' | 'day' | 'verify' | 'complaints' | 'reports' | 'payments' | 'accounts' | 'municipality'>(
+  const [view, setView] = useState<'queue' | 'day' | 'verify' | 'complaints' | 'reports' | 'payments' | 'incidents' | 'accounts' | 'municipality'>(
     hasScannedCode() ? 'verify' : 'queue'
   )
   const [loading, setLoading] = useState(true)
@@ -140,8 +141,15 @@ export default function StaffConsole() {
                 ...(user?.role === 'admin' || user?.departments?.includes('treasury')
                   ? [['payments', 'Payments', Wallet] as const]
                   : []),
+                // Incident reports land with the administrator: an incident is
+                // not any one office's work, and somebody has to look at it and
+                // decide whose it is.
                 ...(user?.role === 'admin'
-                  ? [['accounts', 'Accounts', Users] as const, ['municipality', 'Municipality', Landmark] as const]
+                  ? [
+                      ['incidents', 'Incidents', ShieldAlert] as const,
+                      ['accounts', 'Accounts', Users] as const,
+                      ['municipality', 'Municipality', Landmark] as const,
+                    ]
                   : []),
               ] as const).map(([key, label, Icon]) => (
                 <button
@@ -170,6 +178,8 @@ export default function StaffConsole() {
           <StaffVerifyId />
         ) : view === 'payments' ? (
           <StaffTreasury />
+        ) : view === 'incidents' ? (
+          <StaffIncidents />
         ) : view === 'reports' ? (
           <StaffReports
             departments={departments}

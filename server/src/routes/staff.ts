@@ -5,7 +5,7 @@ import { authenticate, canActOnDepartment, requireRole } from '../auth.ts'
 import { REQUEST_SELECT, serializeWithReady, toCentavos, toPesos, withReadyDates, type RequestRow } from '../serialize.ts'
 import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
 import { documentFileName, makeVerificationCode, renderDocument } from '../documents.ts'
-import { sendAttachment } from '../attachments.ts'
+import { sendAttachment, sendEvidence } from '../attachments.ts'
 import {
   deliverNotification, notificationFor, recordNotification, type NotificationInput,
 } from '../notifications.ts'
@@ -982,4 +982,133 @@ staffRouter.get('/payments', async (req, res) => {
       requestRef: row.reference_no,
     })),
   })
+})
+
+// ---------------------------------------------------------------- incidents
+
+/**
+ * Incident reports, which land with the administrator.
+ *
+ * Admin-only, deliberately: an incident is not any one office's work — a
+ * downed line is the cooperative's, a flooded road is engineering's, and
+ * somebody has to look at it and decide. A real deployment with an MDRRMO
+ * would route these there and widen this check to that department.
+ */
+const incidentQuerySchema = z.object({
+  status: z.enum(['new', 'acknowledged', 'resolved', 'closed']).optional(),
+})
+
+staffRouter.get('/incidents', requireRole('admin'), async (req, res) => {
+  const parsed = incidentQuerySchema.safeParse(req.query)
+  if (!parsed.success) return res.status(400).json({ error: 'Unknown status filter.' })
+  const { status } = parsed.data
+
+  const rows = await query<{
+    id: string; reference_no: string; kind: string; description: string
+    location: string | null; latitude: number | null; longitude: number | null
+    status: string; reported_at: string; office_note: string | null
+    handled_at: string | null; reporter_name: string; handler_name: string | null
+  }>(
+    `select i.id, i.reference_no, i.kind, i.description, i.location, i.latitude, i.longitude,
+            i.status, i.reported_at, i.office_note, i.handled_at,
+            u.full_name as reporter_name, h.full_name as handler_name
+       from incident_reports i
+       join users u on u.id = i.reporter_id
+       left join users h on h.id = i.handled_by
+      where ($1::text is null or i.status = $1::incident_status)
+      -- Open ones first, oldest first within that: the queue reads as the order
+      -- somebody should work it, not as the order things arrived.
+      order by (i.status in ('new', 'acknowledged')) desc, i.reported_at asc
+      limit 200`,
+    [status ?? null]
+  )
+
+  const evidence = await query<{
+    id: string; incident_id: string; content_type: string; byte_size: string
+    duration_seconds: number | null; uploaded_at: string
+  }>(
+    `select id, incident_id, content_type, byte_size, duration_seconds, uploaded_at
+       from incident_evidence order by uploaded_at asc`
+  )
+
+  res.json(
+    rows.map((row) => ({
+      id: row.id,
+      referenceNo: row.reference_no,
+      kind: row.kind,
+      description: row.description,
+      location: row.location,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      status: row.status,
+      reportedAt: row.reported_at,
+      reportedBy: row.reporter_name,
+      officeNote: row.office_note,
+      handledAt: row.handled_at,
+      handledBy: row.handler_name,
+      evidence: evidence
+        .filter((e) => e.incident_id === row.id)
+        .map((e) => ({
+          id: e.id,
+          contentType: e.content_type,
+          byteSize: Number(e.byte_size),
+          durationSeconds: e.duration_seconds,
+          uploadedAt: e.uploaded_at,
+        })),
+    }))
+  )
+})
+
+const incidentUpdateSchema = z.object({
+  status: z.enum(['acknowledged', 'resolved', 'closed']),
+  note: z.string().max(2000).optional(),
+})
+
+staffRouter.patch('/incidents/:id', requireRole('admin'), async (req, res) => {
+  const parsed = incidentUpdateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'Choose what to set it to.' })
+  const { status, note } = parsed.data
+
+  const updated = await transaction(async (client) => {
+    const result = await client.query<{ id: string; reference_no: string; reporter_id: string }>(
+      `update incident_reports
+          set status = $2, office_note = coalesce($3, office_note),
+              handled_by = $4, handled_at = now()
+        where id = $1
+        returning id, reference_no, reporter_id`,
+      [req.params.id, status, note ?? null, req.user!.id]
+    )
+    const row = result.rows[0]
+    if (!row) return null
+
+    // The resident who reported it is told, in the same transaction as the
+    // change — the whole point of giving them a reference is that it goes
+    // somewhere they can see.
+    const notification = {
+      userId: row.reporter_id,
+      requestId: null,
+      kind: 'incident_updated' as const,
+      title: `Report ${row.reference_no} — ${status}`,
+      body: note?.trim()
+        ? note.trim()
+        : `The municipality has marked your report ${status}.`,
+    }
+    await recordNotification(client, notification)
+    return notification
+  })
+
+  if (!updated) return res.status(404).json({ error: 'Report not found.' })
+  void deliverNotification(updated).catch(() => undefined)
+  res.json({ ok: true })
+})
+
+/** One piece of evidence, streamed so a long video can be scrubbed. */
+staffRouter.get('/incidents/:id/evidence/:evidenceId', requireRole('admin'), async (req, res) => {
+  const row = await one<{ storage_key: string; file_name: string; content_type: string }>(
+    `select storage_key, file_name, content_type
+       from incident_evidence where id = $1 and incident_id = $2`,
+    [req.params.evidenceId, req.params.id]
+  )
+  if (!row) return res.status(404).json({ error: 'Evidence not found.' })
+  await sendEvidence(req, res, row)
 })

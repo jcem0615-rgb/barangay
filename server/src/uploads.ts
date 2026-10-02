@@ -41,6 +41,68 @@ export const PORTRAIT_DESCRIPTION = 'JPEG, PNG, or HEIC'
 /** A portrait is one small picture; the 10 MB request limit is far too loose. */
 export const MAX_PORTRAIT_BYTES = 4 * 1024 * 1024
 
+/**
+ * Evidence on an incident report: a photograph, or a video.
+ *
+ * Video is a different animal from every other upload here. A requirement photo
+ * is a few hundred KB; half an hour of phone video is a gigabyte or more, which
+ * is why evidence is streamed to disk rather than buffered in memory like the
+ * rest, and why the ceiling is expressed two ways.
+ *
+ * **Duration is the rule residents were given: thirty minutes.** It is checked
+ * in the browser, because duration is only cheaply knowable where the file and a
+ * decoder already are — reading it server-side would mean demuxing the container
+ * for every upload.
+ *
+ * **Bytes are the rule the server can actually enforce**, and the two do not
+ * line up: 30 minutes at a modern phone's 1080p bitrate is roughly 1–2 GB, so a
+ * long recording at full quality will hit the byte cap before the time limit.
+ * Raise `MAX_EVIDENCE_MB` if the deployment's storage and connection can take
+ * it — but a resident uploading a gigabyte over mobile data at the scene of
+ * something is not a thing that completes, and the honest fix for long video is
+ * resumable upload straight to object storage rather than a bigger number here.
+ */
+export const MAX_EVIDENCE_SECONDS = 30 * 60
+
+export const MAX_EVIDENCE_BYTES =
+  Number(process.env.MAX_EVIDENCE_MB ?? 512) * 1024 * 1024
+
+export const MAX_EVIDENCE_FILES = 6
+
+const VIDEO_SIGNATURES: Signature[] = [
+  // ISO base media (MP4 and QuickTime both): "ftyp" at offset 4, then a brand.
+  { contentType: 'video/mp4', extension: 'mp4', magic: [0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d], offset: 4 },
+  { contentType: 'video/mp4', extension: 'mp4', magic: [0x66, 0x74, 0x79, 0x70, 0x6d, 0x70, 0x34, 0x32], offset: 4 },
+  // What an iPhone camera produces.
+  { contentType: 'video/quicktime', extension: 'mov', magic: [0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20], offset: 4 },
+  // What Android Chrome's MediaRecorder produces: Matroska/WebM.
+  { contentType: 'video/webm', extension: 'webm', magic: [0x1a, 0x45, 0xdf, 0xa3] },
+]
+
+export const EVIDENCE_DESCRIPTION = 'JPEG, PNG, HEIC, MP4, MOV, or WebM'
+
+/** True for the video types evidence accepts. */
+export function isVideo(contentType: string): boolean {
+  return contentType.startsWith('video/')
+}
+
+/**
+ * The real type of an evidence file. Pictures and video only — a PDF is not
+ * evidence of a flooded road, and accepting one here would mean a document
+ * rendered in a player that cannot play it.
+ */
+export function detectEvidenceType(head: Buffer): DetectedType | null {
+  for (const sig of [...SIGNATURES, ...VIDEO_SIGNATURES]) {
+    if (sig.contentType === 'application/pdf') continue
+    const offset = sig.offset ?? 0
+    if (head.length < offset + sig.magic.length) continue
+    if (sig.magic.every((byte, i) => head[offset + i] === byte)) {
+      return { contentType: sig.contentType, extension: sig.extension }
+    }
+  }
+  return null
+}
+
 export interface DetectedType {
   contentType: string
   extension: string

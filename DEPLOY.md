@@ -44,6 +44,7 @@ Everything is environment variables. Only the first two are required.
 | `UPLOAD_DIR` | **in a container** | Must be a mounted volume, or uploads are lost on deploy |
 | `CLAMAV_HOST` | **for public traffic** | clamd for scanning uploads. Unset = no scanning |
 | `SMTP_URL` | **for public traffic** | Password reset links go nowhere without it |
+| `MAX_EVIDENCE_MB` | no | Largest incident evidence file, default 512. Half an hour of 1080p phone video is 1–2 GB, so raise it only if storage and bandwidth can take it |
 | `PAYMENT_PROVIDER` | **to take money** | The gateway. `mock` is the development provider and **must not** be deployed — it exposes a route that settles a payment without one being made |
 | `PAYMENT_SECRET` | **to take money** | The secret the gateway signs callbacks with. The server refuses to start in production without it |
 | `PUBLIC_URL` | **yes, if mailing** | Address residents reach; reset and notification links use it |
@@ -106,12 +107,15 @@ usually `1` behind a single load balancer or ingress.
       from a secret store
 - [ ] A test payment has been taken end to end, and the treasury's **Payments** tab shows
       it with the gateway's own reference beside it
-- [ ] Every municipal hotline has been **rung** and answered by the office it names —
+- [ ] Every municipal hotline, **the electric cooperative included**, has been **rung** and answered by the office it names —
       the seed ships invented numbers under a real town's name, and 911 and 143 are the
       only two that are correct as published
 - [ ] Office addresses, hours, phones and emails are the municipality's own, not the
       seeded placeholders (fix them in the **Municipality** tab, not by reseeding)
 - [ ] The holiday calendar matches this year's proclamation and carries the local days
+- [ ] The electric cooperative named in the hotlines is the one that actually serves this
+      municipality — Pangasinan is split between more than one
+- [ ] `UPLOAD_DIR` has room for incident video, and somebody owns deleting old evidence
 
 ## Scaling
 
