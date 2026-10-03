@@ -4,7 +4,8 @@
  * Safe to re-run: catalogue rows are upserted, demo accounts are skipped if present.
  */
 import {
-  EMERGENCY_CONTACTS, HOLIDAYS, MUNICIPALITY, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
+  BARANGAY_CERTIFICATES, BARANGAYS, EMERGENCY_CONTACTS, HOLIDAYS, MUNICIPALITY,
+  SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
 } from '../../src/data/mockData.ts'
 import { hashPassword } from './auth.ts'
 import { one, pool, query, transaction } from './db.ts'
@@ -117,6 +118,30 @@ async function main() {
        select id from departments on conflict do nothing`
     )
 
+    // The barangays, and what they issue. Upserted by id so correcting a
+    // captain's name is a re-seed rather than a migration.
+    for (const barangay of BARANGAYS) {
+      await client.query(
+        `insert into barangays (id, name, municipality_code, captain, secretary)
+         values ($1, $2, $3, $4, $5)
+         on conflict (id) do update set
+           name = excluded.name, captain = excluded.captain, secretary = excluded.secretary`,
+        [barangay.id, barangay.name, MUNICIPALITY.code, barangay.captain, barangay.secretary]
+      )
+    }
+    for (const [index, type] of BARANGAY_CERTIFICATES.entries()) {
+      await client.query(
+        `insert into barangay_certificate_types
+           (id, name, description, fee_centavos, purpose_hint, sort_order)
+         values ($1, $2, $3, $4, $5, $6)
+         on conflict (id) do update set
+           name = excluded.name, description = excluded.description,
+           fee_centavos = excluded.fee_centavos, purpose_hint = excluded.purpose_hint,
+           sort_order = excluded.sort_order`,
+        [type.id, type.name, type.description, toCentavos(type.fee), type.purposeHint, index]
+      )
+    }
+
     // The municipality this deployment serves. Upserted onto the single row, so
     // re-seeding corrects a name or province without ever creating a second.
     //
@@ -198,9 +223,50 @@ async function main() {
     created++
   }
 
+  // Barangay staff. Two per barangay would be a lot of demo accounts, so the
+  // first barangay gets both roles and the rest get an administrator — enough to
+  // show the isolation without seeding a directory.
+  //
+  // Officers are issued, never self-registered: nothing in the app lets a
+  // resident become one, which is the whole reason these are here.
+  let barangayAccounts = 0
+  for (const [index, barangay] of BARANGAYS.entries()) {
+    const accounts = [
+      { email: `admin.${barangay.id}@malasiqui.gov.ph`, name: `${barangay.name} Barangay Secretary`, role: 'barangay_admin' },
+      ...(index === 0
+        ? [{ email: `officer.${barangay.id}@malasiqui.gov.ph`, name: `${barangay.name} Barangay Clerk`, role: 'barangay_officer' }]
+        : []),
+    ]
+    for (const account of accounts) {
+      const existing = await one<{ id: string }>(
+        `select id from users where lower(email) = lower($1)`, [account.email]
+      )
+      if (existing) {
+        // The password is left alone — saying otherwise would send somebody
+        // hunting for a login that does not work. The barangay is not: every
+        // query in that console scopes on it, so an account missing it answers
+        // 409 to everything, and a reseed is the one chance to repair it.
+        await query(
+          `update users set barangay_id = $2 where id = $1 and barangay_id is distinct from $2`,
+          [existing.id, barangay.id]
+        )
+        kept++
+        continue
+      }
+      await query(
+        `insert into users (email, password_hash, role, full_name, municipality_code, barangay_id)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [account.email, passwordHash, account.role, account.name, MUNICIPALITY.code, barangay.id]
+      )
+      barangayAccounts++
+      created++
+    }
+  }
+
   // Existing accounts keep their own password — saying otherwise would send
   // someone hunting for a login that does not work.
   console.log(`accounts: ${created} created, ${kept} already existed (incl. ${ADMIN.email})`)
+  console.log(`barangays: ${BARANGAYS.length} seeded, ${barangayAccounts} barangay accounts created`)
   if (created > 0) {
     // Only the development default is safe to print. A supplied SEED_PASSWORD
     // is a real secret and must not end up in deploy logs.

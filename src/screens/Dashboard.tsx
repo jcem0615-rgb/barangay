@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, ShieldAlert } from 'lucide-react'
+import { Bell, Building, Landmark, ShieldAlert } from 'lucide-react'
 import { api } from '../lib/api'
 import { useCatalogue } from '../lib/catalogue'
 import { useResidentProfile } from '../lib/resident'
@@ -10,7 +10,6 @@ import { useOnlineStatus } from '../lib/useOnlineStatus'
 import OfflineBanner from '../components/OfflineBanner'
 import InstallAppButton from '../components/InstallAppButton'
 import ApplicationCard from '../components/ApplicationCard'
-import { resolveIcon } from '../lib/icons'
 import { useT } from '../lib/i18n'
 
 export default function Dashboard() {
@@ -89,30 +88,51 @@ export default function Dashboard() {
         <InstallAppButton variant="banner" />
       </div>
 
-      <div className="mt-6 flex items-center justify-between">
-        <h2 className="font-display text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">{t('home.quickServices')}</h2>
-        <button onClick={() => push({ name: 'services' })} className="text-[calc(13.5px_*_var(--text-scale))] font-semibold text-navy-800">
-          {t('common.viewAll')}
+      {/*
+        Two buttons, not two dozen. Two levels of government issue documents to
+        the same resident and the question people actually get wrong is which one
+        owns what — a barangay clearance is not something the municipal hall
+        issues, and a trip to the wrong counter is the expensive mistake this app
+        exists to prevent. So the dashboard asks that question once, in the two
+        largest controls on the screen, and everything else lives inside the
+        answer. The same pair appears as a switch at the top of both catalogues,
+        so changing your mind never means coming back here.
+      */}
+      <h2 className="font-display mt-6 text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">
+        {t('tier.pickTitle')}
+      </h2>
+      <p className="mt-0.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-500">
+        {t('tier.pickBlurb')}
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <button
+          onClick={() => push({ name: 'services' })}
+          className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm shadow-slate-900/[0.03] active:scale-[0.98] active:bg-slate-50"
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy-800 text-white">
+            <Landmark size={21} strokeWidth={1.9} />
+          </span>
+          <span className="font-display text-[calc(15px_*_var(--text-scale))] font-extrabold leading-tight text-navy-950">
+            {t('tier.municipal')}
+          </span>
+          <span className="text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-500">
+            {t('tier.municipalBlurb', { offices: String(departments.length) })}
+          </span>
         </button>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-2.5">
-        {departments.map((cat) => {
-          const Icon = resolveIcon(cat.icon)
-          return (
-            <button
-              key={cat.id}
-              onClick={() => push({ name: 'category', categoryId: cat.id })}
-              className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white py-3.5 shadow-sm shadow-slate-900/[0.02] active:scale-[0.97] active:bg-slate-50"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-50 text-navy-800">
-                <Icon size={19} strokeWidth={1.9} />
-              </span>
-              <span className="px-1 text-center text-[calc(11.5px_*_var(--text-scale))] font-semibold leading-tight text-navy-950">
-                {cat.name.replace(' Services', '').replace(' (BOSS)', '')}
-              </span>
-            </button>
-          )
-        })}
+        <button
+          onClick={() => push({ name: 'barangay' })}
+          className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm shadow-slate-900/[0.03] active:scale-[0.98] active:bg-slate-50"
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-700 text-white">
+            <Building size={21} strokeWidth={1.9} />
+          </span>
+          <span className="font-display text-[calc(15px_*_var(--text-scale))] font-extrabold leading-tight text-navy-950">
+            {t('tier.barangay')}
+          </span>
+          <span className="text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-500">
+            {t('tier.barangayBlurb')}
+          </span>
+        </button>
       </div>
 
       <div className="mt-6 flex items-center justify-between">

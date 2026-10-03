@@ -10,6 +10,21 @@ const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'
  * Guarded by a build-time flag so the constant folds away and the demo server is
  * tree-shaken out of the production bundle entirely.
  */
+export interface BarangayRequest {
+  id: string
+  referenceNo: string
+  typeId: string
+  typeName: string
+  purpose: string
+  fee: number
+  status: 'pending' | 'processing' | 'ready' | 'released' | 'rejected'
+  requestedAt: string
+  updatedAt: string
+  note: string | null
+  barangayName?: string
+  residentName?: string
+}
+
 const DEMO = import.meta.env.VITE_DEMO === '1'
 
 /** True in the demo build only. Used to label the UI honestly. */
@@ -83,7 +98,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export interface AuthUser {
   id: string
   email: string
-  role: 'resident' | 'staff' | 'admin'
+  role: 'resident' | 'staff' | 'admin' | 'barangay_admin' | 'barangay_officer'
   fullName: string
   departments: string[]
 }
@@ -620,6 +635,68 @@ export const api = {
       `/payments/mock/${encodeURIComponent(reference)}/complete`,
       { method: 'POST', body: JSON.stringify({ method }) }
     ),
+
+  // ---- the barangay tier ----
+
+  /** Public: the sign-up and profile screens need this before any account. */
+  barangays: () => request<Array<{ id: string; name: string; captain: string | null }>>('/barangays'),
+
+  /** The resident's own barangay, and what it charges for each certificate. */
+  myBarangay: () =>
+    request<{
+      barangay: { id: string; name: string; captain: string | null } | null
+      certificates: Array<{
+        id: string; name: string; description: string; fee: number; purposeHint: string
+      }>
+    }>('/barangay/me'),
+
+  setMyBarangay: (barangayId: string) =>
+    request<{ ok: true }>('/barangay/me', { method: 'PUT', body: JSON.stringify({ barangayId }) }),
+
+  requestCertificate: (typeId: string, purpose: string) =>
+    request<{
+      id: string; referenceNo: string; requestedAt: string; status: string
+      typeName: string; fee: number
+    }>('/barangay/requests', { method: 'POST', body: JSON.stringify({ typeId, purpose }) }),
+
+  myCertificates: () => request<BarangayRequest[]>('/barangay/requests'),
+
+  // ---- the barangay's own portal ----
+
+  barangayStaffMe: () =>
+    request<{
+      barangay: { id: string; name: string; captain: string | null; secretary: string | null }
+      role: string
+    }>('/barangay-staff/me'),
+
+  barangayQueue: (status?: string) =>
+    request<BarangayRequest[]>(`/barangay-staff/requests${status ? `?status=${status}` : ''}`),
+
+  advanceCertificate: (id: string, status: string, note?: string) =>
+    request<{ ok: true }>(`/barangay-staff/requests/${id}`, {
+      method: 'PATCH', body: JSON.stringify({ status, note }),
+    }),
+
+  /** What this barangay currently charges — its overrides, else the default. */
+  barangayFees: () =>
+    request<Array<{ id: string; name: string; fee: number }>>('/barangay-staff/fees'),
+
+  setBarangayFee: (typeId: string, fee: number) =>
+    request<{ ok: true; fee: number }>(`/barangay-staff/fees/${typeId}`, {
+      method: 'PUT', body: JSON.stringify({ fee }),
+    }),
+
+  barangayOfficers: () =>
+    request<Array<{ id: string; fullName: string; email: string; role: string; active: boolean }>>(
+      '/barangay-staff/officers'
+    ),
+
+  barangaySummary: () =>
+    request<{
+      barangay: string
+      counts: { pending: number; processing: number; ready: number; released: number; rejected: number }
+      collected: number
+    }>('/barangay-staff/summary'),
 
   // ---- incident reports ----
 

@@ -7,7 +7,12 @@ import { query } from './db.ts'
 const BCRYPT_ROUNDS = 12
 const TOKEN_TTL = '12h'
 
-export type Role = 'resident' | 'staff' | 'admin'
+/**
+ * Barangay staff are their own roles rather than municipal staff with a flag.
+ * The shells they see are different, the data they may touch is different, and
+ * a role meaning two things is the kind that leaks one into the other.
+ */
+export type Role = 'resident' | 'staff' | 'admin' | 'barangay_admin' | 'barangay_officer'
 
 export interface AuthUser {
   id: string

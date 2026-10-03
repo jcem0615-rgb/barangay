@@ -12,6 +12,8 @@ import { catalogueRouter } from './routes/catalogue.ts'
 import { requestsRouter } from './routes/requests.ts'
 import { paymentsRouter, paymentWebhookRouter } from './routes/payments.ts'
 import { incidentsRouter } from './routes/incidents.ts'
+import { barangayRouter, barangayPublicRouter } from './routes/barangay.ts'
+import { barangayStaffRouter } from './routes/barangayStaff.ts'
 import { appointmentsRouter } from './routes/appointments.ts'
 import { feedbackRouter } from './routes/feedback.ts'
 import { privacyRouter } from './routes/privacy.ts'
@@ -92,6 +94,9 @@ app.use('/api/catalogue', catalogueRouter)
 app.use('/api/requests', requestsRouter)
 app.use('/api/payments', paymentsRouter)
 app.use('/api/incidents', incidentsRouter)
+app.use('/api/barangays', barangayPublicRouter)
+app.use('/api/barangay', barangayRouter)
+app.use('/api/barangay-staff', barangayStaffRouter)
 app.use('/api/appointments', appointmentsRouter)
 app.use('/api/feedback', feedbackRouter)
 app.use('/api/privacy', privacyRouter)

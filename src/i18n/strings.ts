@@ -59,9 +59,8 @@ export const en = {
 
   // dashboard
   'home.greeting': 'Magandang araw,',
-  'home.quickServices': 'Quick Services',
   'home.recentRequests': 'Recent Requests',
-  'home.noRequests': 'No requests yet. Start with Quick Services above.',
+  'home.noRequests': 'No requests yet. Pick Municipal or Barangay above to start one.',
 
   // services
   'services.title': 'Services',
@@ -462,6 +461,44 @@ export const en = {
   'sos.national': 'Nationwide',
   'sos.call': 'Call {agency} at {phone}',
 
+  'auth.barangayPick': 'Choose your barangay',
+
+  // Which tier of government. The pair appears on the dashboard as the two
+  // largest controls and again as a switch above either catalogue.
+  'tier.label': 'Level of government',
+  'tier.municipal': 'Municipal',
+  'tier.barangay': 'Barangay',
+  'tier.pickTitle': 'Where are you going?',
+  'tier.pickBlurb': 'Two levels issue documents. Pick the one that issues yours.',
+  'tier.municipalBlurb': '{offices} offices \u2014 permits, certificates, payments',
+  'tier.barangayBlurb': 'Clearance, residency, indigency \u2014 from your barangay',
+
+  // barangay tier
+  'brgy.title': 'Barangay',
+  'brgy.chooseTitle': 'Which barangay do you live in?',
+  'brgy.chooseBlurb':
+    'Your barangay issues your clearance and certificates. The barangay checks this at the counter, so pick the one you actually live in.',
+  'brgy.certificates': 'Certificates',
+  'brgy.free': 'Free',
+  'brgy.myRequests': 'My barangay requests',
+  'brgy.noRequests': 'You have not asked your barangay for anything yet.',
+  'brgy.readyBlurb': 'Ready for pickup at your barangay hall. Bring a valid ID.',
+  'brgy.loadFailed': 'Could not load your barangay. Try again.',
+  'brgy.status.pending': 'Received',
+  'brgy.status.processing': 'Being prepared',
+  'brgy.status.ready': 'For pickup',
+  'brgy.status.released': 'Released',
+  'brgy.status.rejected': 'Not issued',
+  'brgy.fee': 'Fee',
+  'brgy.purposeLabel': 'What is it for?',
+  'brgy.purposeHint': 'The barangay writes this on the certificate, so say it the way it will be read.',
+  'brgy.submit': 'Send to the barangay',
+  'brgy.requestFailed': 'The request did not go through. Try again.',
+  'brgy.sentTitle': 'Sent to your barangay',
+  'brgy.sentBlurb': 'Your reference is {ref}. The barangay can see it now.',
+  'brgy.sentFee': 'Pay the {amount} fee at the barangay hall when you collect it.',
+  'brgy.sentFree': 'There is no fee for this one.',
+
   // id card
   'id.title': 'Digital ID',
   'id.photoTitle': 'ID photo',
@@ -533,9 +570,8 @@ export const fil: Record<StringKey, string> = {
   'auth.resetFailed': 'Hindi naisagawa ang pagpapalit ng password.',
 
   'home.greeting': 'Magandang araw,',
-  'home.quickServices': 'Mabilisang Serbisyo',
   'home.recentRequests': 'Mga Kamakailang Kahilingan',
-  'home.noRequests': 'Wala pang kahilingan. Magsimula sa Mabilisang Serbisyo sa itaas.',
+  'home.noRequests': 'Wala pang kahilingan. Piliin ang Munisipyo o Barangay sa itaas para magsimula.',
 
   'services.title': 'Mga Serbisyo',
   'services.subtitle': 'Pumili ng tanggapan ng LGU',
@@ -925,6 +961,40 @@ export const fil: Record<StringKey, string> = {
   'sos.municipal': 'Munisipyo',
   'sos.national': 'Buong bansa',
   'sos.call': 'Tawagan ang {agency} sa {phone}',
+
+  'auth.barangayPick': 'Piliin ang barangay mo',
+  'tier.label': 'Antas ng pamahalaan',
+  'tier.municipal': 'Munisipyo',
+  'tier.barangay': 'Barangay',
+  'tier.pickTitle': 'Saan ka pupunta?',
+  'tier.pickBlurb': 'Dalawang antas ang naglalabas ng dokumento. Piliin ang naglalabas ng sa iyo.',
+  'tier.municipalBlurb': '{offices} tanggapan \u2014 permit, sertipiko, bayarin',
+  'tier.barangayBlurb': 'Clearance, residency, indigency \u2014 mula sa barangay mo',
+
+  'brgy.title': 'Barangay',
+  'brgy.chooseTitle': 'Saang barangay ka nakatira?',
+  'brgy.chooseBlurb':
+    'Ang barangay mo ang naglalabas ng clearance at mga sertipiko mo. Tinitingnan ito ng barangay sa counter, kaya piliin ang talagang tinitirhan mo.',
+  'brgy.certificates': 'Mga sertipiko',
+  'brgy.free': 'Walang bayad',
+  'brgy.myRequests': 'Mga kahilingan ko sa barangay',
+  'brgy.noRequests': 'Wala pa kang hinihiling sa barangay mo.',
+  'brgy.readyBlurb': 'Puwede nang kunin sa barangay hall. Magdala ng balidong ID.',
+  'brgy.loadFailed': 'Hindi makuha ang barangay mo. Subukan muli.',
+  'brgy.status.pending': 'Natanggap',
+  'brgy.status.processing': 'Inihahanda',
+  'brgy.status.ready': 'Puwede nang kunin',
+  'brgy.status.released': 'Naibigay na',
+  'brgy.status.rejected': 'Hindi inilabas',
+  'brgy.fee': 'Bayad',
+  'brgy.purposeLabel': 'Para saan ito?',
+  'brgy.purposeHint': 'Isusulat ito ng barangay sa sertipiko, kaya isulat sa paraang mababasa.',
+  'brgy.submit': 'Ipadala sa barangay',
+  'brgy.requestFailed': 'Hindi naipadala ang kahilingan. Subukan muli.',
+  'brgy.sentTitle': 'Naipadala sa barangay mo',
+  'brgy.sentBlurb': 'Ang reference mo ay {ref}. Nakikita na ito ng barangay.',
+  'brgy.sentFee': 'Bayaran ang {amount} sa barangay hall kapag kukunin mo.',
+  'brgy.sentFree': 'Walang bayad ang isang ito.',
 
   'id.title': 'Digital ID',
   'id.photoTitle': 'Larawan sa ID',

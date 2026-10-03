@@ -8,10 +8,15 @@ A mobile-first PWA for residents of a Philippine municipality — the sample dat
 **Malasiqui, Pangasinan** — to transact with the LGU's own offices: Business Permits &
 Licensing (BOSS), Social Welfare (CSWDO), the Local Civil Registrar, the Treasurer's
 Office, the Office of the Building Official, and the Municipal Health Office.
-Barangay-level services are deliberately out of scope — this is the municipal tier.
 
-Both sides of the system live here: the resident PWA and the staff-facing department
-console, backed by a real Node + Postgres API with accounts and roles (`server/`).
+**It now covers both tiers of local government.** The barangay issues the document most
+residents actually need in a year — a clearance, a certificate of residency, a certificate
+of indigency — from an office two streets away, and it has its own records, its own roles
+and its own console here. The two tiers are kept visibly apart; see *Two tiers of
+government* below.
+
+Both sides of the system live here: the resident PWA and the staff-facing consoles,
+backed by a real Node + Postgres API with accounts and roles (`server/`).
 PhilSys verification and payment settlement are still simulated.
 
 ## Stack
@@ -35,7 +40,8 @@ PhilSys verification and payment settlement are still simulated.
 src/
   types.ts              Domain model: ServiceDefinition, Application, ResidentProfile, etc.
   data/mockData.ts       Resident profile, 6 service categories, 17 services, 8 sectoral
-                         programmes, 2 seed applications, and DATA_VERSION
+                         programmes, 6 barangays and what they issue, 2 seed
+                         applications, and DATA_VERSION
   i18n/strings.ts        English + Filipino dictionaries (en is the source of truth)
   lib/
     i18n.tsx              I18nProvider + useT(); language persisted in localStorage
@@ -53,6 +59,7 @@ src/
     scannedCode.ts           Reads ?verify= once at startup, for a clerk arriving by scan
   components/            Reusable UI: IDCard, WorkflowTracker, StatusPill, FormField, etc.
   screens/                One component per Screen variant in nav.tsx
+    barangay/             The barangay's own console (its two roles, one file)
   App.tsx                 Providers + ScreenRouter switch + bottom nav visibility
 ```
 
@@ -67,17 +74,18 @@ src/
   `.id-texture` classes behind the Digital ID card — this is the one deliberate flourish; keep
   everything else restrained if you extend the UI.
 
-## Two shells, one bundle
+## Three shells, one bundle
 
 `App.tsx` renders by the role the server reports on `/auth/me`:
 
 - no session → `SignIn` (residents can self-register; staff use issued accounts)
-- `resident` → the mobile PWA shell
-- `staff` / `admin` → `StaffConsole`, the desk-width department queue
+- `resident` → the mobile PWA shell, covering both tiers of government
+- `staff` / `admin` → `StaffConsole`, the desk-width municipal department queue
 - `admin` additionally gets its Accounts tab, for creating and revoking staff accounts
+- `barangay_admin` / `barangay_officer` → `BarangayConsole`, that barangay's own desk
 
 Roles are a server-side fact. The shell is a rendering convenience, never a control —
-the API refuses cross-role and cross-department access on its own.
+the API refuses cross-role, cross-department and cross-barangay access on its own.
 
 ## Data flow / how offline works
 
@@ -101,6 +109,78 @@ Workflow progression belongs to the server. Staff call assess / advance / reject
 resident calls pay. The client never sets `currentStepIndex` itself. Paying moves a
 request to the final step but does not close it — the office advances it once more, and
 that release step renders and stores the PDF (`server/src/documents.ts`).
+
+## Two tiers of government
+
+A resident deals with two levels of local government, and the mistake they actually make is
+not knowing which one owns what. A barangay clearance does not come from the municipal
+hall; the municipal business permit asks for the barangay one first. Getting it wrong costs
+a trip to the wrong counter, which is the expensive part of dealing with an LGU and the
+thing this app exists to prevent.
+
+**So the tier is asked once, in the two largest controls on the dashboard**, and everything
+else lives inside the answer. Nothing else on that screen competes with them except the
+emergency button. The same pair appears as a switch (`TierSwitch`) at the top of both
+catalogues, so changing your mind never means walking back to the dashboard, and the tier
+you are in is always on screen rather than inferred.
+
+Both tiers sit under the one **Services** tab in the bottom nav. A second nav item would be
+a second place to make the same choice, which is the confusion rather than the cure.
+
+**The barangay is a row, not a string.** `BARANGAYS` (`src/data/mockData.ts`) is seeded into
+`barangays` and published on `GET /api/barangays`, which is public because the sign-up
+screen needs it before anybody has an account. Registration takes a `barangayId` from that
+list, stamps `users.barangay_id`, and writes the barangay's *own* name onto the profile —
+the municipality rule, one tier down: the register decides what a place is called, not the
+browser. A resident who registered before this is asked once in the barangay hub.
+
+**What a barangay issues is shared; what it charges is not.** `BARANGAY_CERTIFICATES` is one
+catalogue for every barangay, because a clearance is the same document in all of them and
+letting six offices each invent their own would make a resident's certificate depend on
+which street they live on. Fees genuinely vary, so a barangay administrator overrides them
+in `barangay_certificate_fees` and nothing else. The fee is **frozen onto the request** when
+it is filed, so changing one never rewrites what somebody was already quoted.
+
+**Reference numbers come from one counter for the municipality**, not one per barangay.
+Per-barangay numbering reads nicer from inside a barangay, but it makes `BRGY-2026-00001`
+mean six different requests, and a reference is quoted down a phone and typed into a search
+box — it has to identify a request on its own. How many a barangay has issued is a count,
+and the summary answers that.
+
+**A certificate moves in a fixed order**: pending → processing → ready → released, with
+rejection reachable from anywhere and requiring a reason the resident can read. `ready`
+means "come and collect it", so a resident told that before the certificate is printed
+makes a wasted trip — which is why the order is enforced server-side and not merely
+rendered. Released and rejected are final. Every move notifies the resident in the same
+transaction as the change.
+
+**The barangay console is a separate shell, not a tab in the municipal one**
+(`src/screens/barangay/BarangayConsole.tsx`). A barangay secretary does not work a municipal
+queue and has no business seeing one; separate shells mean there is no filter to get wrong.
+Municipal staff — the administrator included — get 403 from every `/barangay-staff` route,
+and barangay accounts get 403 from the municipal ones. A different tier is not a wider one.
+
+**Isolation is the security property, and it is not a parameter.** Every query in
+`server/src/routes/barangayStaff.ts` is scoped to the barangay on the signed-in account's
+own row, so naming another barangay's request returns 404 rather than 403 — there is
+nowhere to name one. Same on the resident side: a request is filed to the barangay on the
+resident's record, never to one in the request body.
+
+**Two roles.** The officer processes certificates. The administrator — the captain or the
+secretary — does that too, plus the three things that are the barangay's to decide: what it
+charges, who works here, and what it has done. The officer's tabs are hidden *and* the API
+refuses them, in that order of importance. The officer list is read-only: issuing an account
+is a municipal act, because the hall knows who actually holds a barangay office, and making
+a barangay an account authority of its own is a larger decision than this needed.
+
+Barangay accounts are seeded as `admin.<barangay>@malasiqui.gov.ph` (every barangay) and
+`officer.<barangay>@malasiqui.gov.ph` (the first one only — enough to show the isolation
+without seeding a directory). A reseed repairs an existing barangay account's
+`barangay_id` if it is missing, since every query in that console scopes on it and an
+account without one answers 409 to everything.
+
+**The console stays English**, like the municipal one and for the same reason. The resident
+side is translated; certificate names are not, exactly like "Cedula" and "Building Permit".
 
 ## Adding a new service
 
@@ -964,6 +1044,28 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   time — the accepted trade for not leaving accounts guessable.
 - **Queue paging** is keyset on `(submitted_at, id)`; the cursor must carry the
   timestamp at full microsecond precision or pages overlap. See `server/README.md`.
+- **The barangay roster is six sample barangays, not Malasiqui's real 73.** `BARANGAYS` in
+  `mockData.ts` is placeholder data with invented captains and secretaries; the real roster
+  belongs in the PSGC listing for the municipality, and the officials' names change every
+  barangay election. Replace both before deploying, and treat the names as data somebody
+  has to maintain rather than something seeded once.
+- **A barangay certificate has no document at the end.** The request reaches `released` and
+  the resident is told to collect it; the barangay prints its own certificate as it always
+  has. The municipal side renders a PDF with a verification code and the barangay side does
+  not, which is a deliberate stopping point rather than a finished feature — a barangay
+  certificate that can be verified the way a municipal one can is the obvious next piece.
+- **Nothing is paid online at the barangay.** The fee is quoted and shown, and settled at the
+  barangay hall on collection. The payment machinery is all municipal; pointing it at a
+  barangay means deciding who the money goes to, which is a treasury question rather than a
+  code one.
+- **Barangay accounts are issued by the municipal administrator, in the database.** The
+  console lists who can sign in for a barangay but cannot add or revoke one — the
+  `StaffAccounts` screen only makes municipal staff. A barangay that can issue its own
+  accounts is a new authorization surface worth designing deliberately.
+- **Blotter, KP (katarungang pambarangay) forms, summons, household records, announcements
+  and barangay IDs are not here.** The certificate lifecycle is the spine; those are each
+  their own feature with their own rules, and bolting them on as fields of this one would
+  get them all wrong.
 - Navigation stack resets on reload (in-memory, not URL-based).
 
 ## Demo build
@@ -1023,6 +1125,11 @@ npm run dev                   # http://localhost:5173
 Seeded staff logins are `<office>@malasiqui.gov.ph` (treasury, bpls, obo, lcr, cswdo,
 health) with the password printed by `npm run seed`. Sign in as `cswdo@` to see the
 programme record on a request. Residents register in the app.
+
+Barangay logins use the same password: `admin.poblacion@malasiqui.gov.ph` for the
+administrator's console and `officer.poblacion@malasiqui.gov.ph` for the officer's, which
+is the pair to compare when checking what each role may do. Every other barangay has an
+administrator account only.
 
 ```bash
 npm run build     # tsc -b && vite build -> dist/

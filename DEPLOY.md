@@ -116,6 +116,15 @@ usually `1` behind a single load balancer or ingress.
 - [ ] The electric cooperative named in the hotlines is the one that actually serves this
       municipality — Pangasinan is split between more than one
 - [ ] `UPLOAD_DIR` has room for incident video, and somebody owns deleting old evidence
+- [ ] **The barangay roster is the municipality's real one.** The seed ships six sample
+      barangays with invented captains and secretaries; Malasiqui has 73. Take the list from
+      the PSGC listing for this municipality, and get the officials' names from the hall —
+      they are printed on every certificate and they change at every barangay election
+- [ ] Each barangay's certificate fees match what it actually charges (set them in that
+      barangay's own console, not by reseeding), and the free ones are still free —
+      indigency and the first-time jobseeker certificate are free by law
+- [ ] Every barangay has at least one account that someone there can actually sign into, and
+      the seeded barangay passwords have been changed like the municipal ones
 
 ## Scaling
 
@@ -151,5 +160,11 @@ Deploying does not make these real, and residents will notice:
   **Deploying with `PAYMENT_PROVIDER=mock` makes every permit free**, because the
   mock's own route settles a payment nobody made.
 - **PhilSys verification** and the ID **QR code** are visual only.
+- **A barangay certificate produces no document.** The request reaches "released" and the
+  resident is told to collect it; the barangay prints its own certificate as it always has,
+  and nothing in the app verifies one. The municipal side renders a signed-at-release PDF
+  with a verification code; the barangay side does not.
+- **Nothing is paid online at the barangay.** The fee is quoted in the app and settled at
+  the barangay hall on collection.
 - **Sessions** are 12-hour JWTs with no refresh or revocation list. Signing out
   clears the token client-side; it stays valid until it expires.

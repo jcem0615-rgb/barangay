@@ -29,6 +29,103 @@ export const MUNICIPALITY = {
   province: 'Pangasinan',
 } as const
 
+/**
+ * The barangays of this municipality, and what they issue.
+ *
+ * A municipality is not the only counter a resident deals with — most of what an
+ * ordinary person needs in a year is a barangay clearance or a certificate of
+ * indigency, from an office two streets away rather than the municipal hall. The
+ * app now covers both tiers, and keeps them apart on screen so nobody has to
+ * know which level of government owns what before they can start.
+ *
+ * **These six are samples.** Malasiqui has dozens of barangays; the real roster
+ * is published as PSGC codes and should be loaded from there before deploying,
+ * not typed out from memory. The captain and secretary names are placeholders
+ * too, and they are printed on every certificate the barangay issues — so they
+ * are the first thing to correct.
+ */
+export interface BarangaySeed {
+  id: string
+  name: string
+  captain: string
+  secretary: string
+}
+
+export const BARANGAYS: BarangaySeed[] = [
+  { id: 'poblacion', name: 'Poblacion', captain: 'Hon. Ramon T. Agustin', secretary: 'Luzviminda P. Cruz' },
+  { id: 'san-julian', name: 'San Julian', captain: 'Hon. Ernesto B. Dizon', secretary: 'Marites R. Flores' },
+  { id: 'nalsian', name: 'Nalsian', captain: 'Hon. Teresita M. Ramos', secretary: 'Allan G. Sison' },
+  { id: 'tolonguat', name: 'Tolonguat', captain: 'Hon. Benigno S. Padilla', secretary: 'Cecilia V. Mendoza' },
+  { id: 'cabatling', name: 'Cabatling', captain: 'Hon. Alfredo C. Bautista', secretary: 'Rosalinda T. Garcia' },
+  { id: 'bacundao-weste', name: 'Bacundao Weste', captain: 'Hon. Lourdes A. Navarro', secretary: 'Dante E. Ocampo' },
+]
+
+/**
+ * What a barangay issues.
+ *
+ * One catalogue shared by every barangay rather than a per-barangay editable
+ * set: a barangay clearance is the same document in all of them, and letting six
+ * offices each invent their own would make a resident's certificate depend on
+ * which street they live on. Fees are the one thing that genuinely varies, so
+ * they are the one thing a barangay can override.
+ */
+export interface BarangayCertificateType {
+  id: string
+  name: string
+  description: string
+  /** Default fee in pesos; a barangay may set its own. 0 is free, and common. */
+  fee: number
+  /** What the resident has to say before it can be issued. */
+  purposeHint: string
+}
+
+export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
+  {
+    id: 'clearance',
+    name: 'Barangay Clearance',
+    description: 'The one almost everything else asks for first — employment, a permit, a bank.',
+    fee: 50,
+    purposeHint: 'e.g. local employment, bank requirement',
+  },
+  {
+    id: 'residency',
+    name: 'Certificate of Residency',
+    description: 'Proof that you live in this barangay, and for how long.',
+    fee: 30,
+    purposeHint: 'e.g. school enrolment, PhilHealth',
+  },
+  {
+    id: 'indigency',
+    name: 'Certificate of Indigency',
+    description: 'For assistance that is means-tested — medical, burial, educational.',
+    // Free everywhere, and it should be: charging for proof of poverty is the
+    // kind of thing this certificate exists to relieve.
+    fee: 0,
+    purposeHint: 'e.g. hospital bill, DSWD assistance',
+  },
+  {
+    id: 'business-clearance',
+    name: 'Barangay Business Clearance',
+    description: 'Required before the municipal business permit — the BOSS asks for it.',
+    fee: 100,
+    purposeHint: 'e.g. new sari-sari store, renewal',
+  },
+  {
+    id: 'good-moral',
+    name: 'Certificate of Good Moral Character',
+    description: 'Usually for a school, a scholarship, or a first job.',
+    fee: 30,
+    purposeHint: 'e.g. scholarship application',
+  },
+  {
+    id: 'first-time-jobseeker',
+    name: 'First Time Jobseeker Certificate',
+    description: 'Under RA 11261, which also makes it free and waives other fees.',
+    fee: 0,
+    purposeHint: 'e.g. first employment requirements',
+  },
+]
+
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'bpls',

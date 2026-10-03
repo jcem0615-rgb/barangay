@@ -366,6 +366,19 @@ npm run test:push         # subscriptions, scoping, real VAPID signing, and the 
 npm run test:privacy      # export, correction, and what closure really erases and really keeps
 npm run test:antivirus    # scanning, against a mock clamd speaking INSTREAM
                           # (starts its own API on port 4100; no setup needed)
+npm run test:payments     # signed webhooks, idempotency, amount checking, reconciliation
+npm run test:incidents    # who may report, what counts as evidence, and the video ceiling
+npm run test:residency    # one municipality per account, and one account per person
+npm run test:barangay     # the barangay tier: the order, the roles, and the isolation
+```
+
+`test:payments` signs its own callbacks, so it needs the **same** `PAYMENT_SECRET`
+the server is running with — the suite otherwise falls back to a default, every
+signature it builds is refused, and the failures read as broken verification
+rather than a mismatched secret:
+
+```bash
+PAYMENT_SECRET="$(grep '^PAYMENT_SECRET=' .env | cut -d= -f2-)" npm run test:payments
 ```
 
 Covers registration and login, request submission, the full assess → pay →

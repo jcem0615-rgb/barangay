@@ -10,7 +10,8 @@
  * nothing here is used by the production build.
  */
 import {
-  EMERGENCY_CONTACTS, HOLIDAYS, MUNICIPALITY, SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
+  BARANGAYS, BARANGAY_CERTIFICATES, EMERGENCY_CONTACTS, HOLIDAYS, MUNICIPALITY,
+  SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
 } from '../data/mockData'
 import { addWorkingDays } from './schedule'
 import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../types'
@@ -18,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v15'
+const STORE_KEY = 'elgu-demo-state-v16'
 
 interface DemoIncident {
   id: string
@@ -63,7 +64,7 @@ interface DemoUser {
   email: string
   password: string
   fullName: string
-  role: 'resident' | 'staff' | 'admin'
+  role: 'resident' | 'staff' | 'admin' | 'barangay_admin' | 'barangay_officer'
   departments: string[]
   position: string | null
   active: boolean
@@ -71,6 +72,11 @@ interface DemoUser {
   notifySms: boolean
   /** The register this account belongs to; null on the seeded demo accounts. */
   municipalityCode?: string | null
+  /**
+   * For a resident, the barangay they said they live in; for barangay staff, the
+   * barangay they work for. Null means the resident has not said yet.
+   */
+  barangayId?: string | null
   /**
    * Name, date of birth and mother's maiden name, folded together. The real
    * server stores a SHA-256 of those; the demo keeps the folded form, which is
@@ -159,6 +165,16 @@ interface DemoState {
   feedback: DemoFeedback[]
   complaints: DemoComplaint[]
   complaintCounter: number
+  barangayRequests: DemoBarangayRequest[]
+  /** barangay id -> certificate id -> fee in pesos. Only what a barangay changed. */
+  barangayFees: Record<string, Record<string, number>>
+}
+
+interface DemoBarangayRequest {
+  id: string; referenceNo: string; barangayId: string; residentId: string; residentName: string
+  typeId: string; typeName: string; purpose: string; fee: number
+  status: 'pending' | 'processing' | 'ready' | 'released' | 'rejected'
+  requestedAt: string; updatedAt: string; note: string | null
 }
 
 interface DemoFeedback {
@@ -246,6 +262,29 @@ function seed(): DemoState {
       photo: null, photoUpdatedAt: null,
       programs: [],
     })),
+    // Barangay accounts, the same way the real seed makes them: an administrator
+    // everywhere, plus one officer in the first barangay so both halves of that
+    // portal can be signed into without creating twelve demo logins.
+    ...BARANGAYS.flatMap((b, index) => [
+      {
+        id: uid(), email: `admin.${b.id}@malasiqui.gov.ph`, password: DEMO_PASSWORD,
+        fullName: `${b.name} Barangay Secretary`, role: 'barangay_admin' as const,
+        departments: [], position: null, active: true, notifyEmail: true, notifySms: false,
+        barangayId: b.id,
+        profile: { philSysId: null, barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
+        photo: null, photoUpdatedAt: null, programs: [],
+      },
+      ...(index === 0
+        ? [{
+            id: uid(), email: `officer.${b.id}@malasiqui.gov.ph`, password: DEMO_PASSWORD,
+            fullName: `${b.name} Barangay Clerk`, role: 'barangay_officer' as const,
+            departments: [], position: null, active: true, notifyEmail: true, notifySms: false,
+            barangayId: b.id,
+            profile: { philSysId: null, barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
+            photo: null, photoUpdatedAt: null, programs: [],
+          }]
+        : []),
+    ]),
   ]
 
   // A resident with history, so the demo isn't an empty shell on first open.
@@ -253,8 +292,11 @@ function seed(): DemoState {
     id: uid(), email: 'maria@example.ph', password: DEMO_PASSWORD,
     fullName: 'Maria Clara D. Santos', role: 'resident', departments: [], position: null,
     active: true, notifyEmail: true, notifySms: false,
+    // In a real barangay from the list rather than an invented one, so the
+    // barangay console's queue and the resident's hub are the same barangay.
+    barangayId: BARANGAYS[0]!.id,
     profile: {
-      philSysId: '6392-8841-0027-3311', barangay: 'Barangay San Isidro',
+      philSysId: '6392-8841-0027-3311', barangay: `Barangay ${BARANGAYS[0]!.name}`,
       municipality: 'Municipality of Malasiqui', province: 'Pangasinan',
       birthDate: '1994-03-18', address: 'Blk 4 Lot 12, Purok 3', phone: null,
     },
@@ -287,6 +329,8 @@ function seed(): DemoState {
     feedback: [],
     complaints: [],
     complaintCounter: 0,
+    barangayRequests: [],
+    barangayFees: {},
   }
 
   const boss = SERVICES.find((s) => s.id === 'boss-application')!
@@ -324,6 +368,35 @@ function seed(): DemoState {
       now - 86400000 * 3
     )
   )
+
+  // Two barangay requests in the resident's own barangay, so the barangay
+  // console opens on a queue rather than an empty table and the resident's hub
+  // has history. One already collected, one waiting to be worked.
+  const brgyYear = new Date(now).getFullYear()
+  const brgySeed: Array<[string, string, DemoBarangayRequest['status'], number]> = [
+    ['clearance', 'Local employment requirement', 'pending', 2],
+    ['residency', 'School enrolment of my daughter', 'released', 21],
+  ]
+  for (const [typeId, purpose, status, daysAgo] of brgySeed) {
+    const type = BARANGAY_CERTIFICATES.find((c) => c.id === typeId)!
+    state.counters[`brgy-${brgyYear}`] = (state.counters[`brgy-${brgyYear}`] ?? 0) + 1
+    const at = new Date(now - 86400000 * daysAgo).toISOString()
+    state.barangayRequests.push({
+      id: uid(),
+      referenceNo: `BRGY-${brgyYear}-${String(state.counters[`brgy-${brgyYear}`]).padStart(5, '0')}`,
+      barangayId: resident.barangayId!,
+      residentId: resident.id,
+      residentName: resident.fullName,
+      typeId: type.id,
+      typeName: type.name,
+      purpose,
+      fee: type.fee,
+      status,
+      requestedAt: at,
+      updatedAt: at,
+      note: null,
+    })
+  }
 
   seedHistory(state, resident, now)
 
@@ -510,6 +583,31 @@ const notify = (userId: string, requestId: string | null, kind: string, title: s
     createdAt: new Date().toISOString(), readAt: null,
   })
 }
+
+/**
+ * What this barangay charges for a certificate: its own figure where it set one,
+ * the shared catalogue's where it did not. The same coalesce the server does in
+ * SQL, so the resident's screen and the administrator's agree.
+ */
+const barangayFee = (barangayId: string, typeId: string) =>
+  state.barangayFees[barangayId]?.[typeId] ??
+  BARANGAY_CERTIFICATES.find((c) => c.id === typeId)?.fee ??
+  0
+
+const serializeBarangayRequest = (r: DemoBarangayRequest) => ({
+  id: r.id,
+  referenceNo: r.referenceNo,
+  typeId: r.typeId,
+  typeName: r.typeName,
+  purpose: r.purpose,
+  fee: r.fee,
+  status: r.status,
+  requestedAt: r.requestedAt,
+  updatedAt: r.updatedAt,
+  note: r.note,
+  barangayName: BARANGAYS.find((b) => b.id === r.barangayId)?.name,
+  residentName: r.residentName,
+})
 
 /**
  * Memberships in catalogue order, with `expired` derived on read — the same
@@ -873,6 +971,227 @@ async function route(
     }
   }
 
+  // ---- the barangay tier ----
+  //
+  // Kept apart from the municipal routes exactly as on the server: its own
+  // records, its own roles, and a scope that comes from the signed-in account's
+  // own barangay rather than anything the caller passes.
+
+  /** Public: the list is needed before anybody has an account. */
+  if (parts[0] === 'barangays') {
+    if (parts[1] === 'certificates') {
+      return { status: 200, body: BARANGAY_CERTIFICATES }
+    }
+    return {
+      status: 200,
+      body: BARANGAYS.map((b) => ({ id: b.id, name: b.name, captain: b.captain })),
+    }
+  }
+
+  if (parts[0] === 'barangay') {
+    const user = need('resident')
+
+    if (parts[1] === 'me') {
+      if (method === 'PUT') {
+        const chosen = BARANGAYS.find((b) => b.id === body?.barangayId)
+        if (!chosen) throw new DemoError(404, 'That barangay is not in this municipality.')
+        user.barangayId = chosen.id
+        persist()
+        return { status: 200, body: { ok: true } }
+      }
+      const own = BARANGAYS.find((b) => b.id === user.barangayId)
+      if (!own) return { status: 200, body: { barangay: null, certificates: [] } }
+      return {
+        status: 200,
+        body: {
+          barangay: { id: own.id, name: own.name, captain: own.captain },
+          certificates: BARANGAY_CERTIFICATES.map((c) => ({
+            ...c, fee: barangayFee(own.id, c.id),
+          })),
+        },
+      }
+    }
+
+    if (parts[1] === 'requests') {
+      if (method === 'POST') {
+        if (!user.barangayId) throw new DemoError(409, 'Set which barangay you live in first.')
+        const type = BARANGAY_CERTIFICATES.find((c) => c.id === body?.typeId)
+        if (!type) throw new DemoError(404, 'That certificate is not issued here.')
+        const purpose = String(body?.purpose ?? '').trim()
+        if (purpose.length < 3) throw new DemoError(400, 'Say what it is for.')
+
+        const year = new Date().getFullYear()
+        // One counter for the municipality, as on the server.
+        const key = `brgy-${year}`
+        state.counters[key] = (state.counters[key] ?? 0) + 1
+        const now = new Date().toISOString()
+        const created: DemoBarangayRequest = {
+          id: uid(),
+          referenceNo: `BRGY-${year}-${String(state.counters[key]).padStart(5, '0')}`,
+          barangayId: user.barangayId,
+          residentId: user.id,
+          residentName: user.fullName,
+          typeId: type.id,
+          typeName: type.name,
+          purpose,
+          // Frozen at the fee in force now, so a later change does not rewrite
+          // what this resident was quoted.
+          fee: barangayFee(user.barangayId, type.id),
+          status: 'pending',
+          requestedAt: now,
+          updatedAt: now,
+          note: null,
+        }
+        state.barangayRequests.unshift(created)
+        persist()
+        return {
+          status: 201,
+          body: {
+            id: created.id, referenceNo: created.referenceNo, requestedAt: created.requestedAt,
+            status: created.status, typeName: created.typeName, fee: created.fee,
+          },
+        }
+      }
+      return {
+        status: 200,
+        body: state.barangayRequests
+          .filter((r) => r.residentId === user.id)
+          .map(serializeBarangayRequest),
+      }
+    }
+  }
+
+  if (parts[0] === 'barangay-staff') {
+    const user = need('barangay_admin', 'barangay_officer')
+    const own = BARANGAYS.find((b) => b.id === user.barangayId)
+    if (!own) throw new DemoError(409, 'This account is not attached to a barangay.')
+    const adminOnly = () => {
+      if (user.role !== 'barangay_admin') {
+        throw new DemoError(403, 'You do not have access to this area.')
+      }
+    }
+
+    if (parts[1] === 'me') {
+      return {
+        status: 200,
+        body: {
+          barangay: { id: own.id, name: own.name, captain: own.captain, secretary: own.secretary },
+          role: user.role,
+        },
+      }
+    }
+
+    if (parts[1] === 'requests' && !parts[2]) {
+      const status = query.get('status')
+      const open = ['pending', 'processing', 'ready']
+      return {
+        status: 200,
+        body: state.barangayRequests
+          .filter((r) => r.barangayId === own.id && (!status || r.status === status))
+          // Open first, oldest first within them: the order somebody should work it.
+          .sort((a, b) =>
+            Number(open.includes(b.status)) - Number(open.includes(a.status)) ||
+            a.requestedAt.localeCompare(b.requestedAt)
+          )
+          .map(serializeBarangayRequest),
+      }
+    }
+
+    if (parts[1] === 'requests' && parts[2] && method === 'PATCH') {
+      const row = state.barangayRequests.find((r) => r.id === parts[2] && r.barangayId === own.id)
+      if (!row) throw new DemoError(404, 'Request not found.')
+      const next = String(body?.status ?? '')
+      const note = body?.note ? String(body.note).trim() : ''
+      const allowed: Record<string, string[]> = {
+        pending: ['processing', 'rejected'],
+        processing: ['ready', 'rejected'],
+        ready: ['released', 'rejected'],
+        released: [], rejected: [],
+      }
+      if (next === 'rejected' && !note) {
+        throw new DemoError(400, 'Give a reason the resident can read.')
+      }
+      if (!allowed[row.status]?.includes(next)) {
+        throw new DemoError(409, `A request that is ${row.status} cannot be set to ${next}.`)
+      }
+      row.status = next as DemoBarangayRequest['status']
+      if (note) row.note = note
+      row.updatedAt = new Date().toISOString()
+      notify(
+        row.residentId,
+        null,
+        'barangay_request',
+        next === 'rejected'
+          ? `${row.referenceNo} — not issued`
+          : next === 'ready'
+            ? `${row.referenceNo} — ready for pickup`
+            : `${row.referenceNo} — ${next}`,
+        next === 'ready'
+          ? `Your certificate is ready at Barangay ${own.name}. Bring a valid ID.`
+          : note || `Your barangay certificate request is now ${next}.`
+      )
+      persist()
+      return { status: 200, body: { ok: true } }
+    }
+
+    if (parts[1] === 'fees' && !parts[2]) {
+      adminOnly()
+      return {
+        status: 200,
+        body: BARANGAY_CERTIFICATES.map((c) => ({
+          id: c.id, name: c.name, fee: barangayFee(own.id, c.id),
+        })),
+      }
+    }
+
+    if (parts[1] === 'fees' && parts[2] && method === 'PUT') {
+      adminOnly()
+      const fee = Number(body?.fee)
+      if (!Number.isFinite(fee) || fee < 0 || fee > 10000) {
+        throw new DemoError(400, 'Give a fee in pesos, 0 or more.')
+      }
+      if (!BARANGAY_CERTIFICATES.some((c) => c.id === parts[2])) {
+        throw new DemoError(404, 'No such certificate.')
+      }
+      state.barangayFees[own.id] = { ...(state.barangayFees[own.id] ?? {}), [parts[2]!]: fee }
+      persist()
+      return { status: 200, body: { ok: true, fee } }
+    }
+
+    if (parts[1] === 'officers') {
+      adminOnly()
+      return {
+        status: 200,
+        body: state.users
+          .filter((u) => u.barangayId === own.id && u.role !== 'resident')
+          .map((u) => ({
+            id: u.id, fullName: u.fullName, email: u.email, role: u.role, active: u.active,
+          })),
+      }
+    }
+
+    if (parts[1] === 'summary') {
+      adminOnly()
+      const mine = state.barangayRequests.filter((r) => r.barangayId === own.id)
+      const count = (status: DemoBarangayRequest['status']) =>
+        mine.filter((r) => r.status === status).length
+      return {
+        status: 200,
+        body: {
+          barangay: own.name,
+          counts: {
+            pending: count('pending'), processing: count('processing'), ready: count('ready'),
+            released: count('released'), rejected: count('rejected'),
+          },
+          // Released only: a fee on a pending request is not money in the drawer.
+          collected: mine
+            .filter((r) => r.status === 'released')
+            .reduce((total, r) => total + r.fee, 0),
+        },
+      }
+    }
+  }
+
   // ---- incident reports ----
   //
   // The same rules the server enforces: a video over thirty minutes is refused,
@@ -1088,6 +1407,14 @@ async function route(
             'password. If it is not, the Local Civil Registrar can sort it out.'
         )
       }
+      // The barangay is a row, so a named one has to exist and the name on the
+      // profile comes from it — the municipality rule, one tier down.
+      const chosenBarangay = body.barangayId
+        ? BARANGAYS.find((b) => b.id === body.barangayId)
+        : undefined
+      if (body.barangayId && !chosenBarangay) {
+        throw new DemoError(400, 'That barangay is not in this municipality.')
+      }
       const user: DemoUser = {
         id: uid(), email: body.email, password: body.password, fullName: body.fullName,
         role: 'resident', departments: [], position: null, active: true,
@@ -1095,8 +1422,9 @@ async function route(
         // Stamped from the deployment's own record, never from the request.
         municipalityCode: MUNICIPALITY.code,
         identityKey: identity,
+        barangayId: chosenBarangay?.id ?? null,
         profile: {
-          philSysId: null, barangay: body.barangay ?? null,
+          philSysId: null, barangay: chosenBarangay?.name ?? body.barangay ?? null,
           municipality: MUNICIPALITY.name,
           province: MUNICIPALITY.province, birthDate: body.birthDate, address: body.address ?? null, phone: null,
         },

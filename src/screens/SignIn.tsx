@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Building2, Loader2 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { api, ApiError, IS_DEMO } from '../lib/api'
@@ -20,10 +20,18 @@ export default function SignIn() {
   // them would be asking the browser to assert something it does not decide.
   const [form, setForm] = useState({
     email: '', password: '', fullName: '',
-    barangay: '', birthDate: '', motherMaidenName: '',
+    barangayId: '', birthDate: '', motherMaidenName: '',
   })
+  const [barangays, setBarangays] = useState<Array<{ id: string; name: string }>>([])
   const [residesHere, setResidesHere] = useState(false)
   const { municipality } = useCatalogue()
+
+  // Public, and needed before anybody has an account. Fetched once rather than
+  // on switching to the register tab, so the list is there the moment it is
+  // wanted.
+  useEffect(() => {
+    api.barangays().then(setBarangays).catch(() => undefined)
+  }, [])
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -103,7 +111,30 @@ export default function SignIn() {
           )}
           {mode === 'register' && (
             <>
-              <Field label={t('auth.barangay')} value={form.barangay} onChange={set('barangay')} autoComplete="address-level4" />
+              {/*
+                A list, not a text box. The barangay is a row the municipality
+                keeps — it decides what the place is called, and it is what the
+                account is attached to — so a typed one could not be matched to
+                it. Where the list has not arrived the field is simply absent and
+                the barangay hub asks later, rather than offering an empty one.
+              */}
+              {barangays.length > 0 && (
+                <label className="block">
+                  <span className="mb-1 block text-[calc(13.5px_*_var(--text-scale))] font-medium text-navy-950">
+                    {t('auth.barangay')}
+                  </span>
+                  <select
+                    value={form.barangayId}
+                    onChange={set('barangayId')}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[calc(15px_*_var(--text-scale))] text-navy-950 outline-none transition focus:border-navy-600 focus:bg-white focus:ring-2 focus:ring-navy-600/15"
+                  >
+                    <option value="">{t('auth.barangayPick')}</option>
+                    {barangays.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {/* With the mother's maiden name, this is what separates two
                   residents of the same name — so both are required, and the
                   server refuses a second account matching an existing one. */}

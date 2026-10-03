@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import CategoryTile from '../components/CategoryTile'
+import TierSwitch from '../components/TierSwitch'
 import { useCatalogue } from '../lib/catalogue'
 import { useNav } from '../lib/nav'
 import { useT } from '../lib/i18n'
@@ -37,6 +38,12 @@ export default function Services() {
       <TopBar title={t('services.title')} subtitle={t('services.subtitle')} />
 
       <div className="px-4 pt-4">
+        {/* Which tier, before what service: the search below only ever looks at
+            the municipal catalogue. */}
+        <div className="mb-3">
+          <TierSwitch active="municipal" />
+        </div>
+
         <div className="relative">
           <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
           <input

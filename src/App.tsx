@@ -28,6 +28,9 @@ import MyData from './screens/MyData'
 import Emergency from './screens/Emergency'
 import ReportIncident from './screens/ReportIncident'
 import DataPrivacy from './screens/DataPrivacy'
+import BarangayHub from './screens/BarangayHub'
+import BarangayRequestForm from './screens/BarangayRequestForm'
+import BarangayConsole from './screens/barangay/BarangayConsole'
 
 function ScreenRouter() {
   const { screen } = useNav()
@@ -69,6 +72,10 @@ function ScreenRouter() {
       return <Emergency />
     case 'report-incident':
       return <ReportIncident />
+    case 'barangay':
+      return <BarangayHub />
+    case 'barangay-request':
+      return <BarangayRequestForm typeId={screen.typeId} />
     default:
       return <Dashboard />
   }
@@ -121,6 +128,10 @@ function RoleShell() {
 
   if (!user) return <SignIn />
   if (user.role === 'staff' || user.role === 'admin') return <StaffConsole />
+  // The barangay gets its own console rather than a tab in the municipal one:
+  // a barangay secretary has no business in a municipal queue, and separate
+  // shells mean there is no filter to get wrong.
+  if (user.role === 'barangay_admin' || user.role === 'barangay_officer') return <BarangayConsole />
 
   return (
     <NavProvider>

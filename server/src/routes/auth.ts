@@ -2,7 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
-import { authenticate, hashPassword, requireRole, signToken, verifyPassword } from '../auth.ts'
+import { authenticate, hashPassword, requireRole, signToken, verifyPassword, type Role } from '../auth.ts'
 import {
   checkLoginThrottle, clearLoginFailures, clientIp, LOGIN_LIMITS,
   purgeOldAttempts, recordLoginAttempt,
@@ -29,6 +29,11 @@ const registerSchema = z.object({
   // predictable substitutions.
   password: z.string().min(10, 'Use at least 10 characters.').max(200),
   fullName: z.string().min(2).max(120),
+  // Which barangay they live in, chosen from the list. Optional because an
+  // account can be made without it and the barangay hub asks later; given, it
+  // is the barangay the account is attached to, and the name on the profile
+  // comes from that row rather than from anything typed here.
+  barangayId: z.string().max(60).optional(),
   barangay: z.string().max(120).optional(),
   address: z.string().max(300).optional(),
   philSysId: z.string().max(60).optional(),
@@ -71,6 +76,18 @@ authRouter.post('/register', async (req, res) => {
   const municipality = await servedMunicipality()
   const identity = identityKey(body.fullName, body.birthDate, body.motherMaidenName)
 
+  // The barangay is a row, not a string. Where one is named it has to exist, and
+  // what goes on the profile is its own name — the same rule as the
+  // municipality, one tier down: the register decides what a place is called.
+  const barangay = body.barangayId
+    ? await one<{ id: string; name: string }>(
+        `select id, name from barangays where id = $1`, [body.barangayId]
+      )
+    : null
+  if (body.barangayId && !barangay) {
+    return res.status(400).json({ error: 'That barangay is not in this municipality.' })
+  }
+
   // One person, one account. A second registration under a new email address
   // would split their requests across two records, and an office looking one of
   // them up would find half their history.
@@ -94,10 +111,10 @@ authRouter.post('/register', async (req, res) => {
   const passwordHash = await hashPassword(body.password)
   const user = await transaction(async (client) => {
     const inserted = await client.query<{ id: string; email: string; role: string; full_name: string }>(
-      `insert into users (email, password_hash, role, full_name, municipality_code)
-       values ($1, $2, 'resident', $3, $4)
+      `insert into users (email, password_hash, role, full_name, municipality_code, barangay_id)
+       values ($1, $2, 'resident', $3, $4, $5)
        returning id, email, role, full_name`,
-      [body.email, passwordHash, body.fullName, municipality.code]
+      [body.email, passwordHash, body.fullName, municipality.code, barangay?.id ?? null]
     )
     const created = inserted.rows[0]!
     await client.query(
@@ -105,7 +122,7 @@ authRouter.post('/register', async (req, res) => {
          (user_id, philsys_id, barangay, municipality, province, birth_date, address, identity_key)
        values ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
-        created.id, body.philSysId ?? null, body.barangay ?? null, municipality.name,
+        created.id, body.philSysId ?? null, barangay?.name ?? body.barangay ?? null, municipality.name,
         municipality.province, body.birthDate, body.address ?? null, identity,
       ]
     )
@@ -139,7 +156,7 @@ authRouter.post('/login', async (req, res) => {
     })
   }
 
-  const user = await one<{ id: string; email: string; password_hash: string; role: 'resident' | 'staff' | 'admin'; full_name: string; municipality_code: string | null }>(
+  const user = await one<{ id: string; email: string; password_hash: string; role: Role; full_name: string; municipality_code: string | null }>(
     `select id, email, password_hash, role, full_name, municipality_code
        from users
       where lower(email) = lower($1) and deactivated_at is null`,

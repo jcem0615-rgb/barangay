@@ -25,6 +25,7 @@ export type NotificationKind =
   | 'appointment_booked' | 'appointment_cancelled' | 'appointment_missed'
   | 'complaint_filed' | 'complaint_answered'
   | 'incident_updated'
+  | 'barangay_request'
 
 export interface NotificationInput {
   userId: string

@@ -20,6 +20,8 @@ export type Screen =
   | { name: 'my-data' }
   | { name: 'emergency' }
   | { name: 'report-incident' }
+  | { name: 'barangay' }
+  | { name: 'barangay-request'; typeId: string }
 
 interface NavContextValue {
   screen: Screen

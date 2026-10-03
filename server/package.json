@@ -30,6 +30,7 @@
     "test:privacy": "node test/privacy.mjs",
     "test:payments": "node test/payments.mjs",
     "test:incidents": "node test/incidents.mjs",
+    "test:barangay": "node test/barangay.mjs",
     "test:residency": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/residency.mjs",
     "test:id-verification": "node test/id-verification.mjs",
     "test:hotlines": "node test/hotlines.mjs",
