@@ -20,7 +20,7 @@ export default function BottomNav() {
       : // Both tiers live under the Services tab: the switch at the top of each
         // catalogue is what distinguishes them, so a second nav item would be a
         // second place to make the same choice.
-        ['services', 'category', 'service-form', 'barangay', 'barangay-request'].includes(screen.name)
+        ['services', 'category', 'service-form', 'barangay', 'barangay-request', 'service-guide'].includes(screen.name)
         ? 'services'
         : screen.name === 'applications' || screen.name === 'application-detail' || screen.name === 'payment'
           ? 'applications'

@@ -30,6 +30,7 @@ import ReportIncident from './screens/ReportIncident'
 import DataPrivacy from './screens/DataPrivacy'
 import BarangayHub from './screens/BarangayHub'
 import BarangayRequestForm from './screens/BarangayRequestForm'
+import DocumentGuide from './screens/DocumentGuide'
 import BarangayConsole from './screens/barangay/BarangayConsole'
 
 function ScreenRouter() {
@@ -76,6 +77,8 @@ function ScreenRouter() {
       return <BarangayHub />
     case 'barangay-request':
       return <BarangayRequestForm typeId={screen.typeId} />
+    case 'service-guide':
+      return <DocumentGuide serviceId={screen.serviceId} certificateId={screen.certificateId} />
     default:
       return <Dashboard />
   }

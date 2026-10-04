@@ -116,6 +116,13 @@ usually `1` behind a single load balancer or ingress.
 - [ ] The electric cooperative named in the hotlines is the one that actually serves this
       municipality — Pangasinan is split between more than one
 - [ ] `UPLOAD_DIR` has room for incident video, and somebody owns deleting old evidence
+- [ ] **Every document's step-by-step route matches the office's Citizen's Charter.** The
+      seed ships a plausible ordering for all 17 municipal services and 6 barangay
+      certificates — which document to get first, and who issues it — written from common
+      practice rather than from this municipality's charter. Sit down with each office and
+      reconcile them. A resident who follows a wrong order makes exactly the wasted trip
+      the guide exists to prevent, and the municipality's name on the screen is why they
+      trusted it
 - [ ] **The barangay roster is the municipality's real one.** The seed ships six sample
       barangays with invented captains and secretaries; Malasiqui has 73. Take the list from
       the PSGC listing for this municipality, and get the officials' names from the hall —

@@ -22,6 +22,8 @@ export type Screen =
   | { name: 'report-incident' }
   | { name: 'barangay' }
   | { name: 'barangay-request'; typeId: string }
+  // One document's route, whichever tier issues it. Exactly one id is set.
+  | { name: 'service-guide'; serviceId?: string; certificateId?: string }
 
 interface NavContextValue {
   screen: Screen

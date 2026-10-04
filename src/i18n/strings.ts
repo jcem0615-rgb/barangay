@@ -463,6 +463,22 @@ export const en = {
 
   'auth.barangayPick': 'Choose your barangay',
 
+  // the step-by-step route to one document
+  'guide.title': 'How to get this',
+  'guide.subtitle': 'Step by step, in order',
+  'guide.none': 'The office has not published a step-by-step list for this one yet. The requirements on the form are what it asks for.',
+  'guide.onlyIf': 'Only if {condition}',
+  'guide.howToGet': 'How to get this one',
+  'guide.howToGetBarangay': 'Get this from your barangay',
+  'guide.fee': 'Fee',
+  'guide.takes': 'Takes',
+  'guide.sameDay': 'Same day',
+  'guide.start': 'Start this application',
+  'guide.confirm': 'Requirements change. If you are travelling for this, ring the office first and check.',
+  'guide.allNumbers': 'See the office numbers',
+  'guide.cta': 'How to get this, step by step',
+  'guide.ctaBlurb': '{count} steps, and which one to do first',
+
   // Which tier of government. The pair appears on the dashboard as the two
   // largest controls and again as a switch above either catalogue.
   'tier.label': 'Level of government',
@@ -963,6 +979,21 @@ export const fil: Record<StringKey, string> = {
   'sos.call': 'Tawagan ang {agency} sa {phone}',
 
   'auth.barangayPick': 'Piliin ang barangay mo',
+  'guide.title': 'Paano ito makuha',
+  'guide.subtitle': 'Hakbang-hakbang, ayon sa pagkakasunod',
+  'guide.none': 'Wala pang nakalathalang hakbang-hakbang ang tanggapan para dito. Ang mga requirement sa form ang hinihingi nito.',
+  'guide.onlyIf': 'Kung {condition} lamang',
+  'guide.howToGet': 'Paano makuha ito',
+  'guide.howToGetBarangay': 'Kunin ito sa barangay mo',
+  'guide.fee': 'Bayad',
+  'guide.takes': 'Tagal',
+  'guide.sameDay': 'Kaparehong araw',
+  'guide.start': 'Simulan ang aplikasyon',
+  'guide.confirm': 'Nagbabago ang mga requirement. Kung maglalakbay ka para dito, tumawag muna sa tanggapan at magtanong.',
+  'guide.allNumbers': 'Tingnan ang mga numero ng tanggapan',
+  'guide.cta': 'Paano ito makuha, hakbang-hakbang',
+  'guide.ctaBlurb': '{count} hakbang, at kung alin ang unahin',
+
   'tier.label': 'Antas ng pamahalaan',
   'tier.municipal': 'Munisipyo',
   'tier.barangay': 'Barangay',

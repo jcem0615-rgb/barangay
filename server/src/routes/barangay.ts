@@ -32,15 +32,16 @@ barangayPublicRouter.get('/', async (_req, res) => {
 
 barangayPublicRouter.get('/certificates', async (_req, res) => {
   const rows = await query<{
-    id: string; name: string; description: string; fee_centavos: number; purpose_hint: string
+    id: string; name: string; description: string; fee_centavos: number
+    purpose_hint: string; steps: unknown[]
   }>(
-    `select id, name, description, fee_centavos, purpose_hint
+    `select id, name, description, fee_centavos, purpose_hint, steps
        from barangay_certificate_types where active = true order by sort_order, name`
   )
   res.json(
     rows.map((r) => ({
       id: r.id, name: r.name, description: r.description,
-      fee: toPesos(r.fee_centavos), purposeHint: r.purpose_hint,
+      fee: toPesos(r.fee_centavos), purposeHint: r.purpose_hint, steps: r.steps,
     }))
   )
 })
@@ -58,9 +59,10 @@ barangayRouter.get('/me', async (req, res) => {
   if (!row) return res.json({ barangay: null, certificates: [] })
 
   const types = await query<{
-    id: string; name: string; description: string; fee_centavos: number; purpose_hint: string
+    id: string; name: string; description: string; fee_centavos: number
+    purpose_hint: string; steps: unknown[]
   }>(
-    `select t.id, t.name, t.description, t.purpose_hint,
+    `select t.id, t.name, t.description, t.purpose_hint, t.steps,
             coalesce(f.fee_centavos, t.fee_centavos) as fee_centavos
        from barangay_certificate_types t
        left join barangay_certificate_fees f on f.type_id = t.id and f.barangay_id = $1
@@ -72,7 +74,7 @@ barangayRouter.get('/me', async (req, res) => {
     barangay: { id: row.id, name: row.name, captain: row.captain },
     certificates: types.map((t) => ({
       id: t.id, name: t.name, description: t.description,
-      fee: toPesos(t.fee_centavos), purposeHint: t.purpose_hint,
+      fee: toPesos(t.fee_centavos), purposeHint: t.purpose_hint, steps: t.steps,
     })),
   })
 })

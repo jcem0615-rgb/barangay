@@ -9,6 +9,7 @@
 // catalogue back from the server at runtime — this is the authoring source.
 import type {
   EmergencyContact, SectoralProgram, ServiceCategory, ServiceCategoryId, ServiceDefinition,
+  ServiceStep,
 } from '../types'
 
 /**
@@ -77,6 +78,8 @@ export interface BarangayCertificateType {
   fee: number
   /** What the resident has to say before it can be issued. */
   purposeHint: string
+  /** How to get it, in order. */
+  steps: ServiceStep[]
 }
 
 export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
@@ -86,6 +89,12 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'The one almost everything else asks for first — employment, a permit, a bank.',
     fee: 50,
     purposeHint: 'e.g. local employment, bank requirement',
+    steps: [
+      { label: 'Be a resident of this barangay', where: 'Your barangay', note: 'The barangay checks this against its own records at the counter.' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Say what it is for', where: 'On the next screen', note: 'The purpose is written on the certificate, so it has to match what you will use it for.' },
+      { label: 'Collect and pay at the barangay hall', where: 'Your barangay' },
+    ],
   },
   {
     id: 'residency',
@@ -93,6 +102,12 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'Proof that you live in this barangay, and for how long.',
     fee: 30,
     purposeHint: 'e.g. school enrolment, PhilHealth',
+    steps: [
+      { label: 'Be a resident of this barangay', where: 'Your barangay', note: 'Some barangays ask how long you have lived there, so know the date you moved in.' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Say what it is for', where: 'On the next screen' },
+      { label: 'Collect and pay at the barangay hall', where: 'Your barangay' },
+    ],
   },
   {
     id: 'indigency',
@@ -102,6 +117,12 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     // kind of thing this certificate exists to relieve.
     fee: 0,
     purposeHint: 'e.g. hospital bill, DSWD assistance',
+    steps: [
+      { label: 'Be a resident of this barangay', where: 'Your barangay' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Say what it is for', where: 'On the next screen', note: 'Name the assistance you are applying for — the office receiving it will look for that.' },
+      { label: 'Collect it at the barangay hall', where: 'Your barangay', note: 'Free. A barangay may not charge for proof of poverty.' },
+    ],
   },
   {
     id: 'business-clearance',
@@ -109,6 +130,12 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'Required before the municipal business permit — the BOSS asks for it.',
     fee: 100,
     purposeHint: 'e.g. new sari-sari store, renewal',
+    steps: [
+      { label: 'Be a resident, or have the business located in this barangay', where: 'Your barangay' },
+      { label: 'Proof of the business address', where: 'Your lease contract or land title' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Collect and pay at the barangay hall', where: 'Your barangay', note: 'Get this before the municipal business permit — the BOSS will ask for it.' },
+    ],
   },
   {
     id: 'good-moral',
@@ -116,6 +143,12 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'Usually for a school, a scholarship, or a first job.',
     fee: 30,
     purposeHint: 'e.g. scholarship application',
+    steps: [
+      { label: 'Be a resident of this barangay', where: 'Your barangay', note: 'The barangay will check its blotter, so this is not issued on the spot everywhere.' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Say what it is for', where: 'On the next screen' },
+      { label: 'Collect and pay at the barangay hall', where: 'Your barangay' },
+    ],
   },
   {
     id: 'first-time-jobseeker',
@@ -123,6 +156,12 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'Under RA 11261, which also makes it free and waives other fees.',
     fee: 0,
     purposeHint: 'e.g. first employment requirements',
+    steps: [
+      { label: 'Be a resident of this barangay for at least six months', where: 'Your barangay', note: 'RA 11261 sets the residency period, not the barangay.' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Say what it is for', where: 'On the next screen' },
+      { label: 'Collect it at the barangay hall', where: 'Your barangay', note: 'Free by law, and it waives the fees on the documents you need for that first job.' },
+    ],
   },
 ]
 
@@ -201,6 +240,19 @@ export function findCategory(id: ServiceCategoryId): ServiceCategory | undefined
   return SERVICE_CATEGORIES.find((c) => c.id === id)
 }
 
+/**
+ * The service catalogue.
+ *
+ * **The `steps` on each service are placeholder content, like the hotlines and
+ * the holiday calendar.** They are a careful reading of how these documents are
+ * ordinarily obtained in a Philippine municipality, and they are not this
+ * municipality's Citizen's Charter. The whole point of the guide is to stop a
+ * resident making a wasted trip, so a step list that is wrong about what comes
+ * first does the exact harm the feature exists to prevent — and it does it with
+ * the municipality's name on the screen, which is what makes a resident believe
+ * it. Check every chain against the office's own charter before launch, and
+ * re-check whenever a requirement changes.
+ */
 export const SERVICES: ServiceDefinition[] = [
   {
     id: 'boss-application',
@@ -214,6 +266,14 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['DTI / SEC registration', 'Barangay Business Clearance', 'Lease contract or land title', 'Fire Safety Inspection Certificate'],
     searchTerms: ['business permit', 'mayor’s permit', 'negosyo', 'sari-sari store', 'tindahan', 'new business', 'renewal', 'business registration', 'permit sa negosyo'],
+    steps: [
+      { label: 'Barangay Business Clearance', where: 'Your barangay', certificateId: 'business-clearance', note: 'The barangay has to clear the location before the municipality will look at the permit.' },
+      { label: 'DTI registration (sole proprietor) or SEC registration (corporation or partnership)', where: 'DTI / SEC — not the municipality', note: 'Register the business name nationally first. The municipality licenses the business; it does not name it.' },
+      { label: 'Lease contract, or land title if you own the place', where: 'Your lessor, or the Registry of Deeds' },
+      { label: 'Fire Safety Inspection Certificate', where: 'Bureau of Fire Protection', note: 'Issued after an inspection, so book it early — this is the step most often waited on.' },
+      { label: 'Sanitary Permit', where: 'Municipal Health Office', serviceId: 'sanitary-permit', onlyIf: 'you will handle food or drink' },
+      { label: 'File the application here', where: 'Business Permits (BOSS)' },
+    ],
     fields: [
       { id: 'businessName', label: 'Business name', type: 'text', placeholder: 'e.g. Santos Sari-Sari Store', required: true },
       { id: 'businessType', label: 'Application type', type: 'select', options: ['New Business', 'Renewal'], required: true },
@@ -234,6 +294,12 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: false,
     requirements: ['Valid government ID', 'Certificate of Indigency', 'Case-specific proof (medical abstract, death certificate, etc.)'],
     searchTerms: ['ayuda', 'financial assistance', 'tulong', 'medical assistance', 'burial assistance', 'libing', 'pamasahe', 'crisis', 'AICS', 'cash aid'],
+    steps: [
+      { label: 'Certificate of Indigency', where: 'Your barangay', certificateId: 'indigency', note: 'Free, and free by law — a barangay may not charge for proof of poverty.' },
+      { label: 'Proof of what happened', where: 'The hospital, funeral home, or clinic', note: 'A medical abstract, a billing statement, a death certificate — whatever matches what you are asking help for.' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'File the application here', where: 'Social Welfare (CSWDO)' },
+    ],
     fields: [
       { id: 'assistanceType', label: 'Type of assistance', type: 'select', options: ['Medical Assistance', 'Burial Assistance', 'Transportation Assistance', 'Food Assistance'], required: true },
       { id: 'amountRequested', label: 'Amount requested (₱)', type: 'number', placeholder: 'e.g. 5000', required: true },
@@ -252,6 +318,13 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: false,
     requirements: ['Valid government ID', 'Birth certificate or proof of age', 'Medical certificate (for PWD)', '1x1 ID photo'],
     searchTerms: ['senior citizen', 'matanda', 'PWD', 'person with disability', 'may kapansanan', 'discount card', 'OSCA', 'senior ID'],
+    steps: [
+      { label: 'Birth certificate, or any document proving your age', where: 'Local Civil Registrar', serviceId: 'birth-certificate' },
+      { label: 'Medical certificate stating the disability', where: 'A licensed physician', onlyIf: 'you are applying as a person with disability' },
+      { label: 'One 1x1 ID photo', where: 'Any photo shop' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'File the application here', where: 'Social Welfare (CSWDO)', note: 'Free. A senior citizen or PWD ID is never sold.' },
+    ],
     fields: [
       { id: 'idType', label: 'ID type', type: 'select', options: ['Senior Citizen ID', 'PWD ID'], required: true },
       { id: 'applicationKind', label: 'Application kind', type: 'select', options: ['New Application', 'Renewal', 'Lost ID Replacement'], required: true },
@@ -270,6 +343,11 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Valid government ID', 'Complete name and date of birth of registrant'],
     searchTerms: ['birth certificate', 'birth cert', 'kapanganakan', 'PSA birth', 'NSO', 'born', 'live birth'],
+    steps: [
+      { label: "The registrant's complete name and date of birth", where: 'Write it exactly as it was registered', note: 'A middle name spelled differently from the register is the usual reason a copy comes back not found.' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Request it here', where: 'Local Civil Registrar' },
+    ],
     fields: [
       { id: 'registrantName', label: 'Full name of registrant', type: 'text', required: true },
       { id: 'dateOfBirth', label: 'Date of birth', type: 'date', required: true },
@@ -289,6 +367,11 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Valid government ID', 'Full names of both spouses and date of marriage'],
     searchTerms: ['marriage certificate', 'kasal', 'marriage cert', 'PSA marriage', 'wedding'],
+    steps: [
+      { label: 'Full names of both spouses and the date of marriage', where: 'Write them as they were registered' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Request it here', where: 'Local Civil Registrar' },
+    ],
     fields: [
       { id: 'spouse1', label: "Spouse 1 full name", type: 'text', required: true },
       { id: 'spouse2', label: "Spouse 2 full name", type: 'text', required: true },
@@ -308,6 +391,12 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Valid government ID', 'Full name of deceased and date of death', 'Proof of relationship to the deceased'],
     searchTerms: ['death certificate', 'namatay', 'death cert', 'PSA death', 'burial papers'],
+    steps: [
+      { label: 'Full name of the deceased and the date of death', where: 'Write it as it was registered' },
+      { label: 'Proof that you are related to them', where: 'A birth or marriage certificate showing the link' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Request it here', where: 'Local Civil Registrar' },
+    ],
     fields: [
       { id: 'deceasedName', label: 'Full name of deceased', type: 'text', required: true },
       { id: 'dateOfDeath', label: 'Date of death', type: 'date', required: true },
@@ -327,6 +416,11 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Valid government ID', 'Proof of address'],
     searchTerms: ['cedula', 'community tax', 'sedula', 'CTC', 'residence certificate', 'buwis sa paninirahan'],
+    steps: [
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Proof of your address', where: 'A utility bill, or your barangay', certificateId: 'residency' },
+      { label: 'Get it here', where: "Municipal Treasurer's Office", note: 'Many other transactions ask for a cedula, so this is often the first thing to get rather than the last.' },
+    ],
     fields: [
       { id: 'purpose', label: 'Purpose', type: 'select', options: ['Employment', 'Government Transaction', 'Bank / Loan Requirement', 'School Requirement', 'Other'], required: true },
       { id: 'occupation', label: 'Occupation', type: 'text', placeholder: 'e.g. Store owner', required: true },
@@ -345,6 +439,11 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: false,
     requirements: ['Tax Declaration number', 'Latest official receipt (if previously paid)'],
     searchTerms: ['real property tax', 'amilyar', 'land tax', 'property assessment', 'tax declaration', 'lupa'],
+    steps: [
+      { label: 'Your Tax Declaration number', where: 'On your last tax receipt or declaration' },
+      { label: 'The latest official receipt, if you have paid before', where: 'Your own records' },
+      { label: 'Request the assessment here', where: "Municipal Treasurer's Office", note: 'Free. This tells you what is owed; it does not pay it.' },
+    ],
     fields: [
       { id: 'taxDecNo', label: 'Tax Declaration number', type: 'text', placeholder: 'e.g. 03-0012-00456', required: true },
       { id: 'propertyType', label: 'Property type', type: 'select', options: ['Residential Land', 'Residential Building', 'Commercial', 'Agricultural', 'Machinery'], required: true },
@@ -364,6 +463,12 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Tax Declaration number', 'Latest real property tax official receipt', 'Valid government ID'],
     searchTerms: ['tax clearance', 'real property clearance', 'amilyar clearance', 'no tax due', 'property clearance'],
+    steps: [
+      { label: 'Know what is owed', where: "Municipal Treasurer's Office", serviceId: 'rpt-assessment' },
+      { label: 'Settle the real property tax in full', where: "Municipal Treasurer's Office", note: 'A clearance says nothing is owed, so nothing can be owed. Keep the receipt.' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Request the clearance here', where: "Municipal Treasurer's Office" },
+    ],
     fields: [
       { id: 'taxDecNo', label: 'Tax Declaration number', type: 'text', placeholder: 'e.g. 03-0012-00456', required: true },
       { id: 'purpose', label: 'Purpose', type: 'select', options: ['Property Sale / Transfer', 'Bank Loan Collateral', 'Building Permit Requirement', 'Other'], required: true },
@@ -382,6 +487,12 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Tax Declaration or land title', 'Vicinity map / sketch plan', 'Real Property Tax Clearance'],
     searchTerms: ['zoning', 'locational clearance', 'land use', 'zoning clearance', 'pwesto'],
+    steps: [
+      { label: 'Land title, or the Tax Declaration for the lot', where: 'Registry of Deeds, or the Assessor' },
+      { label: 'Real Property Tax Clearance', where: "Municipal Treasurer's Office", serviceId: 'rpt-clearance' },
+      { label: 'Vicinity map or sketch plan of the lot', where: 'A geodetic engineer, or your plans' },
+      { label: 'Apply here', where: 'Building & Zoning (OBO)', note: 'Zoning comes before the building permit: it answers whether you may build that there at all.' },
+    ],
     fields: [
       { id: 'projectType', label: 'Intended use', type: 'select', options: ['Residential', 'Commercial', 'Industrial', 'Institutional', 'Mixed Use'], required: true },
       { id: 'projectLocation', label: 'Property location', type: 'textarea', placeholder: 'Lot, street, barangay', required: true },
@@ -406,6 +517,14 @@ export const SERVICES: ServiceDefinition[] = [
       'Real Property Tax Clearance',
     ],
     searchTerms: ['building permit', 'construction', 'magpapatayo', 'bahay', 'renovation', 'pagpapagawa', 'structure'],
+    steps: [
+      { label: 'Zoning / Locational Clearance', where: 'Building & Zoning (OBO)', serviceId: 'zoning-clearance', note: 'Do this one first. If zoning says no, nothing after it matters.' },
+      { label: 'Land title, or the Tax Declaration for the lot', where: 'Registry of Deeds, or the Assessor' },
+      { label: 'Real Property Tax Clearance', where: "Municipal Treasurer's Office", serviceId: 'rpt-clearance' },
+      { label: 'Five sets of plans, signed and sealed', where: 'A licensed architect or civil engineer', note: 'Signed and sealed by the professional who prepared them — unsigned plans are returned.' },
+      { label: 'Structural computations', where: 'The same licensed professional' },
+      { label: 'Apply here', where: 'Building & Zoning (OBO)', note: 'Apply before any work starts. A permit does not cover what has already been built.' },
+    ],
     fields: [
       { id: 'workType', label: 'Scope of work', type: 'select', options: ['New Construction', 'Renovation / Alteration', 'Addition', 'Repair', 'Demolition'], required: true },
       { id: 'occupancyType', label: 'Occupancy classification', type: 'select', options: ['Residential (Single)', 'Residential (Duplex)', 'Commercial', 'Industrial', 'Institutional'], required: true },
@@ -426,6 +545,13 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Approved Building Permit', 'Certificate of Completion', 'As-built plans', 'Fire Safety Inspection Certificate'],
     searchTerms: ['occupancy permit', 'certificate of occupancy', 'move in', 'tapos na bahay', 'final inspection'],
+    steps: [
+      { label: 'Approved Building Permit', where: 'Building & Zoning (OBO)', serviceId: 'building-permit' },
+      { label: 'Certificate of Completion', where: 'Your architect or engineer' },
+      { label: 'As-built plans', where: 'Your architect or engineer', note: 'What was actually built, which is not always what was drawn.' },
+      { label: 'Fire Safety Inspection Certificate', where: 'Bureau of Fire Protection' },
+      { label: 'Apply here', where: 'Building & Zoning (OBO)', note: 'This is what makes the building legal to occupy. Get it before anyone moves in.' },
+    ],
     fields: [
       { id: 'buildingPermitNo', label: 'Building Permit number', type: 'text', placeholder: 'e.g. BP-2026-00214', required: true },
       { id: 'completionDate', label: 'Date of completion', type: 'date', required: true },
@@ -444,6 +570,13 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Valid government ID', 'Chest X-ray result', 'Stool and urinalysis results', 'Completed medical examination'],
     searchTerms: ['health certificate', 'health card', 'yellow card', 'food handler', 'sanitary health', 'medical clearance'],
+    steps: [
+      { label: 'Chest X-ray', where: 'Any accredited clinic or hospital' },
+      { label: 'Stool and urinalysis', where: 'The same clinic', note: 'Results take a day or two, so have these done before anything else here.' },
+      { label: 'Medical examination', where: 'Municipal Health Office, or an accredited clinic' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'Apply here', where: 'Municipal Health Office' },
+    ],
     fields: [
       { id: 'employer', label: 'Employer / establishment', type: 'text', placeholder: 'e.g. Santos Sari-Sari Store', required: true },
       { id: 'natureOfWork', label: 'Nature of work', type: 'select', options: ['Food Handler', 'Food Service Crew', 'Sales / Front Desk', 'Personal Care Services', 'Other'], required: true },
@@ -462,6 +595,16 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Business permit application', 'Health Certificates of all workers', 'Water potability test result'],
     searchTerms: ['sanitary permit', 'sanitation', 'kalinisan', 'food establishment', 'restaurant permit', 'karinderya'],
+    steps: [
+      { label: 'A Health Certificate for every worker', where: 'Municipal Health Office', serviceId: 'health-certificate', note: 'Every one of them, not just the owner. This is usually the slowest part.' },
+      { label: 'Water potability test result', where: 'An accredited laboratory' },
+      // Deliberately not a link back to the business permit, though it is the
+      // same transaction: the two genuinely reference each other, and a guide
+      // that lets you tap between them forever is worse than one that says so
+      // in a sentence. The link runs one way, from the permit to this.
+      { label: 'Your business permit application', where: 'Business Permits (BOSS)', note: 'These two are filed together — the BOSS asks for this permit, and this one asks for that application. Start at the BOSS.' },
+      { label: 'Apply here', where: 'Municipal Health Office' },
+    ],
     fields: [
       { id: 'businessName', label: 'Establishment name', type: 'text', placeholder: 'e.g. Santos Sari-Sari Store', required: true },
       { id: 'establishmentType', label: 'Type of establishment', type: 'select', options: ['Food Establishment', 'Retail Store', 'Salon / Personal Care', 'Lodging', 'Other'], required: true },
@@ -481,6 +624,13 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: true,
     requirements: ['Valid government ID', 'Community Tax Certificate (Cedula)', 'Health Certificate', 'Certificate of employment'],
     searchTerms: ['occupational permit', 'working permit', 'worker permit', 'employment permit', 'trabaho'],
+    steps: [
+      { label: 'Community Tax Certificate (Cedula)', where: "Municipal Treasurer's Office", serviceId: 'cedula' },
+      { label: 'Health Certificate', where: 'Municipal Health Office', serviceId: 'health-certificate', note: 'Needs laboratory results of its own, so start it before the rest.' },
+      { label: 'Certificate of employment from your employer', where: 'Your employer' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'File the application here', where: 'Business Permits (BOSS)' },
+    ],
     fields: [
       { id: 'employer', label: 'Employer', type: 'text', placeholder: 'e.g. Malasiqui Trading Corp.', required: true },
       { id: 'position', label: 'Position', type: 'text', placeholder: 'e.g. Sales Associate', required: true },
@@ -505,6 +655,14 @@ export const SERVICES: ServiceDefinition[] = [
       'Parental consent or advice (if 18\u201324 years old)',
     ],
     searchTerms: ['marriage license', 'ikakasal', 'wedding license', 'apply to marry', 'pakasal'],
+    steps: [
+      { label: 'PSA birth certificate of both of you', where: 'Local Civil Registrar', serviceId: 'birth-certificate' },
+      { label: 'CENOMAR for both of you', where: 'PSA', note: 'Certificate of No Marriage Record. Order it early — it comes from the national office, not this one.' },
+      { label: 'Pre-marriage counselling certificate', where: 'Social Welfare (CSWDO) or the Health Office' },
+      { label: 'Parental consent, or parental advice', where: 'Your parents, in writing', note: 'Consent if either of you is 18 to 20; advice if 21 to 24.', onlyIf: 'either of you is under 25' },
+      { label: 'Valid government IDs for both of you', where: 'You already have these' },
+      { label: 'Apply here', where: 'Local Civil Registrar', note: 'The application is posted publicly for 10 days before the licence is released. Count that in.' },
+    ],
     fields: [
       { id: 'applicantName', label: 'Your full name', type: 'text', required: true },
       { id: 'partnerName', label: "Partner's full name", type: 'text', required: true },
@@ -525,6 +683,13 @@ export const SERVICES: ServiceDefinition[] = [
     requiresPayment: false,
     requirements: ['Valid government ID', 'Birth certificate of child / children', 'Proof of solo parent status', 'Certificate of no marriage or death certificate of spouse (if applicable)'],
     searchTerms: ['solo parent', 'single parent', 'solo parent ID', 'nag-iisang magulang', 'RA 8972'],
+    steps: [
+      { label: 'Birth certificate of each child', where: 'Local Civil Registrar', serviceId: 'birth-certificate' },
+      { label: 'Barangay certification that you are raising them alone', where: 'Your barangay', note: 'Ask at the barangay hall — not every barangay calls it the same thing.' },
+      { label: 'CENOMAR, or the death certificate of your spouse', where: 'PSA, or the Local Civil Registrar', serviceId: 'death-certificate', onlyIf: 'you were married' },
+      { label: 'Any valid government ID', where: 'You already have this' },
+      { label: 'File the application here', where: 'Social Welfare (CSWDO)' },
+    ],
     fields: [
       { id: 'groundForSoloParent', label: 'Ground for solo parent status', type: 'select', options: ['Death of Spouse', 'Separation / Abandonment', 'Annulled Marriage', 'Solo Adoptive Parent', 'Other'], required: true },
       { id: 'childrenCount', label: 'Number of dependent children', type: 'number', placeholder: 'e.g. 2', required: true },

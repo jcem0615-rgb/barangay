@@ -60,8 +60,8 @@ async function main() {
         `insert into services (id, department_id, name, short_description, processing_time,
                                processing_days_min, processing_days_max,
                                fee_centavos, requires_payment, requirements, fields,
-                               search_terms, active)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true)
+                               search_terms, steps, active)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
          on conflict (id) do update set
            department_id = excluded.department_id, name = excluded.name,
            short_description = excluded.short_description,
@@ -71,13 +71,14 @@ async function main() {
            fee_centavos = excluded.fee_centavos,
            requires_payment = excluded.requires_payment,
            requirements = excluded.requirements, fields = excluded.fields,
-           search_terms = excluded.search_terms, active = true`,
+           search_terms = excluded.search_terms, steps = excluded.steps, active = true`,
         [
           service.id, service.categoryId, service.name, service.shortDescription,
           service.processingTime, service.processingDaysMin, service.processingDaysMax,
           toCentavos(service.fee), service.requiresPayment,
           JSON.stringify(service.requirements), JSON.stringify(service.fields),
           service.searchTerms ?? [],
+          JSON.stringify(service.steps ?? []),
         ]
       )
     }
@@ -132,13 +133,16 @@ async function main() {
     for (const [index, type] of BARANGAY_CERTIFICATES.entries()) {
       await client.query(
         `insert into barangay_certificate_types
-           (id, name, description, fee_centavos, purpose_hint, sort_order)
-         values ($1, $2, $3, $4, $5, $6)
+           (id, name, description, fee_centavos, purpose_hint, sort_order, steps)
+         values ($1, $2, $3, $4, $5, $6, $7)
          on conflict (id) do update set
            name = excluded.name, description = excluded.description,
            fee_centavos = excluded.fee_centavos, purpose_hint = excluded.purpose_hint,
-           sort_order = excluded.sort_order`,
-        [type.id, type.name, type.description, toCentavos(type.fee), type.purposeHint, index]
+           sort_order = excluded.sort_order, steps = excluded.steps`,
+        [
+          type.id, type.name, type.description, toCentavos(type.fee), type.purposeHint,
+          index, JSON.stringify(type.steps ?? []),
+        ]
       )
     }
 

@@ -1,6 +1,6 @@
 import type {
   Application, EmergencyContact, Municipality, ResidentProgram, SectoralProgram,
-  ServiceCategory, ServiceDefinition,
+  ServiceCategory, ServiceDefinition, ServiceStep,
 } from '../types'
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'
@@ -641,12 +641,20 @@ export const api = {
   /** Public: the sign-up and profile screens need this before any account. */
   barangays: () => request<Array<{ id: string; name: string; captain: string | null }>>('/barangays'),
 
+  /** The certificate catalogue, public — the guide needs it before any account. */
+  barangayCertificates: () =>
+    request<Array<{
+      id: string; name: string; description: string; fee: number
+      purposeHint: string; steps: ServiceStep[]
+    }>>('/barangays/certificates'),
+
   /** The resident's own barangay, and what it charges for each certificate. */
   myBarangay: () =>
     request<{
       barangay: { id: string; name: string; captain: string | null } | null
       certificates: Array<{
-        id: string; name: string; description: string; fee: number; purposeHint: string
+        id: string; name: string; description: string; fee: number
+        purposeHint: string; steps: ServiceStep[]
       }>
     }>('/barangay/me'),
 

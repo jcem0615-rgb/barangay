@@ -29,6 +29,41 @@ export interface ServiceField {
   helper?: string
 }
 
+/**
+ * One step on the way to a document.
+ *
+ * `requirements` says *what* to bring; it does not say where any of it comes
+ * from or which to get first, and that is the question that actually costs
+ * people a wasted trip. A resident told they need a Barangay Business Clearance
+ * is not told that the barangay issues it, that this app can start it, or that
+ * it has to exist before the permit can be filed at all.
+ *
+ * So steps are ordered, each names who issues it, and one that this app can
+ * itself issue carries the id — which turns a line of text into somewhere to
+ * tap. The two lists live side by side on purpose: requirements drives the
+ * upload checklist on a filed request, steps is the route to having them, and a
+ * step like "pay at the window" is a real step and never an attachment.
+ */
+export interface ServiceStep {
+  /** What to get or do, in the words a resident would use. */
+  label: string
+  /** Who issues it, or where it happens. */
+  where: string
+  /** The municipal service here that issues it, when one does. */
+  serviceId?: string
+  /** The barangay certificate that issues it, when one does. */
+  certificateId?: string
+  /** The one thing about this step worth more than the step itself. */
+  note?: string
+  /**
+   * True where the step applies only to some applicants — a food business, a
+   * PWD, an applicant aged 18–24. Shown as a condition rather than silently
+   * listed, because a resident chasing a document they never needed is the same
+   * wasted trip in the other direction.
+   */
+  onlyIf?: string
+}
+
 export interface ServiceDefinition {
   id: string
   categoryId: ServiceCategoryId
@@ -55,6 +90,12 @@ export interface ServiceDefinition {
    * Never shown; they only widen what matches.
    */
   searchTerms: string[]
+  /**
+   * How to get this, in order. Empty where the municipality has not written it
+   * down yet — the guide screen then falls back to the flat requirements list
+   * rather than inventing an order.
+   */
+  steps: ServiceStep[]
 }
 
 export const WORKFLOW_STEPS = [

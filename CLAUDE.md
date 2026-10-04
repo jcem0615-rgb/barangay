@@ -182,11 +182,66 @@ account without one answers 409 to everything.
 **The console stays English**, like the municipal one and for the same reason. The resident
 side is translated; certificate names are not, exactly like "Cedula" and "Building Permit".
 
+## How to get a document
+
+`requirements` said *what* to bring. It never said where any of it comes from or
+which to get first, and that is the question that actually costs a resident a
+morning: somebody who turns up for a business permit without the barangay
+clearance is sent away, and the wasted trip is the single most expensive thing
+about dealing with an LGU.
+
+So every service and every barangay certificate carries `steps` — an ordered
+`ServiceStep[]` (`src/types.ts`), authored in `mockData.ts`, stored as `jsonb`
+and published on the catalogue. `DocumentGuide.tsx` renders it as a numbered
+vertical chain with a connector line. Vertical because a left-to-right flow chart
+is unreadable at 430px, and the order is the only thing the shape has to carry.
+
+**A step that this app can itself issue is a button, not a sentence.** That is
+the whole payoff of holding both tiers: a step carrying `certificateId:
+'business-clearance'` stops being a thing to go and find out about and becomes
+the next tap, which opens *that* document's route. Chains go four deep —
+Certificate of Occupancy → Building Permit → Zoning Clearance → Real Property Tax
+Clearance → Assessment — and each is walkable.
+
+**The two lists live side by side on purpose.** `requirements` drives the upload
+checklist on a filed request; `steps` is the route to having them. They are not
+the same granularity and merging them would break both: "pay at the window" is a
+real step and never an attachment, and an attachment slot for "DTI registration"
+tells nobody that DTI is not the municipality.
+
+**What applies only to some applicants says so before it says what it is**
+(`onlyIf`). A food business needs a Sanitary Permit and a hardware store does
+not; a resident chasing a document they never needed is the same wasted trip in
+the other direction, so the condition is a badge above the label rather than a
+footnote under it.
+
+**Links are one-way, even where the real process is not.** The business permit
+and the sanitary permit genuinely reference each other — they are filed together
+— but a guide that lets a resident tap between two documents forever is worse
+than one that says so in a sentence. The cycle is broken deliberately, the link
+runs permit → sanitary permit, and `server/test/document-steps.mjs` walks the
+whole graph to prove no other cycle exists. That suite also refuses a step
+pointing at a service or certificate that does not exist, and a route that ends
+on a prerequisite rather than on applying.
+
+**The guide ends with the office's phone number, not a disclaimer.** A process
+changes without telling an app, and "confirm before you travel" is useless advice
+without the number to confirm with. Ringing costs a minute; the trip this exists
+to save costs a morning.
+
+**Every chain here is placeholder content, exactly like the hotlines.** They are
+a careful reading of how these documents are ordinarily obtained in a Philippine
+municipality — they are not this municipality's Citizen's Charter. A step list
+that is wrong about what comes first does the precise harm the feature exists to
+prevent, under the municipality's own name, which is what makes a resident
+believe it. Check every chain against the office's charter before launch.
+
 ## Adding a new service
 
 Everything about a service (fields, requirements, fee, processing time) is data, not code.
 Add an entry to `SERVICES` in `src/data/mockData.ts` with a `ServiceField[]` (and a
-`processingDaysMin`/`Max` matching its `processingTime` prose) — `ServiceForm.tsx`
+`processingDaysMin`/`Max` matching its `processingTime` prose, and a `steps[]` route —
+see *How to get a document*) — `ServiceForm.tsx`
 renders any combination of `text` / `select` / `date` / `textarea` / `number` fields
 automatically, no new screen needed. If a category needs an icon not already in
 `src/lib/icons.ts`, import it from `lucide-react` and register it there.
@@ -1066,6 +1121,17 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   and barangay IDs are not here.** The certificate lifecycle is the spine; those are each
   their own feature with their own rules, and bolting them on as fields of this one would
   get them all wrong.
+- **The document routes are a reading of common practice, not a charter.** Every `steps`
+  chain is placeholder content on the same footing as the hotlines and the holiday
+  calendar: plausible, carefully ordered, and not verified against what this municipality
+  actually asks for. Reconcile them with each office's Citizen's Charter before launch,
+  and re-check whenever a requirement changes — the app reports the order confidently and
+  a resident will act on it.
+- **Nothing checks that a prerequisite was actually obtained.** The guide says to get the
+  barangay clearance first; the municipal form will still accept a submission without it,
+  and the office catches it. Enforcing the chain server-side would mean knowing that *this*
+  resident's clearance is the one the permit needs, which is a document-matching problem
+  this app has no way to solve.
 - Navigation stack resets on reload (in-memory, not URL-based).
 
 ## Demo build

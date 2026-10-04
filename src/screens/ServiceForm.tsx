@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, CheckCircle2, ClipboardList, CloudOff, Loader2, Paperclip, Send, Trash2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
+import GuideLink from '../components/GuideLink'
 import PushToggle from '../components/PushToggle'
 import FormField from '../components/FormField'
 import OfflineBanner from '../components/OfflineBanner'
@@ -179,6 +180,8 @@ export default function ServiceForm({ serviceId }: { serviceId: string }) {
 
       <div className="space-y-4 px-4 pt-4">
         {!isOnline && <OfflineBanner />}
+
+        <GuideLink serviceId={service.id} stepCount={service.steps?.length ?? 0} />
 
         {draft.restored && (
           <div className="flex items-start gap-2.5 rounded-2xl border border-gold-500/40 bg-gold-100/60 p-3.5">

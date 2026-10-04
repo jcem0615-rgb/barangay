@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
+import GuideLink from '../components/GuideLink'
 import { api, ApiError } from '../lib/api'
 import { formatPeso } from '../lib/money'
 import { useNav } from '../lib/nav'
@@ -17,7 +18,9 @@ import { useT } from '../lib/i18n'
 export default function BarangayRequestForm({ typeId }: { typeId: string }) {
   const { replace } = useNav()
   const { t } = useT()
-  const [type, setType] = useState<{ name: string; description: string; fee: number; purposeHint: string } | null>(null)
+  const [type, setType] = useState<
+    { name: string; description: string; fee: number; purposeHint: string; steps?: unknown[] } | null
+  >(null)
   const [purpose, setPurpose] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +74,10 @@ export default function BarangayRequestForm({ typeId }: { typeId: string }) {
     <div className="animate-tap-in pb-24">
       <TopBar title={type?.name ?? t('brgy.title')} />
       <div className="px-4 pt-4">
+        <div className="mb-4">
+          <GuideLink certificateId={typeId} stepCount={type?.steps?.length ?? 0} />
+        </div>
+
         {type && (
           <>
             <p className="text-[calc(13.5px_*_var(--text-scale))] leading-snug text-slate-600">
