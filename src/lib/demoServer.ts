@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v16'
+const STORE_KEY = 'elgu-demo-state-v17'
 
 interface DemoIncident {
   id: string
@@ -168,6 +168,28 @@ interface DemoState {
   barangayRequests: DemoBarangayRequest[]
   /** barangay id -> certificate id -> fee in pesos. Only what a barangay changed. */
   barangayFees: Record<string, Record<string, number>>
+  /**
+   * The blotter. Held like everything else here, and read by nothing but the
+   * barangay console — the demo mirrors that rule because a demo that leaked it
+   * would teach the opposite of what the real server does.
+   */
+  blotter: DemoBlotterEntry[]
+}
+
+interface DemoBlotterEntry {
+  id: string; referenceNo: string; barangayId: string
+  complainant: string; complainantContact: string | null
+  respondent: string; respondentAddress: string | null
+  nature: string; narrative: string; occurredAt: string | null
+  status: 'recorded' | 'mediation' | 'settled' | 'unsettled' | 'withdrawn' | 'referred'
+  outcomeNote: string | null
+  recordedBy: string | null; recordedAt: string; updatedAt: string
+  summons: Array<{
+    id: string; sequence: number; hearingAt: string; venue: string; note: string | null
+    servedAt: string | null; servedNote: string | null
+    outcome: 'pending' | 'appeared' | 'failed_to_appear' | 'rescheduled' | 'cancelled'
+    issuedAt: string; issuedBy: string | null
+  }>
 }
 
 interface DemoBarangayRequest {
@@ -331,6 +353,7 @@ function seed(): DemoState {
     complaintCounter: 0,
     barangayRequests: [],
     barangayFees: {},
+    blotter: [],
   }
 
   const boss = SERVICES.find((s) => s.id === 'boss-application')!
@@ -396,6 +419,55 @@ function seed(): DemoState {
       updatedAt: at,
       note: null,
     })
+  }
+
+  // Two entries in the blotter so the console opens on a book rather than an
+  // empty table: one being mediated with a hearing called, one already settled.
+  // Both name people who are not sign-in accounts, which is the ordinary case —
+  // a respondent rarely has one, and matching them to one is exactly what this
+  // book must not do.
+  const bltrYear = new Date(now).getFullYear()
+  const blotterSeed: Array<[Partial<DemoBlotterEntry>, number]> = [
+    [{
+      complainant: 'Lourdes M. Fabro', complainantContact: '0917 555 0134',
+      respondent: 'Rodel A. Quinto', respondentAddress: 'Purok 2, Poblacion',
+      nature: 'Dispute between neighbours',
+      narrative: 'Complainant states the respondent has burned refuse against the shared fence on three occasions after being asked to stop, and that smoke enters her kitchen.',
+      status: 'mediation',
+    }, 6],
+    [{
+      complainant: 'Nestor B. Ancheta',
+      respondent: 'Vilma R. Soriano', respondentAddress: 'Purok 5, Poblacion',
+      nature: 'Debt or unpaid obligation',
+      narrative: 'Complainant states an agreed repayment of a loan has not been made since January and that messages have gone unanswered.',
+      status: 'settled',
+      outcomeNote: 'Parties agreed on repayment of ₱1,000 monthly beginning the first week of next month. Both signed.',
+    }, 40],
+  ]
+  for (const [seed, daysAgo] of blotterSeed) {
+    state.counters[`bltr-${bltrYear}`] = (state.counters[`bltr-${bltrYear}`] ?? 0) + 1
+    const at = new Date(now - 86400000 * daysAgo).toISOString()
+    const entry: DemoBlotterEntry = {
+      id: uid(),
+      referenceNo: `BLTR-${bltrYear}-${String(state.counters[`bltr-${bltrYear}`]).padStart(5, '0')}`,
+      barangayId: BARANGAYS[0]!.id,
+      complainantContact: null, respondentAddress: null, occurredAt: null, outcomeNote: null,
+      recordedBy: `${BARANGAYS[0]!.name} Barangay Clerk`,
+      recordedAt: at, updatedAt: at, summons: [],
+      ...seed,
+    } as DemoBlotterEntry
+    if (entry.status === 'mediation') {
+      entry.summons.push({
+        id: uid(), sequence: 1,
+        hearingAt: new Date(now + 86400000 * 3).toISOString(),
+        venue: 'Barangay hall', note: 'Both parties to appear.',
+        servedAt: new Date(now - 86400000 * 4).toISOString(), servedNote: 'Served personally.',
+        outcome: 'pending',
+        issuedAt: new Date(now - 86400000 * 5).toISOString(),
+        issuedBy: `${BARANGAYS[0]!.name} Barangay Secretary`,
+      })
+    }
+    state.blotter.push(entry)
   }
 
   seedHistory(state, resident, now)
@@ -1132,6 +1204,183 @@ async function route(
       )
       persist()
       return { status: 200, body: { ok: true } }
+    }
+
+    // ---- the blotter ----
+    //
+    // Both roles may write and close; only the administrator calls a hearing or
+    // records what happened at one, exactly as the server has it.
+    if (parts[1] === 'blotter') {
+      const mine = () => state.blotter.filter((b) => b.barangayId === own.id)
+      const serialize = (b: DemoBlotterEntry) => ({
+        id: b.id, referenceNo: b.referenceNo,
+        complainant: b.complainant, complainantContact: b.complainantContact,
+        respondent: b.respondent, respondentAddress: b.respondentAddress,
+        nature: b.nature, narrative: b.narrative, occurredAt: b.occurredAt,
+        status: b.status, outcomeNote: b.outcomeNote,
+        recordedAt: b.recordedAt, updatedAt: b.updatedAt, recordedBy: b.recordedBy,
+        summonsCount: b.summons.length,
+        nextHearing: b.summons.find((x) => x.outcome === 'pending')?.hearingAt ?? null,
+      })
+      const OPEN = ['recorded', 'mediation']
+      const CLOSINGS = ['settled', 'unsettled', 'withdrawn', 'referred']
+      const adminOnlyHere = () => {
+        if (user.role !== 'barangay_admin') {
+          throw new DemoError(403, 'You do not have access to this area.')
+        }
+      }
+
+      // the captain's upcoming hearings
+      if (parts[2] === 'calendar' && parts[3] === 'upcoming') {
+        return {
+          status: 200,
+          body: mine()
+            .flatMap((b) => b.summons
+              .filter((x) => x.outcome === 'pending')
+              .map((x) => ({
+                id: x.id, blotterId: b.id, sequence: x.sequence, hearingAt: x.hearingAt,
+                venue: x.venue, servedAt: x.servedAt, referenceNo: b.referenceNo,
+                complainant: b.complainant, respondent: b.respondent,
+              })))
+            .sort((a, b) => a.hearingAt.localeCompare(b.hearingAt)),
+        }
+      }
+
+      if (!parts[2] && method === 'POST') {
+        const narrative = String(body?.narrative ?? '').trim()
+        if (narrative.length < 20) {
+          throw new DemoError(400, 'Write what happened, in a few sentences.')
+        }
+        if (String(body?.complainant ?? '').trim().length < 2) {
+          throw new DemoError(400, 'Who is complaining?')
+        }
+        if (String(body?.respondent ?? '').trim().length < 2) {
+          throw new DemoError(400, 'Who is it against?')
+        }
+        if (body?.occurredAt && new Date(body.occurredAt).getTime() > Date.now() + 60_000) {
+          throw new DemoError(400, 'The incident cannot be in the future.')
+        }
+        const year = new Date().getFullYear()
+        const key = `bltr-${year}`
+        state.counters[key] = (state.counters[key] ?? 0) + 1
+        const now = new Date().toISOString()
+        const entry: DemoBlotterEntry = {
+          id: uid(),
+          referenceNo: `BLTR-${year}-${String(state.counters[key]).padStart(5, '0')}`,
+          barangayId: own.id,
+          complainant: String(body.complainant).trim(),
+          complainantContact: body.complainantContact ? String(body.complainantContact) : null,
+          respondent: String(body.respondent).trim(),
+          respondentAddress: body.respondentAddress ? String(body.respondentAddress) : null,
+          nature: String(body.nature ?? 'Other'),
+          narrative,
+          occurredAt: body.occurredAt ? String(body.occurredAt) : null,
+          status: 'recorded',
+          outcomeNote: null,
+          recordedBy: user.fullName,
+          recordedAt: now,
+          updatedAt: now,
+          summons: [],
+        }
+        state.blotter.unshift(entry)
+        persist()
+        return { status: 201, body: serialize(entry) }
+      }
+
+      if (!parts[2]) {
+        const status = query.get('status')
+        const q = (query.get('q') ?? '').trim().toLowerCase()
+        return {
+          status: 200,
+          body: mine()
+            .filter((b) => (!status || b.status === status))
+            .filter((b) => !q || [b.referenceNo, b.complainant, b.respondent]
+              .some((v) => v.toLowerCase().includes(q)))
+            .sort((a, b) =>
+              Number(OPEN.includes(b.status)) - Number(OPEN.includes(a.status)) ||
+              b.recordedAt.localeCompare(a.recordedAt))
+            .map(serialize),
+        }
+      }
+
+      const entry = state.blotter.find((b) => b.id === parts[2] && b.barangayId === own.id)
+      if (!entry) throw new DemoError(404, 'Entry not found.')
+
+      // one entry, with its hearings
+      if (!parts[3] && method === 'GET') {
+        return { status: 200, body: { ...serialize(entry), summons: entry.summons } }
+      }
+
+      if (!parts[3] && method === 'PATCH') {
+        const next = String(body?.status ?? '')
+        const note = body?.outcomeNote ? String(body.outcomeNote).trim() : ''
+        if (!['mediation', ...CLOSINGS].includes(next)) {
+          throw new DemoError(400, 'Choose what to set it to.')
+        }
+        if (CLOSINGS.includes(next) && !note) {
+          throw new DemoError(400, 'Say how it ended — the terms agreed, or where it was sent.')
+        }
+        if (!OPEN.includes(entry.status)) {
+          throw new DemoError(409, `This entry is already ${entry.status}. A concluded matter is not reopened here.`)
+        }
+        entry.status = next as DemoBlotterEntry['status']
+        if (note) entry.outcomeNote = note
+        entry.updatedAt = new Date().toISOString()
+        if (CLOSINGS.includes(next)) {
+          for (const s of entry.summons) if (s.outcome === 'pending') s.outcome = 'cancelled'
+        }
+        persist()
+        return { status: 200, body: { ok: true } }
+      }
+
+      if (parts[3] === 'summons' && !parts[4] && method === 'POST') {
+        adminOnlyHere()
+        if (!OPEN.includes(entry.status)) {
+          throw new DemoError(409, `This entry is ${entry.status}. Nothing more is called on it.`)
+        }
+        if (entry.summons.some((s) => s.outcome === 'pending')) {
+          throw new DemoError(409, 'There is already a hearing called on this entry. Record what happened at it first.')
+        }
+        const at = String(body?.hearingAt ?? '')
+        if (!at || new Date(at).getTime() < Date.now() - 60_000) {
+          throw new DemoError(400, 'A hearing cannot be called for a date that has passed.')
+        }
+        const summons = {
+          id: uid(),
+          sequence: entry.summons.length + 1,
+          hearingAt: at,
+          venue: String(body?.venue ?? 'Barangay hall'),
+          note: body?.note ? String(body.note) : null,
+          servedAt: null,
+          servedNote: null,
+          outcome: 'pending' as const,
+          issuedAt: new Date().toISOString(),
+          issuedBy: user.fullName,
+        }
+        entry.summons.push(summons)
+        if (entry.status === 'recorded') entry.status = 'mediation'
+        entry.updatedAt = new Date().toISOString()
+        persist()
+        return { status: 201, body: { id: summons.id, sequence: summons.sequence, hearingAt: summons.hearingAt } }
+      }
+
+      if (parts[3] === 'summons' && parts[4] && method === 'PATCH') {
+        adminOnlyHere()
+        const summons = entry.summons.find((s) => s.id === parts[4])
+        if (!summons) throw new DemoError(404, 'Summons not found.')
+        const outcome = body?.outcome ? String(body.outcome) : null
+        if (!outcome && !body?.servedAt && !body?.servedNote) {
+          throw new DemoError(400, 'Nothing to record.')
+        }
+        if (outcome && summons.outcome !== 'pending') {
+          throw new DemoError(409, `That hearing is already recorded as ${summons.outcome}.`)
+        }
+        if (outcome) summons.outcome = outcome as typeof summons.outcome
+        if (body?.servedAt) summons.servedAt = String(body.servedAt)
+        if (body?.servedNote) summons.servedNote = String(body.servedNote)
+        persist()
+        return { status: 200, body: { ok: true } }
+      }
     }
 
     if (parts[1] === 'fees' && !parts[2]) {

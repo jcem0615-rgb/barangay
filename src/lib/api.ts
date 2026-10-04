@@ -25,6 +25,38 @@ export interface BarangayRequest {
   residentName?: string
 }
 
+export interface BlotterEntry {
+  id: string
+  referenceNo: string
+  complainant: string
+  complainantContact: string | null
+  respondent: string
+  respondentAddress: string | null
+  nature: string
+  narrative: string
+  occurredAt: string | null
+  status: 'recorded' | 'mediation' | 'settled' | 'unsettled' | 'withdrawn' | 'referred'
+  outcomeNote: string | null
+  recordedAt: string
+  updatedAt: string
+  recordedBy: string | null
+  summonsCount?: number
+  nextHearing?: string | null
+}
+
+export interface BlotterSummons {
+  id: string
+  sequence: number
+  hearingAt: string
+  venue: string
+  note: string | null
+  servedAt: string | null
+  servedNote: string | null
+  outcome: 'pending' | 'appeared' | 'failed_to_appear' | 'rescheduled' | 'cancelled'
+  issuedAt: string
+  issuedBy: string | null
+}
+
 const DEMO = import.meta.env.VITE_DEMO === '1'
 
 /** True in the demo build only. Used to label the UI honestly. */
@@ -705,6 +737,51 @@ export const api = {
       counts: { pending: number; processing: number; ready: number; released: number; rejected: number }
       collected: number
     }>('/barangay-staff/summary'),
+
+  // ---- the barangay blotter ----
+  //
+  // Barangay staff only, and scoped server-side to their own barangay. Nothing
+  // in the resident app calls any of these.
+
+  blotterEntries: (params: { status?: string; q?: string } = {}) => {
+    const search = new URLSearchParams()
+    if (params.status) search.set('status', params.status)
+    if (params.q) search.set('q', params.q)
+    const qs = search.toString()
+    return request<BlotterEntry[]>(`/barangay-staff/blotter${qs ? `?${qs}` : ''}`)
+  },
+
+  blotterEntry: (id: string) =>
+    request<BlotterEntry & { summons: BlotterSummons[] }>(`/barangay-staff/blotter/${id}`),
+
+  recordBlotterEntry: (body: {
+    complainant: string; complainantContact?: string
+    respondent: string; respondentAddress?: string
+    nature: string; narrative: string; occurredAt?: string
+  }) => request<BlotterEntry>('/barangay-staff/blotter', { method: 'POST', body: JSON.stringify(body) }),
+
+  closeBlotterEntry: (id: string, status: string, outcomeNote?: string) =>
+    request<{ ok: true }>(`/barangay-staff/blotter/${id}`, {
+      method: 'PATCH', body: JSON.stringify({ status, outcomeNote }),
+    }),
+
+  issueSummons: (id: string, body: { hearingAt: string; venue: string; note?: string }) =>
+    request<{ id: string; sequence: number; hearingAt: string }>(
+      `/barangay-staff/blotter/${id}/summons`, { method: 'POST', body: JSON.stringify(body) }
+    ),
+
+  recordSummons: (id: string, summonsId: string, body: {
+    outcome?: string; servedAt?: string; servedNote?: string
+  }) =>
+    request<{ ok: true }>(`/barangay-staff/blotter/${id}/summons/${summonsId}`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
+  blotterCalendar: () =>
+    request<Array<{
+      id: string; blotterId: string; sequence: number; hearingAt: string; venue: string
+      servedAt: string | null; referenceNo: string; complainant: string; respondent: string
+    }>>('/barangay-staff/blotter/calendar/upcoming'),
 
   // ---- incident reports ----
 

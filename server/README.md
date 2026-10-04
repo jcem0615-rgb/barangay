@@ -371,6 +371,7 @@ npm run test:incidents    # who may report, what counts as evidence, and the vid
 npm run test:residency    # one municipality per account, and one account per person
 npm run test:barangay     # the barangay tier: the order, the roles, and the isolation
 npm run test:document-steps  # the route to each document: live links, no cycles, no dead ends
+npm run test:blotter      # the barangay book: who may open it, the roles, and that no resident can
 ```
 
 `test:payments` signs its own callbacks, so it needs the **same** `PAYMENT_SECRET`

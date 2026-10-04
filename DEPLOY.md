@@ -123,6 +123,14 @@ usually `1` behind a single load balancer or ingress.
       reconcile them. A resident who follows a wrong order makes exactly the wasted trip
       the guide exists to prevent, and the municipality's name on the screen is why they
       trusted it
+- [ ] **Somebody has decided who in each barangay may open the blotter.** It names people
+      accused of things and found guilty of nothing, and every account with a
+      `barangay_officer` or `barangay_admin` role for that barangay can read the whole book.
+      Issue those accounts to the people who actually hold the office, and revoke them when
+      they leave — the app has no finer permission than the role
+- [ ] **The retention of blotter entries matches the LGU's own records policy**, and
+      somebody owns deleting what is past it. Nothing here expires an entry, and a book of
+      accusations kept forever is a liability rather than a record
 - [ ] **The Filipino routes have been read by somebody who speaks it**, not only the
       English. Both are authored in `mockData.ts` and a wrong instruction translates
       perfectly well; the Filipino is the version most residents will actually read

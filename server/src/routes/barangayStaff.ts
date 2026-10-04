@@ -5,6 +5,7 @@ import { authenticate, requireRole } from '../auth.ts'
 import { toCentavos, toPesos } from '../serialize.ts'
 import { deliverNotification, recordNotification } from '../notifications.ts'
 import { serializeBarangayRequest } from './barangay.ts'
+import { blotterRouter } from './blotter.ts'
 
 /**
  * The barangay's own portal: the officer who processes certificates, and the
@@ -28,6 +29,11 @@ async function ownBarangay(userId: string) {
     [userId]
   )
 }
+
+// The blotter hangs off this router rather than beside it, so it inherits the
+// authentication, the two roles and — the part that matters — the habit of
+// taking the barangay from the account rather than from the caller.
+barangayStaffRouter.use('/blotter', blotterRouter)
 
 barangayStaffRouter.get('/me', async (req, res) => {
   const barangay = await ownBarangay(req.user!.id)

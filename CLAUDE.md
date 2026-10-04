@@ -182,6 +182,63 @@ account without one answers 409 to everything.
 **The console stays English**, like the municipal one and for the same reason. The resident
 side is translated; certificate names are not, exactly like "Cedula" and "Building Permit".
 
+## The blotter and the summons
+
+Katarungang Pambarangay (RA 7160, Chapter 7): a dispute is brought to the barangay, the
+Punong Barangay calls both sides, and most civil and lesser criminal matters cannot be
+filed in court until that has been tried. The blotter is the book it is written in, and
+the barangay's own `Blotter` tab is where it now lives.
+
+**This is the most defamatory data in the application, and the rules around it are the
+inverse of everything else here.** A blotter entry names a respondent — somebody accused
+of something who has been found to have done nothing — so:
+
+- **No resident route reads it.** There is no screen, no endpoint and no field anywhere in
+  the resident app. It is not in the Data Privacy export either, which is deliberate: the
+  export is what the app holds *about you*, and half of a blotter entry is somebody else's
+  name and somebody else's account of what they say you did.
+- **Nothing notifies anybody.** Everywhere else a change is written with a notification in
+  the same transaction; here that would mean telling somebody by push that they have been
+  named in a live quarrel, and it is not how a summons is served. The law wants personal
+  service by the barangay, so the console says so where a hearing is read rather than only
+  where it is issued — "did they get told?" is a question somebody has while looking at a
+  hearing that is coming up.
+- **Municipal staff get 403, administrator included.** This is the barangay's book.
+- **Scoping is the same structural rule as the rest of that console**: every statement
+  filters on the barangay from the signed-in account's own row, so another barangay's entry
+  is 404 rather than 403 — there is nowhere to name one. That includes search, which is
+  searching names and is bounded to the barangay doing it.
+
+**The parties are free text, not links to accounts.** A respondent usually has no account,
+and matching one would turn this into a place to look up what a named resident stands
+accused of. The barangay writes down who was in front of it, exactly as the paper book does.
+
+**Who may do what follows the line the console already draws.** Both roles write the book
+and close a matter — recording is the clerk's job. Only the administrator issues a summons
+or records what happened at one, because a summons goes out over the Punong Barangay's
+name and compels two people to appear on a date.
+
+**Summons are rows, not a column.** The law expects the barangay to try again when somebody
+does not appear, and how many times a party was actually called is the fact that matters
+later; a single `hearing_date` would lose it. One pending calling at a time, because two
+open summons are two dates the parties could turn up on and only one is right. Calling a
+hearing is what moves a matter into mediation — nobody should have to set a status
+separately and remember to.
+
+**Service is recorded apart from the outcome, because the first decides what the second
+means.** A respondent who never received the summons did not fail to appear, and a barangay
+recording them as having done so is building on a hole.
+
+**Closing is final and cancels any outstanding hearing**, and it has to say how it ended —
+"unsettled" with no reason is the row somebody reconstructs from memory a year later in
+front of a court asking why the case arrived without a settlement.
+
+**What this is not is the legal record.** The prescribed KP forms, the Pangkat ng
+Tagapagkasundo, the ten-day finality of an amicable settlement and the **Certificate to File
+Action** are paper instruments with legal effect. This records that the process happened and
+when; it conducts none of it and issues no certificate. The console says so where somebody
+closes a matter as unsettled, which is the moment they would otherwise look for one.
+
 ## How to get a document
 
 `requirements` said *what* to bring. It never said where any of it comes from or
@@ -1142,10 +1199,16 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   console lists who can sign in for a barangay but cannot add or revoke one — the
   `StaffAccounts` screen only makes municipal staff. A barangay that can issue its own
   accounts is a new authorization surface worth designing deliberately.
-- **Blotter, KP (katarungang pambarangay) forms, summons, household records, announcements
-  and barangay IDs are not here.** The certificate lifecycle is the spine; those are each
-  their own feature with their own rules, and bolting them on as fields of this one would
-  get them all wrong.
+- **The blotter records the KP process; it does not conduct it.** See *The blotter and the
+  summons*. There is no Pangkat ng Tagapagkasundo, no prescribed KP form, no ten-day
+  settlement finality and no Certificate to File Action — those are paper instruments with
+  legal effect, and an app that printed one would be claiming a standing it does not have.
+  The periods the law sets (15 days to mediate, 15 more for the Pangkat) are not enforced or
+  counted either; a deployment that wants them should treat them like the expected-ready
+  dates, over the same working-day calendar.
+- **Household records, announcements and the barangay ID are not here.** Each is its own
+  feature with its own rules, and bolting them on as fields of the certificate or the
+  blotter would get them all wrong.
 - **The document routes are a reading of common practice, not a charter.** Every `steps`
   chain is placeholder content on the same footing as the hotlines and the holiday
   calendar: plausible, carefully ordered, and not verified against what this municipality
