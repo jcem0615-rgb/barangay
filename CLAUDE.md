@@ -1230,6 +1230,11 @@ administrator's console and `officer.poblacion@malasiqui.gov.ph` for the officer
 is the pair to compare when checking what each role may do. Every other barangay has an
 administrator account only.
 
+The demo build lists all of these on its own sign-in screen (`DEMO_ACCOUNTS` in
+`SignIn.tsx`), grouped by tier. Add a row there whenever a seeded role is added — an
+account nobody can find is one nobody tries, and the panel is the only place a person
+clicking through the demo would look.
+
 ```bash
 npm run build     # tsc -b && vite build -> dist/
 npm run preview   # serve the production build locally

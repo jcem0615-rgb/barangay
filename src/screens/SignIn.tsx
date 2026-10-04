@@ -231,29 +231,39 @@ export default function SignIn() {
         {IS_DEMO ? (
           <div className="mt-4 rounded-2xl border border-gold-500/40 bg-gold-100/50 p-4">
             <p className="text-[calc(13px_*_var(--text-scale))] font-bold text-navy-950">Demo — sign in with any of these</p>
-            <dl className="mt-2 space-y-1 text-[calc(12.5px_*_var(--text-scale))] text-navy-900">
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-600">Resident</dt>
-                <dd className="font-medium">maria@example.ph</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-600">Treasury staff</dt>
-                <dd className="font-medium">treasury@malasiqui.gov.ph</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-600">Administrator</dt>
-                <dd className="font-medium">admin@malasiqui.gov.ph</dd>
-              </div>
-              <div className="flex justify-between gap-3 border-t border-gold-500/30 pt-1">
+            {/*
+              Grouped by tier, the same split the dashboard makes: the point of
+              the demo is following one request across both levels of government,
+              and a flat list of five addresses does not show that there are two
+              sides to be on.
+            */}
+            <div className="mt-2 text-[calc(12.5px_*_var(--text-scale))] text-navy-900">
+              {DEMO_ACCOUNTS.map((group) => (
+                <section key={group.tier}>
+                  <h3 className="pb-0.5 pt-2 text-[calc(11px_*_var(--text-scale))] font-bold uppercase tracking-wide text-slate-500">
+                    {group.tier}
+                  </h3>
+                  <dl className="space-y-1">
+                    {group.accounts.map(([role, email]) => (
+                      <div key={email} className="flex justify-between gap-3">
+                        <dt className="shrink-0 text-slate-600">{role}</dt>
+                        <dd className="min-w-0 truncate font-medium">{email}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              ))}
+              <dl className="mt-2 flex justify-between gap-3 border-t border-gold-500/30 pt-2">
                 <dt className="text-slate-600">Password (all)</dt>
                 <dd className="font-mono font-medium">elgu-demo-2026</dd>
-              </div>
-            </dl>
+              </dl>
+            </div>
             <p className="mt-2.5 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
               To follow a request through both sides, sign out and switch
               accounts &mdash; the demo keeps its data in <em>this</em> browser, so a
-              second window or incognito tab starts over. Email, SMS and virus
-              scanning need the real server and do nothing here.
+              second window or incognito tab starts over. Every other barangay has
+              an administrator at <span className="font-mono">admin.&lt;barangay&gt;@malasiqui.gov.ph</span>.
+              Email, SMS and virus scanning need the real server and do nothing here.
             </p>
           </div>
         ) : (
@@ -265,6 +275,38 @@ export default function SignIn() {
     </div>
   )
 }
+
+/**
+ * Who you can be in the demo.
+ *
+ * Every barangay has an administrator and the first also has an officer, but
+ * listing twelve addresses would bury the one thing this panel is for — so it
+ * names Poblacion's pair, which is the one with both roles, and says the rest
+ * follow the same shape.
+ */
+const DEMO_ACCOUNTS: Array<{ tier: string; accounts: Array<[string, string]> }> = [
+  {
+    tier: 'Resident',
+    // Named rather than labelled 'Resident' twice: this is the seeded account
+    // with requests on both tiers already, so saying who you will be is worth
+    // more than repeating the heading.
+    accounts: [['Maria Santos', 'maria@example.ph']],
+  },
+  {
+    tier: 'Municipal offices',
+    accounts: [
+      ['Treasury staff', 'treasury@malasiqui.gov.ph'],
+      ['Administrator', 'admin@malasiqui.gov.ph'],
+    ],
+  },
+  {
+    tier: 'Barangay Poblacion',
+    accounts: [
+      ['Officer', 'officer.poblacion@malasiqui.gov.ph'],
+      ['Administrator', 'admin.poblacion@malasiqui.gov.ph'],
+    ],
+  },
+]
 
 function Field({
   label, helper, ...props
