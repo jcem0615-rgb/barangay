@@ -501,6 +501,9 @@ export const en = {
   'brgy.chooseTitle': 'Which barangay do you live in?',
   'brgy.chooseBlurb':
     'Your barangay issues your clearance and certificates. The barangay checks this at the counter, so pick the one you actually live in.',
+  'brgy.board': 'From your barangay',
+  'brgy.urgent': 'Urgent',
+  'brgy.edited': 'Updated since posting',
   'brgy.certificates': 'Certificates',
   'brgy.free': 'Free',
   'brgy.myRequests': 'My barangay requests',
@@ -1017,6 +1020,9 @@ export const fil: Record<StringKey, string> = {
   'brgy.chooseTitle': 'Saang barangay ka nakatira?',
   'brgy.chooseBlurb':
     'Ang barangay mo ang naglalabas ng clearance at mga sertipiko mo. Tinitingnan ito ng barangay sa counter, kaya piliin ang talagang tinitirhan mo.',
+  'brgy.board': 'Mula sa barangay mo',
+  'brgy.urgent': 'Mahalaga',
+  'brgy.edited': 'Binago matapos ipaskil',
   'brgy.certificates': 'Mga sertipiko',
   'brgy.free': 'Walang bayad',
   'brgy.myRequests': 'Mga kahilingan ko sa barangay',

@@ -59,7 +59,8 @@ src/
     scannedCode.ts           Reads ?verify= once at startup, for a clerk arriving by scan
   components/            Reusable UI: IDCard, WorkflowTracker, StatusPill, FormField, etc.
   screens/                One component per Screen variant in nav.tsx
-    barangay/             The barangay's own console (its two roles, one file)
+    barangay/             The barangay's own console: the certificate queue, the board of
+                          notices, the blotter and the register of inhabitants
   App.tsx                 Providers + ScreenRouter switch + bottom nav visibility
 ```
 
@@ -289,6 +290,67 @@ Tagapagkasundo, the ten-day finality of an amicable settlement and the **Certifi
 Action** are paper instruments with legal effect. This records that the process happened and
 when; it conducts none of it and issues no certificate. The console says so where somebody
 closes a matter as unsettled, which is the moment they would otherwise look for one.
+
+## The board of notices
+
+A barangay's oldest piece of communication is a sheet of paper taped to the wall outside the
+hall: no water tomorrow, assembly on Sunday, deworming at the health centre. It works for
+whoever walks past it that week and for nobody else. The `Notices` tab is that board, and
+the resident's barangay hub is the wall.
+
+**Every other barangay feature here refuses to be readable, and this one inverts all of
+it.** The blotter names people accused of things and the household register lists who lives
+where, so both are console-only, notify nobody, and appear in no resident route and no
+privacy export. A notice is the opposite: it is worth nothing until the people it concerns
+have seen it. So it has a resident read, it can ring a phone, and the board sits *above* the
+certificates in the hub — what the barangay is telling you comes before what you can ask it
+for.
+
+**What is scoped here is relevance, not secrecy.** A resident sees their own barangay's
+notices and no others, because a water interruption two barangays away is exactly the noise
+that teaches somebody to stop reading the ones that matter. The scoping is the same
+structural rule as the rest of that console — the barangay comes off the signed-in account's
+own row, so another barangay's notice is 404 rather than 403.
+
+**Urgent is the administrator's, and it is the only thing here that reaches a phone.** An
+ordinary notice waits on the board for whoever opens the app; an urgent one writes a
+notification row for every resident of the barangay. An app where any clerk can ring every
+phone in the barangay is an app whose notifications get switched off, and then the one that
+mattered goes unread. The officer's console says who does that rather than showing a switch
+that answers 403, and the API refuses it either way.
+
+**The fan-out is in the same transaction as the notice**, one row per resident, like every
+other notification in this app. A notice that was posted was always announced; there is no
+half state where it is on the board and nobody was told. Email, SMS and push go out after
+the commit, so a slow mail server cannot hold the notice open. The confirmation says how
+many it reached and waits to be dismissed — the one screen stating the blast radius of what
+somebody just did should not vanish on a timer.
+
+**A public notice carries its real text on a lock screen**, which is why
+`barangay_announcement` is deliberately *not* in `PRIVATE_KINDS`. The rule there protects a
+4Ps enrolment from being announced to whoever is holding the phone; "no water from 8am
+tomorrow" is taped to a wall in public and is useless as a title with nothing under it.
+
+**Expiry is applied on read**, like `expired` on a programme record and age in the register:
+a notice about Saturday stops showing on Sunday with nothing scheduled to make that true. A
+past expiry is refused at the point of posting, because a notice nobody could ever see is a
+mistake rather than a choice. The barangay still sees a lapsed one in its own list.
+
+**`urgent` is not editable.** The notification went or it did not; flipping the flag
+afterwards would either fire a second round for the same notice or leave one marked urgent
+that never rang anything. Re-posting is honest about there being a new notice. An ordinary
+correction is allowed and the board says **edited** — the first version is what people read,
+and somebody who acted on it needs to see that it moved.
+
+**Taking a notice down is the administrator's and keeps the row.** It is the barangay's
+public word; what it said last month is a thing somebody asks about. `archived_at` leaves
+the board and stays in the console's own archive.
+
+**Urgency is a word and an icon, never a colour alone** — the rule the workflow tracker
+follows for whose move it is. Amber, not red: red belongs to the emergency hotlines, and an
+urgent notice is worth stopping for without being the button you press when the house is on
+fire. The board renders nothing at all when it is empty, rather than keeping a permanent
+"no announcements" card in front of the certificates.
 
 ## How to get a document
 
@@ -1257,9 +1319,19 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   The periods the law sets (15 days to mediate, 15 more for the Pangkat) are not enforced or
   counted either; a deployment that wants them should treat them like the expected-ready
   dates, over the same working-day calendar.
-- **Announcements and the barangay ID are not here.** Each is its own feature with its own
-  rules, and bolting them on as fields of the certificate, the blotter or the register would
-  get them all wrong.
+- **The barangay ID is not here.** It is its own feature with its own rules, and bolting it
+  on as a field of the certificate, the blotter or the register would get it wrong.
+- **A notice reaches a resident who opens the app, and a phone only when it is urgent.**
+  There is no scheduled posting, no attachment, no read receipt and no way to send one to a
+  single purok rather than the whole barangay — a notice is one piece of text for everybody
+  who lives there. A barangay that wants a photograph of the assembly flyer on the board
+  wants an upload surface, with the type sniffing and the size cap the rest of the app has,
+  rather than a URL field somebody pastes a Facebook link into.
+- **An urgent notice is one notification per resident, written in the posting
+  transaction.** At six barangays' worth of residents that is the right trade — the notice
+  and the telling cannot come apart. A barangay with ten thousand residents wants that
+  fan-out moved to a queue, which is the point at which it stops being one transaction and
+  needs its own answer for what a half-delivered notice means.
 - **The register has no export, deliberately.** A barangay genuinely needs printed lists for
   relief distribution, and a CSV button is the single action that turns a scoped register
   into a spreadsheet on somebody's laptop — which is how registers leak. A deployment that

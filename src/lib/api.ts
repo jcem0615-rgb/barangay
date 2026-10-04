@@ -86,6 +86,20 @@ export interface HouseholdMember {
   isVoter: boolean
 }
 
+export interface Announcement {
+  id: string
+  kind: 'general' | 'service' | 'emergency' | 'health' | 'event'
+  title: string
+  body: string
+  urgent: boolean
+  expiresAt: string | null
+  archivedAt: string | null
+  postedBy: string | null
+  postedAt: string
+  /** Set when the notice was corrected after it went out. */
+  editedAt: string | null
+}
+
 const DEMO = import.meta.env.VITE_DEMO === '1'
 
 /** True in the demo build only. Used to label the UI honestly. */
@@ -811,6 +825,33 @@ export const api = {
       id: string; blotterId: string; sequence: number; hearingAt: string; venue: string
       servedAt: string | null; referenceNo: string; complainant: string; respondent: string
     }>>('/barangay-staff/blotter/calendar/upcoming'),
+
+  // ---- barangay announcements ----
+  //
+  // The one barangay feature with a resident face: a board is worthless until
+  // the people it concerns have seen it.
+
+  /** The live notices on the resident's own barangay board. */
+  barangayAnnouncements: () => request<Announcement[]>('/barangay/announcements'),
+
+  staffAnnouncements: (archived?: boolean) =>
+    request<Announcement[]>(
+      `/barangay-staff/announcements${archived === undefined ? '' : `?archived=${archived}`}`
+    ),
+
+  postAnnouncement: (body: {
+    kind: string; title: string; body: string; urgent?: boolean; expiresAt?: string
+  }) => request<Announcement & { notified: number }>('/barangay-staff/announcements', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+
+  editAnnouncement: (id: string, body: Record<string, string | null | undefined>) =>
+    request<Announcement>(`/barangay-staff/announcements/${id}`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
+  takeDownAnnouncement: (id: string) =>
+    request<{ ok: true }>(`/barangay-staff/announcements/${id}`, { method: 'DELETE' }),
 
   // ---- the record of barangay inhabitants ----
   //

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  BadgeCheck, BookText, Building, Home, CheckCircle2, Inbox, Loader2, LogOut, PhilippinePeso,
+  BadgeCheck, BookText, Building, Home, Megaphone, CheckCircle2, Inbox, Loader2, LogOut, PhilippinePeso,
   RefreshCw, Users,
 } from 'lucide-react'
 import { api, ApiError, type BarangayRequest } from '../../lib/api'
 import BarangayBlotter from './BarangayBlotter'
 import BarangayHouseholds from './BarangayHouseholds'
+import BarangayAnnouncements from './BarangayAnnouncements'
 import { useAuth } from '../../lib/auth'
 import { formatPeso } from '../../lib/money'
 
@@ -44,7 +45,7 @@ const NEXT: Record<BarangayRequest['status'], Array<{ status: string; label: str
   rejected: [],
 }
 
-type View = 'queue' | 'blotter' | 'households' | 'summary' | 'fees' | 'officers'
+type View = 'queue' | 'announcements' | 'blotter' | 'households' | 'summary' | 'fees' | 'officers'
 
 export default function BarangayConsole() {
   const { user, logout } = useAuth()
@@ -61,6 +62,9 @@ export default function BarangayConsole() {
 
   const tabs: Array<[View, string, typeof Inbox]> = [
     ['queue', 'Requests', Inbox],
+    // The only tab here residents see the output of, so it sits second —
+    // close to the work rather than buried with the administrator's tools.
+    ['announcements', 'Notices', Megaphone],
     // Both roles: the clerk writes the book, the administrator calls hearings
     // on it. The split lives inside the screen rather than in who may open it.
     ['blotter', 'Blotter', BookText],
@@ -126,6 +130,7 @@ export default function BarangayConsole() {
           <p role="alert" className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-[13px] text-rose-700">{setupError}</p>
         )}
         {view === 'queue' && <Queue />}
+        {view === 'announcements' && <BarangayAnnouncements />}
         {view === 'blotter' && <BarangayBlotter />}
         {view === 'households' && <BarangayHouseholds />}
         {view === 'summary' && <Summary />}

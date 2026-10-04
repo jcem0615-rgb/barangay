@@ -26,6 +26,7 @@ export type NotificationKind =
   | 'complaint_filed' | 'complaint_answered'
   | 'incident_updated'
   | 'barangay_request'
+  | 'barangay_announcement'
 
 export interface NotificationInput {
   userId: string

@@ -148,6 +148,12 @@ usually `1` behind a single load balancer or ingress.
       indigency and the first-time jobseeker certificate are free by law
 - [ ] Every barangay has at least one account that someone there can actually sign into, and
       the seeded barangay passwords have been changed like the municipal ones
+- [ ] **Somebody in each barangay knows that an urgent notice rings every resident's
+      phone**, and that only the administrator account can post one. A notice marked urgent
+      writes a notification to every resident of that barangay and the text goes out on a
+      lock screen as written — this is the one place in the app where a typo reaches
+      everybody at once, and there is no recall. The board itself seeds empty, so nothing
+      has to be cleared; the two sample notices are the clickable demo's only
 
 ## Scaling
 

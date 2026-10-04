@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v18'
+const STORE_KEY = 'elgu-demo-state-v19'
 
 interface DemoIncident {
   id: string
@@ -176,6 +176,16 @@ interface DemoState {
   blotter: DemoBlotterEntry[]
   /** The register of inhabitants, scoped to a barangay exactly as on the server. */
   households: DemoHousehold[]
+  /** The barangay's board of notices — the one barangay record residents read. */
+  announcements: DemoAnnouncement[]
+}
+
+interface DemoAnnouncement {
+  id: string; barangayId: string
+  kind: 'general' | 'service' | 'emergency' | 'health' | 'event'
+  title: string; body: string; urgent: boolean
+  expiresAt: string | null; archivedAt: string | null
+  postedBy: string | null; postedAt: string; updatedAt: string
 }
 
 interface DemoHouseholdMember {
@@ -371,6 +381,7 @@ function seed(): DemoState {
     barangayFees: {},
     blotter: [],
     households: [],
+    announcements: [],
   }
 
   const boss = SERVICES.find((s) => s.id === 'boss-application')!
@@ -536,6 +547,33 @@ function seed(): DemoState {
       updatedAt: new Date(now - 86400000 * 30).toISOString(),
       members,
     })
+  }
+
+  // Two notices on the demo resident's own barangay board: one urgent that is
+  // the kind people act on, one ordinary. They are what makes the hub show a
+  // board at all on a first visit.
+  const annSeed: Array<[Partial<DemoAnnouncement>, number]> = [
+    [{
+      kind: 'service', urgent: true,
+      title: 'Water interruption, Tuesday 8am to 4pm',
+      body: 'The main along Mabini St is being repaired. Store water on Monday night. Tankers will be at the covered court from 10am.',
+    }, 1],
+    [{
+      kind: 'event',
+      title: 'Barangay assembly, Sunday 3pm',
+      body: 'Quarterly assembly at the covered court. The budget and the clean-up schedule are on the agenda. All household heads are asked to attend.',
+    }, 4],
+  ]
+  for (const [seed, daysAgo] of annSeed) {
+    const at = new Date(now - 86400000 * daysAgo).toISOString()
+    state.announcements.push({
+      id: uid(), barangayId: BARANGAYS[0]!.id,
+      kind: 'general', title: '', body: '', urgent: false,
+      expiresAt: null, archivedAt: null,
+      postedBy: `${BARANGAYS[0]!.name} Barangay Secretary`,
+      postedAt: at, updatedAt: at,
+      ...seed,
+    } as DemoAnnouncement)
   }
 
   seedHistory(state, resident, now)
@@ -733,6 +771,25 @@ const barangayFee = (barangayId: string, typeId: string) =>
   state.barangayFees[barangayId]?.[typeId] ??
   BARANGAY_CERTIFICATES.find((c) => c.id === typeId)?.fee ??
   0
+
+const serializeAnnouncement = (a: DemoAnnouncement) => ({
+  id: a.id, kind: a.kind, title: a.title, body: a.body, urgent: a.urgent,
+  expiresAt: a.expiresAt, archivedAt: a.archivedAt,
+  postedBy: a.postedBy, postedAt: a.postedAt,
+  // A notice corrected after it went out is not the one people read.
+  editedAt: a.updatedAt > a.postedAt ? a.updatedAt : null,
+})
+
+/**
+ * Expiry applied on read rather than by a job, as on the server: a notice stops
+ * showing on the day it lapses with nothing scheduled to make that true.
+ */
+const liveAnnouncements = (barangayId: string) =>
+  state.announcements
+    .filter((a) => a.barangayId === barangayId && !a.archivedAt)
+    .filter((a) => !a.expiresAt || new Date(a.expiresAt).getTime() > Date.now())
+    .sort((a, b) => Number(b.urgent) - Number(a.urgent) || b.postedAt.localeCompare(a.postedAt))
+    .map(serializeAnnouncement)
 
 const serializeBarangayRequest = (r: DemoBarangayRequest) => ({
   id: r.id,
@@ -1152,6 +1209,13 @@ async function route(
       }
     }
 
+    // The board of notices on this resident's own barangay. Relevance, not
+    // secrecy: their barangay and no other.
+    if (parts[1] === 'announcements') {
+      if (!user.barangayId) return { status: 200, body: [] }
+      return { status: 200, body: liveAnnouncements(user.barangayId) }
+    }
+
     if (parts[1] === 'requests') {
       if (method === 'POST') {
         if (!user.barangayId) throw new DemoError(409, 'Set which barangay you live in first.')
@@ -1272,6 +1336,97 @@ async function route(
       )
       persist()
       return { status: 200, body: { ok: true } }
+    }
+
+    // ---- the board of notices ----
+    //
+    // Posting is both roles'; urgent is the administrator's, because it is the
+    // only thing here that reaches a phone.
+    if (parts[1] === 'announcements') {
+      const mine = () => state.announcements.filter((a) => a.barangayId === own.id)
+
+      if (!parts[2] && method === 'POST') {
+        const title = String(body?.title ?? '').trim()
+        const text = String(body?.body ?? '').trim()
+        if (title.length < 4) throw new DemoError(400, 'Give it a title people can scan.')
+        if (text.length < 10) throw new DemoError(400, 'Say what is happening.')
+        if (body?.urgent && user.role !== 'barangay_admin') {
+          throw new DemoError(403, 'An urgent notice reaches every resident\u2019s phone, so the barangay administrator posts it.')
+        }
+        if (body?.expiresAt && new Date(body.expiresAt).getTime() < Date.now()) {
+          throw new DemoError(400, 'That notice would expire before anybody saw it.')
+        }
+        const now = new Date().toISOString()
+        const notice: DemoAnnouncement = {
+          id: uid(), barangayId: own.id,
+          kind: (body?.kind ?? 'general') as DemoAnnouncement['kind'],
+          title, body: text, urgent: Boolean(body?.urgent),
+          expiresAt: body?.expiresAt ? String(body.expiresAt) : null,
+          archivedAt: null, postedBy: user.fullName, postedAt: now, updatedAt: now,
+        }
+        state.announcements.unshift(notice)
+
+        // The fan-out, exactly as the server does it: this barangay's residents,
+        // and only for an urgent notice.
+        let notified = 0
+        if (notice.urgent) {
+          for (const resident of state.users) {
+            if (resident.role !== 'resident' || resident.barangayId !== own.id || !resident.active) continue
+            notify(resident.id, null, 'barangay_announcement',
+              `Barangay ${own.name}: ${notice.title}`, notice.body)
+            notified++
+          }
+        }
+        persist()
+        return { status: 201, body: { ...serializeAnnouncement(notice), notified } }
+      }
+
+      if (!parts[2]) {
+        const archived = query.get('archived')
+        return {
+          status: 200,
+          body: mine()
+            .filter((a) => archived === null ||
+              (archived === 'true' ? a.archivedAt !== null : a.archivedAt === null))
+            .sort((a, b) =>
+              Number(b.archivedAt === null) - Number(a.archivedAt === null) ||
+              Number(b.urgent) - Number(a.urgent) ||
+              b.postedAt.localeCompare(a.postedAt))
+            .map(serializeAnnouncement),
+        }
+      }
+
+      const notice = state.announcements.find((a) => a.id === parts[2] && a.barangayId === own.id)
+
+      if (method === 'PATCH') {
+        if (!notice || notice.archivedAt) {
+          throw new DemoError(404, 'Notice not found, or already taken down.')
+        }
+        if (body?.kind !== undefined) notice.kind = body.kind as DemoAnnouncement['kind']
+        if (body?.title !== undefined) notice.title = String(body.title).trim()
+        if (body?.body !== undefined) notice.body = String(body.body).trim()
+        if ('expiresAt' in (body ?? {})) {
+          notice.expiresAt = body.expiresAt ? String(body.expiresAt) : null
+        }
+        // `urgent` is deliberately not editable: the notification went when it
+        // was posted, or it did not.
+        notice.updatedAt = new Date().toISOString()
+        persist()
+        return { status: 200, body: serializeAnnouncement(notice) }
+      }
+
+      if (method === 'DELETE') {
+        if (user.role !== 'barangay_admin') {
+          throw new DemoError(403, 'You do not have access to this area.')
+        }
+        if (!notice || notice.archivedAt) {
+          throw new DemoError(404, 'Notice not found, or already taken down.')
+        }
+        notice.archivedAt = new Date().toISOString()
+        notice.updatedAt = notice.archivedAt
+        persist()
+        return { status: 200, body: { ok: true } }
+      }
     }
 
     // ---- the register of inhabitants ----

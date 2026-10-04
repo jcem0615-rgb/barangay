@@ -373,7 +373,14 @@ npm run test:barangay     # the barangay tier: the order, the roles, and the iso
 npm run test:document-steps  # the route to each document: live links, no cycles, no dead ends
 npm run test:blotter      # the barangay book: who may open it, the roles, and that no resident can
 npm run test:households   # the register of inhabitants: scoping, the figures, and no account links
+npm run test:announcements  # the board: who may post, who may ring every phone, expiry on read
 ```
+
+Run them one at a time, or clear `login_attempts` between them. Every suite signs
+in — several deliberately with the wrong password — and the per-IP throttle counts
+all of it against one address when the whole lot runs back to back from localhost.
+A suite that fails with 429 or `Sign in to continue.` has been locked out rather
+than broken, and passes on its own.
 
 `test:payments` signs its own callbacks, so it needs the **same** `PAYMENT_SECRET`
 the server is running with — the suite otherwise falls back to a default, every

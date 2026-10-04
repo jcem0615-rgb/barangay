@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { authenticate, requireRole } from '../auth.ts'
 import { toPesos } from '../serialize.ts'
+import { liveAnnouncementsFor } from './announcements.ts'
 
 /**
  * The barangay tier, resident side.
@@ -158,6 +159,23 @@ barangayRouter.post('/requests', async (req, res) => {
     typeName: type.name,
     fee: toPesos(type.fee_centavos),
   })
+})
+
+/**
+ * The notices on this resident's own barangay board.
+ *
+ * Scoped to the barangay on their record rather than to one they could name: a
+ * resident reads their own board, and the point of that is relevance rather
+ * than secrecy — notices from two barangays away are the noise that teaches
+ * people to stop reading.
+ */
+barangayRouter.get('/announcements', async (req, res) => {
+  const row = await one<{ barangay_id: string | null }>(
+    `select barangay_id from users where id = $1`,
+    [req.user!.id]
+  )
+  if (!row?.barangay_id) return res.json([])
+  res.json(await liveAnnouncementsFor(row.barangay_id))
 })
 
 barangayRouter.get('/requests', async (req, res) => {

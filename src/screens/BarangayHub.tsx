@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Building, CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import TierSwitch from '../components/TierSwitch'
+import AnnouncementBoard from '../components/AnnouncementBoard'
 import { api, ApiError, type BarangayRequest } from '../lib/api'
 import { formatPeso } from '../lib/money'
 import { useNav } from '../lib/nav'
@@ -97,6 +98,9 @@ export default function BarangayHub() {
 
         {!busy && mine?.barangay && (
           <>
+            {/* What the barangay is telling you, before what you can ask it for. */}
+            <AnnouncementBoard />
+
             <p className="mb-2 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">
               {t('brgy.certificates')}
             </p>
