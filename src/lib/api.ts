@@ -193,7 +193,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export interface AuthUser {
   id: string
   email: string
-  role: 'resident' | 'staff' | 'admin' | 'barangay_admin' | 'barangay_officer'
+  role: 'resident' | 'staff' | 'admin' | 'barangay_admin' | 'barangay_officer' | 'barangay_kagawad'
   fullName: string
   departments: string[]
 }
@@ -805,6 +805,55 @@ export const api = {
     request<Array<{ id: string; fullName: string; email: string; role: string; active: boolean }>>(
       '/barangay-staff/officers'
     ),
+
+  /**
+   * Issuing one. The barangay may create an officer or a kagawad and never an
+   * administrator — that stays a municipal act, which is what keeps this from
+   * being a way to manufacture authority.
+   */
+  issueBarangayAccount: (body: {
+    email: string; fullName: string; role: 'barangay_officer' | 'barangay_kagawad'
+  }) =>
+    request<{
+      id: string; fullName: string; email: string; role: string; active: boolean; invited: boolean
+    }>('/barangay-staff/officers', { method: 'POST', body: JSON.stringify(body) }),
+
+  revokeBarangayAccount: (id: string) =>
+    request<void>(`/barangay-staff/officers/${id}/deactivate`, { method: 'POST' }),
+
+  restoreBarangayAccount: (id: string) =>
+    request<void>(`/barangay-staff/officers/${id}/reactivate`, { method: 'POST' }),
+
+  resendBarangayInvite: (id: string) =>
+    request<{ sent: boolean }>(`/barangay-staff/officers/${id}/send-reset`, { method: 'POST' }),
+
+  // ---- the council's own view ----
+  //
+  // A separate mount, not a branch of the staff routes: a kagawad is refused by
+  // every route in that console, including ones added later. Figures, never
+  // people — there is no endpoint here that returns a resident.
+
+  kagawadMe: () =>
+    request<{ barangay: { id: string; name: string; captain: string | null }; role: string }>(
+      '/barangay-kagawad/me'
+    ),
+
+  kagawadSummary: () =>
+    request<{
+      barangay: string
+      counts: { pending: number; processing: number; ready: number; released: number; rejected: number }
+      collected: number
+    }>('/barangay-kagawad/summary'),
+
+  kagawadFigures: () =>
+    request<{
+      barangay: string; households: number; population: number
+      female: number; male: number; children: number; adults: number; seniors: number
+      withoutBirthDate: number; pwd: number; fourPs: number; voters: number
+      byPurok: Array<{ purok: string | null; households: number; population: number }>
+    }>('/barangay-kagawad/figures'),
+
+  kagawadAnnouncements: () => request<Announcement[]>('/barangay-kagawad/announcements'),
 
   barangaySummary: () =>
     request<{

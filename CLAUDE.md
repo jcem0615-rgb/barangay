@@ -61,7 +61,8 @@ src/
   screens/                One component per Screen variant in nav.tsx
     barangay/             The barangay's own console: the certificate queue, the board of
                           notices, the blotter, the register of inhabitants and the
-                          hall's own details
+                          hall's own details — plus KagawadConsole, the council's
+                          separate figures-only shell
   App.tsx                 Providers + ScreenRouter switch + bottom nav visibility
 ```
 
@@ -85,6 +86,7 @@ src/
 - `staff` / `admin` → `StaffConsole`, the desk-width municipal department queue
 - `admin` additionally gets its Accounts tab, for creating and revoking staff accounts
 - `barangay_admin` / `barangay_officer` → `BarangayConsole`, that barangay's own desk
+- `barangay_kagawad` → `KagawadConsole`, the council's figures-only view
 
 Roles are a server-side fact. The shell is a rendering convenience, never a control —
 the API refuses cross-role, cross-department and cross-barangay access on its own.
@@ -168,16 +170,19 @@ own row, so naming another barangay's request returns 404 rather than 403 — th
 nowhere to name one. Same on the resident side: a request is filed to the barangay on the
 resident's record, never to one in the request body.
 
-**Two roles.** The officer processes certificates. The administrator — the captain or the
+**Three roles.** The officer processes certificates. The administrator — the captain or the
 secretary — does that too, plus the three things that are the barangay's to decide: what it
 charges, who works here, and what it has done. The officer's tabs are hidden *and* the API
 refuses them, in that order of importance. The officer list is read-only: issuing an account
 is a municipal act, because the hall knows who actually holds a barangay office, and making
 a barangay an account authority of its own is a larger decision than this needed.
 
+The kagawad is the third and is not a lighter officer — see *The council, and a barangay
+that issues its own accounts*.
+
 Barangay accounts are seeded as `admin.<barangay>@malasiqui.gov.ph` (every barangay) and
-`officer.<barangay>@malasiqui.gov.ph` (the first one only — enough to show the isolation
-without seeding a directory). A reseed repairs an existing barangay account's
+`officer.<barangay>@malasiqui.gov.ph` plus `kagawad.<barangay>@malasiqui.gov.ph` (the first
+one only — enough to show the isolation without seeding a directory). A reseed repairs an existing barangay account's
 `barangay_id` if it is missing, since every query in that console scopes on it and an
 account without one answers 409 to everything.
 
@@ -352,6 +357,57 @@ follows for whose move it is. Amber, not red: red belongs to the emergency hotli
 urgent notice is worth stopping for without being the button you press when the house is on
 fire. The board renders nothing at all when it is empty, rather than keeping a permanent
 "no announcements" card in front of the certificates.
+
+## The council, and a barangay that issues its own accounts
+
+A barangay is not only its office. The Sangguniang Barangay — the Punong Barangay and
+seven kagawads — legislates, passes the budget, sits on committees and answers to the
+people who elected it. None of that is clerical work, and `barangay_kagawad` is
+deliberately not "an officer with fewer tabs".
+
+**The kagawad has its own router, and that is the whole security design.**
+`barangayStaffRouter` opens with `requireRole('barangay_admin', 'barangay_officer')` across
+everything, so every route on it is closed to a kagawad — including every route somebody
+adds next year without thinking about this. Putting a third role on that gate and carving
+it back out route by route would leave the blotter one forgotten `requireRole` away from a
+councillor, and a forgotten gate is exactly the thing that happens. `/barangay-kagawad` is
+a separate mount with a separate gate, the same reasoning as the barangay console being a
+separate shell rather than a tab in the municipal one: there is no filter to get wrong.
+
+**The line it draws is figures, never people.** A kagawad reads what the office issued and
+collected, the register as counts — population, age bands, households per purok — and the
+notice board as residents see it. `barangayFigures` is shared with the secretary's own
+screen, so the council and the clerk never quote different population numbers at each
+other. What a kagawad cannot reach is any individual: no certificate queue, no household
+names or addresses, no resident anywhere in any response.
+
+**No blotter, and this is the decision worth stating plainly.** A blotter entry names a
+respondent — somebody accused of something who has been found to have done nothing.
+Handing seven elected politicians a searchable book of accusations against their own
+constituents is a political weapon, and nothing about holding the office requires it. A
+kagawad who sits on the Lupong Tagapamayapa is appointed to that separately and would need
+an account that says so.
+
+**Read-only, deliberately.** A notice goes out over the barangay's name and the board is
+how the barangay speaks, so posting stays with the captain and the clerk — a council seat
+is not a megaphone. Widening this later is one route; narrowing it after seven people have
+been using it is not.
+
+**The barangay now issues its own clerk and kagawad accounts.** The hall does not know who
+holds a barangay office this term and the captain does, so `POST /barangay-staff/officers`
+is the barangay's. Everything about it follows the rules already here: the barangay is
+stamped from the signed-in account's own row rather than the body, the municipality is
+stamped from the register, the account starts with an unusable random password and its
+holder chooses their own from an emailed link, and the screen says whether that link
+actually sent rather than assuming it did.
+
+**The one exception is the escalation line: a barangay cannot issue an administrator.**
+`ISSUABLE` is officer and kagawad and nothing else, so a barangay cannot mint its own
+authority and a captain who has been revoked cannot have left one behind. The same list
+scopes revocation, in the same statement as the barangay — so an administrator's row is
+*not found* rather than refused, which is what stops a captain and a secretary from
+revoking each other. Revoking spends any outstanding invitation, because a live reset link
+is a way back in.
 
 ## The hall, and how long a certificate lasts
 
@@ -1389,10 +1445,19 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   the screen says to ring first rather than pretending to know. It does mean nothing can
   compute whether the hall is open right now, and a deployment that wants that needs real
   opening hours, which is a different and larger thing to maintain.
-- **Barangay accounts are issued by the municipal administrator, in the database.** The
-  console lists who can sign in for a barangay but cannot add or revoke one — the
-  `StaffAccounts` screen only makes municipal staff. A barangay that can issue its own
-  accounts is a new authorization surface worth designing deliberately.
+- **A barangay issues its own clerks and kagawads; an administrator still comes from the
+  hall.** That one exception is the escalation line and the reason the rest is safe to
+  delegate. It does mean a barangay whose only administrator is locked out needs the
+  municipal administrator to intervene, which is the right trade and worth knowing.
+- **The kagawad is read-only and reads counts.** A deployment that wants councillors to
+  post committee notices, or to see the Lupong Tagapamayapa's own work, is adding routes to
+  `barangayKagawad.ts` — not adding the role to the clerk's gate, which is what the
+  separation exists to prevent. Membership of the Lupon is not modelled at all: a kagawad
+  who sits on it would need an account that says so.
+- **Nothing records which seat a kagawad holds.** There are seven of them and the app knows
+  only that somebody is one — no committee, no term, no ranking. A barangay wanting the
+  council as a roster rather than a set of logins needs the Sanggunian as data, which is a
+  different feature from an account.
 - **The blotter records the KP process; it does not conduct it.** See *The blotter and the
   summons*. There is no Pangkat ng Tagapagkasundo, no prescribed KP form, no ten-day
   settlement finality and no Certificate to File Action — those are paper instruments with
@@ -1503,9 +1568,10 @@ health) with the password printed by `npm run seed`. Sign in as `cswdo@` to see 
 programme record on a request. Residents register in the app.
 
 Barangay logins use the same password: `admin.poblacion@malasiqui.gov.ph` for the
-administrator's console and `officer.poblacion@malasiqui.gov.ph` for the officer's, which
-is the pair to compare when checking what each role may do. Every other barangay has an
-administrator account only.
+administrator's console, `officer.poblacion@malasiqui.gov.ph` for the clerk's and
+`kagawad.poblacion@malasiqui.gov.ph` for the council's. The clerk and the kagawad are the
+pair to compare — one works the register and the blotter, the other sees counts and no
+individual resident at all. Every other barangay has an administrator account only.
 
 The demo build lists all of these on its own sign-in screen (`DEMO_ACCOUNTS` in
 `SignIn.tsx`), grouped by tier. Add a row there whenever a seeded role is added — an

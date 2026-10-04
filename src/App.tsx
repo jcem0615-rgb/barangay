@@ -32,6 +32,7 @@ import BarangayHub from './screens/BarangayHub'
 import BarangayRequestForm from './screens/BarangayRequestForm'
 import DocumentGuide from './screens/DocumentGuide'
 import BarangayConsole from './screens/barangay/BarangayConsole'
+import KagawadConsole from './screens/barangay/KagawadConsole'
 
 function ScreenRouter() {
   const { screen } = useNav()
@@ -135,6 +136,10 @@ function RoleShell() {
   // a barangay secretary has no business in a municipal queue, and separate
   // shells mean there is no filter to get wrong.
   if (user.role === 'barangay_admin' || user.role === 'barangay_officer') return <BarangayConsole />
+  // Its own shell rather than the console with tabs hidden: a kagawad is
+  // elected rather than clerical, and the API refuses them every route that
+  // console calls, so sharing one would only invite a filter to get wrong.
+  if (user.role === 'barangay_kagawad') return <KagawadConsole />
 
   return (
     <NavProvider>

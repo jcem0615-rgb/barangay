@@ -408,26 +408,37 @@ householdsRouter.delete('/:id/members/:memberId', async (req, res) => {
 householdsRouter.get('/figures/summary', async (req, res) => {
   const barangay = await ownBarangay(req.user!.id)
   if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+  res.json({ barangay: barangay.name, ...(await barangayFigures(barangay.id)) })
+})
 
+/**
+ * The counts themselves, apart from the route that serves them.
+ *
+ * Pulled out because a kagawad reads these and must never reach the register
+ * they are computed from: the figures are what an elected official needs to
+ * plan with, and the names and addresses underneath are the secretary's book.
+ * One function, two callers, and the caller that must not see names has no
+ * query of its own that could accidentally select them.
+ */
+export async function barangayFigures(barangayId: string) {
   const rows = await query<MemberRow & { purok: string | null }>(
     `select m.id, m.full_name, m.birth_date::text, m.sex, m.relationship, m.civil_status,
             m.occupation, m.is_pwd, m.is_four_ps, m.is_voter, h.purok
        from household_members m join households h on h.id = m.household_id
       where m.barangay_id = $1 and h.status = 'active'`,
-    [barangay.id]
+    [barangayId]
   )
 
   const households = await query<{ purok: string | null; count: string }>(
     `select purok, count(*) as count from households
       where barangay_id = $1 and status = 'active' group by purok order by purok nulls last`,
-    [barangay.id]
+    [barangayId]
   )
 
   const ages = rows.map((m) => ageOn(m.birth_date))
   const known = ages.filter((a): a is number => a !== null)
 
-  res.json({
-    barangay: barangay.name,
+  return {
     households: households.reduce((total, p) => total + Number(p.count), 0),
     population: rows.length,
     female: rows.filter((m) => m.sex === 'female').length,
@@ -444,7 +455,7 @@ householdsRouter.get('/figures/summary', async (req, res) => {
       households: Number(p.count),
       population: rows.filter((m) => m.purok === p.purok).length,
     })),
-  })
-})
+  }
+}
 
 export { RELATIONSHIPS, CIVIL_STATUSES }

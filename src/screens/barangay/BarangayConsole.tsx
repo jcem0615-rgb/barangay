@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BadgeCheck, BookText, Building, Home, Landmark, Megaphone, CheckCircle2, Inbox, Loader2, LogOut,
-  PhilippinePeso, RefreshCw, Users,
+  PhilippinePeso, RefreshCw, UserPlus, Users,
 } from 'lucide-react'
 import { api, ApiError, type BarangayRequest } from '../../lib/api'
 import BarangayBlotter from './BarangayBlotter'
@@ -44,6 +44,17 @@ const NEXT: Record<BarangayRequest['status'], Array<{ status: string; label: str
   ready: [{ status: 'released', label: 'Released to resident' }, { status: 'rejected', label: 'Do not issue' }],
   released: [],
   rejected: [],
+}
+
+/**
+ * Three roles now, so the pill has to say which — "Officer" covering both a
+ * clerk and an elected councillor would hide the only thing about the row that
+ * decides what the account can read.
+ */
+const ROLE_LABEL: Record<string, string> = {
+  barangay_admin: 'Administrator',
+  barangay_officer: 'Clerk',
+  barangay_kagawad: 'Kagawad',
 }
 
 type View =
@@ -477,30 +488,150 @@ function Fees() {
 // ------------------------------------------------------------------ officers
 
 function Officers() {
+  const { user } = useAuth()
   const [rows, setRows] = useState<Array<{ id: string; fullName: string; email: string; role: string; active: boolean }>>([])
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState({ fullName: '', email: '', role: 'barangay_kagawad' as 'barangay_officer' | 'barangay_kagawad' })
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api.barangayOfficers()
-      .then(setRows)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not load the officers.'))
+  const load = useCallback(async () => {
+    try {
+      setRows(await api.barangayOfficers())
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not load the officers.')
+    }
   }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  const issue = async () => {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const created = await api.issueBarangayAccount({
+        email: draft.email.trim(), fullName: draft.fullName.trim(), role: draft.role,
+      })
+      // An invitation that did not send is the thing somebody must act on, so
+      // it is said rather than assumed — the same honesty the municipal screen
+      // shows. Nobody here ever sees a password.
+      setNotice(
+        created.invited
+          ? `Invitation sent to ${created.email}. They choose their own password from the link; it is good for a week.`
+          : `Account created, but the invitation to ${created.email} did not send. Use "Send link again" once mail is working.`
+      )
+      setAdding(false)
+      setDraft({ fullName: '', email: '', role: 'barangay_kagawad' })
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not issue that account.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const act = async (id: string, what: 'revoke' | 'restore' | 'resend') => {
+    setError(null)
+    setNotice(null)
+    try {
+      if (what === 'revoke') await api.revokeBarangayAccount(id)
+      if (what === 'restore') await api.restoreBarangayAccount(id)
+      if (what === 'resend') {
+        const { sent } = await api.resendBarangayInvite(id)
+        setNotice(sent ? 'A fresh link is on its way.' : 'That link did not send — check the mail settings.')
+      }
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'That did not work.')
+    }
+  }
+
+  const ready = draft.fullName.trim().length >= 2 && /\S+@\S+\.\S+/.test(draft.email.trim())
 
   return (
     <div className="max-w-2xl">
-      {/*
-        Read-only on purpose. Issuing an account is a municipal act — the hall
-        knows who actually holds a barangay office — so this answers "who can
-        sign in as us", which is the question a captain needs, without making the
-        barangay an account authority of its own.
-      */}
       <p className="mb-4 rounded-xl bg-navy-50 px-4 py-3 text-[12.5px] leading-snug text-navy-900">
-        Who can sign in for this barangay. Accounts are issued by the municipal
-        administrator — ask the hall to add or revoke one.
+        Who can sign in for this barangay. You issue clerks and kagawads
+        yourself &mdash; the hall does not know who holds a barangay office this
+        term, and you do. <strong>An administrator account is still the municipal
+        administrator&rsquo;s to issue</strong>, which is what stops this screen
+        from being a way to hand out your own authority. You never see or set
+        anybody&rsquo;s password: they choose it from an emailed link.
       </p>
 
+      {notice && (
+        <p className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-[12.5px] leading-snug text-emerald-900">{notice}</p>
+      )}
       {error && (
         <p role="alert" className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-[13px] text-rose-700">{error}</p>
+      )}
+
+      {adding ? (
+        <div className="mb-4 space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+          <label className="block">
+            <span className="mb-1 block text-[12.5px] font-semibold text-navy-950">Full name</span>
+            <input
+              value={draft.fullName}
+              onChange={(e) => setDraft((d) => ({ ...d, fullName: e.target.value }))}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13.5px] outline-none focus:border-navy-600 focus:bg-white"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[12.5px] font-semibold text-navy-950">Email</span>
+            <input
+              type="email"
+              value={draft.email}
+              onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13.5px] outline-none focus:border-navy-600 focus:bg-white"
+            />
+            <span className="mt-1 block text-[11.5px] text-slate-500">
+              The invitation goes here, so it has to be an address they read.
+            </span>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[12.5px] font-semibold text-navy-950">What they are</span>
+            <select
+              value={draft.role}
+              onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value as typeof d.role }))}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13.5px] outline-none focus:border-navy-600 focus:bg-white"
+            >
+              <option value="barangay_kagawad">Kagawad &mdash; sees the figures only</option>
+              <option value="barangay_officer">Clerk &mdash; works the certificates, the register and the blotter</option>
+            </select>
+            {/* Said before the choice is made rather than discovered after: the
+                difference between these two is the whole of what the account
+                can read, and a kagawad is the lighter one on purpose. */}
+            <span className="mt-1 block text-[11.5px] leading-snug text-slate-500">
+              {draft.role === 'barangay_kagawad'
+                ? 'A kagawad sees counts — certificates issued, money collected, how many people live on each purok — and no individual resident. No register, no blotter, no queue.'
+                : 'A clerk does the day\u2019s work: certificates, the register of inhabitants and the blotter. That is a great deal about named residents, so issue it to somebody who works here.'}
+            </span>
+          </label>
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={() => void issue()}
+              disabled={!ready || busy}
+              className="flex items-center gap-2 rounded-xl bg-navy-800 px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-navy-900 disabled:opacity-60"
+            >
+              {busy && <Loader2 size={14} className="animate-spin" />} Issue the account
+            </button>
+            <button
+              onClick={() => { setAdding(false); setError(null) }}
+              className="text-[13px] font-medium text-slate-500 hover:text-slate-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => { setAdding(true); setNotice(null) }}
+          className="mb-4 flex items-center gap-2 rounded-xl bg-navy-800 px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-navy-900"
+        >
+          <UserPlus size={15} /> Add an account
+        </button>
       )}
 
       <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
@@ -511,12 +642,48 @@ function Officers() {
               <p className="text-[12px] text-slate-500">{row.email}</p>
             </div>
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11.5px] font-semibold text-slate-600">
-              {row.role === 'barangay_admin' ? 'Administrator' : 'Officer'}
+              {ROLE_LABEL[row.role] ?? row.role}
             </span>
             {!row.active && (
               <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11.5px] font-semibold text-rose-700">
                 Revoked
               </span>
+            )}
+            {/* An administrator's row carries no buttons: making and unmaking
+                one is the hall's, so there is nothing here to press — and the
+                API refuses it regardless, which is the half that matters. */}
+            {row.role !== 'barangay_admin' && row.id !== user?.id && (
+              <div className="flex items-center gap-2">
+                {row.active ? (
+                  <>
+                    {/* Named for a screen reader: a column of identical
+                        "Revoke" buttons says nothing about which account it
+                        acts on, and this one closes somebody's access. */}
+                    <button
+                      onClick={() => void act(row.id, 'resend')}
+                      aria-label={`Send ${row.fullName} a fresh link`}
+                      className="text-[12px] font-medium text-navy-800 hover:underline"
+                    >
+                      Send link again
+                    </button>
+                    <button
+                      onClick={() => void act(row.id, 'revoke')}
+                      aria-label={`Revoke ${row.fullName}`}
+                      className="text-[12px] font-medium text-rose-700 hover:underline"
+                    >
+                      Revoke
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => void act(row.id, 'restore')}
+                    aria-label={`Restore ${row.fullName}`}
+                    className="text-[12px] font-medium text-navy-800 hover:underline"
+                  >
+                    Restore
+                  </button>
+                )}
+              </div>
             )}
           </div>
         ))}

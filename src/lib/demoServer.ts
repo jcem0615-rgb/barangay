@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v20'
+const STORE_KEY = 'elgu-demo-state-v21'
 
 interface DemoIncident {
   id: string
@@ -64,7 +64,7 @@ interface DemoUser {
   email: string
   password: string
   fullName: string
-  role: 'resident' | 'staff' | 'admin' | 'barangay_admin' | 'barangay_officer'
+  role: 'resident' | 'staff' | 'admin' | 'barangay_admin' | 'barangay_officer' | 'barangay_kagawad'
   departments: string[]
   position: string | null
   active: boolean
@@ -341,6 +341,16 @@ function seed(): DemoState {
         ? [{
             id: uid(), email: `officer.${b.id}@malasiqui.gov.ph`, password: DEMO_PASSWORD,
             fullName: `${b.name} Barangay Clerk`, role: 'barangay_officer' as const,
+            departments: [], position: null, active: true, notifyEmail: true, notifySms: false,
+            barangayId: b.id,
+            profile: { philSysId: null, barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
+            photo: null, photoUpdatedAt: null, programs: [],
+          },
+          // One kagawad, so the demo can show what an elected member sees and —
+          // the more interesting half — what they are refused.
+          {
+            id: uid(), email: `kagawad.${b.id}@malasiqui.gov.ph`, password: DEMO_PASSWORD,
+            fullName: `${b.name} Barangay Kagawad`, role: 'barangay_kagawad' as const,
             departments: [], position: null, active: true, notifyEmail: true, notifySms: false,
             barangayId: b.id,
             profile: { philSysId: null, barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
@@ -809,6 +819,54 @@ const barangayFee = (barangayId: string, typeId: string) =>
  * console shows up on the resident's screen, with the authored row as the
  * fallback for a browser whose state predates this.
  */
+/**
+ * Age on today, derived rather than stored — the same rule the server follows,
+ * because a stored age is wrong the day after it is written. Module scope now
+ * that both the register and the council's figures need it.
+ */
+const ageOn = (birthDate: string | null) => {
+  if (!birthDate) return null
+  const born = new Date(birthDate)
+  const today = new Date()
+  let age = today.getFullYear() - born.getFullYear()
+  const before =
+    today.getMonth() < born.getMonth() ||
+    (today.getMonth() === born.getMonth() && today.getDate() < born.getDate())
+  if (before) age -= 1
+  return age >= 0 && age < 130 ? age : null
+}
+
+/**
+ * The register as counts, apart from the route that serves them — the same
+ * split the server makes, and for the same reason: a kagawad reads these and
+ * must never reach the register they come from.
+ */
+const barangayFigures = (barangayId: string) => {
+  const active = state.households.filter((h) => h.barangayId === barangayId && h.status === 'active')
+  const people = active.flatMap((h) => h.members.map((m) => ({ ...m, purok: h.purok })))
+  const ages = people.map((m) => ageOn(m.birthDate))
+  const known = ages.filter((a): a is number => a !== null)
+  const puroks = [...new Set(active.map((h) => h.purok))]
+  return {
+    households: active.length,
+    population: people.length,
+    female: people.filter((m) => m.sex === 'female').length,
+    male: people.filter((m) => m.sex === 'male').length,
+    children: known.filter((a) => a < 18).length,
+    adults: known.filter((a) => a >= 18 && a < 60).length,
+    seniors: known.filter((a) => a >= 60).length,
+    withoutBirthDate: ages.length - known.length,
+    pwd: people.filter((m) => m.isPwd).length,
+    fourPs: people.filter((m) => m.isFourPs).length,
+    voters: people.filter((m) => m.isVoter).length,
+    byPurok: puroks.map((purok) => ({
+      purok,
+      households: active.filter((h) => h.purok === purok).length,
+      population: people.filter((m) => m.purok === purok).length,
+    })),
+  }
+}
+
 const barangayOffice = (barangayId: string): DemoBarangayOffice => {
   const seeded = BARANGAYS.find((b) => b.id === barangayId)
   return state.barangayOffices?.[barangayId] ?? {
@@ -1334,6 +1392,59 @@ async function route(
     }
   }
 
+  // ---- the council's own view ----
+  //
+  // Its own branch with its own role check, mirroring the server's separate
+  // router: a kagawad never reaches the staff branch below, so every route
+  // there — including ones added later — refuses them without a filter.
+  // Figures, never people.
+  if (parts[0] === 'barangay-kagawad') {
+    const user = need('barangay_kagawad')
+    const own = BARANGAYS.find((b) => b.id === user.barangayId)
+    if (!own) throw new DemoError(409, 'This account is not attached to a barangay.')
+
+    if (parts[1] === 'me') {
+      const office = barangayOffice(own.id)
+      return {
+        status: 200,
+        body: {
+          barangay: { id: own.id, name: own.name, captain: office.captain },
+          role: 'barangay_kagawad',
+        },
+      }
+    }
+
+    if (parts[1] === 'summary') {
+      const mine = state.barangayRequests.filter((r) => r.barangayId === own.id)
+      const count = (status: DemoBarangayRequest['status']) =>
+        mine.filter((r) => r.status === status).length
+      return {
+        status: 200,
+        body: {
+          barangay: own.name,
+          counts: {
+            pending: count('pending'), processing: count('processing'), ready: count('ready'),
+            released: count('released'), rejected: count('rejected'),
+          },
+          // Released only — a fee on a pending request is not money the
+          // barangay has, and a council budgeting against it would be wrong.
+          collected: mine.filter((r) => r.status === 'released')
+            .reduce((total, r) => total + r.fee, 0),
+        },
+      }
+    }
+
+    if (parts[1] === 'figures') {
+      return { status: 200, body: { barangay: own.name, ...barangayFigures(own.id) } }
+    }
+
+    if (parts[1] === 'announcements') {
+      return { status: 200, body: liveAnnouncements(own.id) }
+    }
+
+    throw new DemoError(404, 'Not found.')
+  }
+
   if (parts[0] === 'barangay-staff') {
     const user = need('barangay_admin', 'barangay_officer')
     const own = BARANGAYS.find((b) => b.id === user.barangayId)
@@ -1563,17 +1674,6 @@ async function route(
     // clerk can look up an account.
     if (parts[1] === 'households') {
       const mine = () => state.households.filter((h) => h.barangayId === own.id)
-      const ageOn = (birthDate: string | null) => {
-        if (!birthDate) return null
-        const born = new Date(birthDate)
-        const today = new Date()
-        let age = today.getFullYear() - born.getFullYear()
-        const before =
-          today.getMonth() < born.getMonth() ||
-          (today.getMonth() === born.getMonth() && today.getDate() < born.getDate())
-        if (before) age -= 1
-        return age >= 0 && age < 130 ? age : null
-      }
       const member = (m: DemoHouseholdMember) => ({ ...m, age: ageOn(m.birthDate) })
       const summary = (h: DemoHousehold) => ({
         id: h.id, householdNo: h.householdNo, address: h.address, purok: h.purok,
@@ -1588,33 +1688,7 @@ async function route(
 
       // what the register is for
       if (parts[2] === 'figures' && parts[3] === 'summary') {
-        const active = mine().filter((h) => h.status === 'active')
-        const people = active.flatMap((h) => h.members.map((m) => ({ ...m, purok: h.purok })))
-        const ages = people.map((m) => ageOn(m.birthDate))
-        const known = ages.filter((a): a is number => a !== null)
-        const puroks = [...new Set(active.map((h) => h.purok))]
-        return {
-          status: 200,
-          body: {
-            barangay: own.name,
-            households: active.length,
-            population: people.length,
-            female: people.filter((m) => m.sex === 'female').length,
-            male: people.filter((m) => m.sex === 'male').length,
-            children: known.filter((a) => a < 18).length,
-            adults: known.filter((a) => a >= 18 && a < 60).length,
-            seniors: known.filter((a) => a >= 60).length,
-            withoutBirthDate: ages.length - known.length,
-            pwd: people.filter((m) => m.isPwd).length,
-            fourPs: people.filter((m) => m.isFourPs).length,
-            voters: people.filter((m) => m.isVoter).length,
-            byPurok: puroks.map((purok) => ({
-              purok,
-              households: active.filter((h) => h.purok === purok).length,
-              population: people.filter((m) => m.purok === purok).length,
-            })),
-          },
-        }
+        return { status: 200, body: { barangay: own.name, ...barangayFigures(own.id) } }
       }
 
       if (!parts[2] && method === 'POST') {
@@ -1951,14 +2025,80 @@ async function route(
 
     if (parts[1] === 'officers') {
       adminOnly()
-      return {
-        status: 200,
-        body: state.users
-          .filter((u) => u.barangayId === own.id && u.role !== 'resident')
-          .map((u) => ({
-            id: u.id, fullName: u.fullName, email: u.email, role: u.role, active: u.active,
-          })),
+      const roster = () => state.users
+        .filter((u) => u.barangayId === own.id && u.role !== 'resident')
+        .map((u) => ({
+          id: u.id, fullName: u.fullName, email: u.email, role: u.role, active: u.active,
+        }))
+
+      // The roles a barangay may issue. Never barangay_admin: making an
+      // administrator stays a municipal act, which is what keeps this from
+      // being a way to hand out your own authority.
+      const ISSUABLE = ['barangay_officer', 'barangay_kagawad']
+
+      if (!parts[2] && method === 'POST') {
+        const email = String(body?.email ?? '').trim()
+        const fullName = String(body?.fullName ?? '').trim()
+        const role = String(body?.role ?? '')
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new DemoError(400, 'Give a real email address.')
+        if (fullName.length < 2) throw new DemoError(400, 'Give their name.')
+        if (!ISSUABLE.includes(role)) {
+          throw new DemoError(400, 'A barangay issues clerks and kagawads. An administrator comes from the municipal hall.')
+        }
+        if (state.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
+          throw new DemoError(409, 'That email already has an account.')
+        }
+        const created: DemoUser = {
+          id: uid(), email, password: DEMO_PASSWORD,
+          fullName, role: role as DemoUser['role'],
+          departments: [], position: null, active: true, notifyEmail: true, notifySms: false,
+          barangayId: own.id,
+          profile: { philSysId: null, barangay: own.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
+          photo: null, photoUpdatedAt: null, programs: [],
+        }
+        state.users.push(created)
+        persist()
+        // The real server mails an invitation and the account starts unusable.
+        // There is no mail here, so the demo says so rather than implying a
+        // link went somewhere — and gives the account the demo password, since
+        // an account nobody can sign into teaches nothing.
+        return {
+          status: 201,
+          body: {
+            id: created.id, fullName, email, role, active: true, invited: false,
+          },
+        }
       }
+
+      // Scoped to this barangay and to the issuable roles in one step, so an
+      // administrator's row is not found rather than refused.
+      const target = parts[2]
+        ? state.users.find((u) =>
+            u.id === parts[2] && u.barangayId === own.id && ISSUABLE.includes(u.role))
+        : undefined
+
+      if (parts[2] && parts[3] === 'deactivate' && method === 'POST') {
+        if (parts[2] === user.id) throw new DemoError(409, 'You cannot revoke your own account.')
+        if (!target || !target.active) throw new DemoError(404, 'Account not found, or already revoked.')
+        target.active = false
+        persist()
+        return { status: 204, body: null }
+      }
+
+      if (parts[2] && parts[3] === 'reactivate' && method === 'POST') {
+        if (!target || target.active) throw new DemoError(404, 'Account not found, or already active.')
+        target.active = true
+        persist()
+        return { status: 204, body: null }
+      }
+
+      if (parts[2] && parts[3] === 'send-reset' && method === 'POST') {
+        if (!target || !target.active) throw new DemoError(404, 'Account not found.')
+        // No mail in the demo, and saying it sent would be a lie somebody acts on.
+        return { status: 200, body: { sent: false } }
+      }
+
+      return { status: 200, body: roster() }
     }
 
     if (parts[1] === 'summary') {

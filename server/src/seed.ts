@@ -252,7 +252,13 @@ async function main() {
     const accounts = [
       { email: `admin.${barangay.id}@malasiqui.gov.ph`, name: `${barangay.name} Barangay Secretary`, role: 'barangay_admin' },
       ...(index === 0
-        ? [{ email: `officer.${barangay.id}@malasiqui.gov.ph`, name: `${barangay.name} Barangay Clerk`, role: 'barangay_officer' }]
+        ? [
+            { email: `officer.${barangay.id}@malasiqui.gov.ph`, name: `${barangay.name} Barangay Clerk`, role: 'barangay_officer' },
+            // One kagawad, in the first barangay only, for the same reason as
+            // the clerk: enough to show what the council may and may not see
+            // without seeding a seven-seat roster nobody reads.
+            { email: `kagawad.${barangay.id}@malasiqui.gov.ph`, name: `${barangay.name} Barangay Kagawad`, role: 'barangay_kagawad' },
+          ]
         : []),
     ]
     for (const account of accounts) {

@@ -12,7 +12,9 @@ const TOKEN_TTL = '12h'
  * The shells they see are different, the data they may touch is different, and
  * a role meaning two things is the kind that leaks one into the other.
  */
-export type Role = 'resident' | 'staff' | 'admin' | 'barangay_admin' | 'barangay_officer'
+export type Role =
+  | 'resident' | 'staff' | 'admin'
+  | 'barangay_admin' | 'barangay_officer' | 'barangay_kagawad'
 
 export interface AuthUser {
   id: string

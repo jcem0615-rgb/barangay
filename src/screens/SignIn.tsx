@@ -301,8 +301,12 @@ const DEMO_ACCOUNTS: Array<{ tier: string; accounts: Array<[string, string]> }> 
   },
   {
     tier: 'Barangay Poblacion',
+    // Three roles, and the pair worth comparing is the clerk and the kagawad:
+    // one works the register and the blotter, the other sees counts and no
+    // individual resident at all.
     accounts: [
-      ['Officer', 'officer.poblacion@malasiqui.gov.ph'],
+      ['Clerk', 'officer.poblacion@malasiqui.gov.ph'],
+      ['Kagawad', 'kagawad.poblacion@malasiqui.gov.ph'],
       ['Administrator', 'admin.poblacion@malasiqui.gov.ph'],
     ],
   },

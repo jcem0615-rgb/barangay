@@ -148,6 +148,16 @@ usually `1` behind a single load balancer or ingress.
       indigency and the first-time jobseeker certificate are free by law
 - [ ] Every barangay has at least one account that someone there can actually sign into, and
       the seeded barangay passwords have been changed like the municipal ones
+- [ ] **Each barangay administrator knows they now issue their own clerks and kagawads**,
+      and what the difference is: a clerk reads the register of inhabitants and the blotter,
+      a kagawad reads counts and no individual resident. Issuing the wrong one hands a
+      councillor the barangay's most personal records. An administrator account still comes
+      from the municipal hall, so make sure somebody there can act when a barangay's only
+      administrator leaves office after an election
+- [ ] **Revoking happens the day somebody leaves office**, not at the end of the term.
+      Nothing here expires an account, a barangay election replaces the whole council, and
+      a kagawad who lost a seat keeps reading the barangay's figures until a person revokes
+      them
 - [ ] **Every barangay hall's address, hours and phone are its real ones.** They are
       seeded as invented placeholders, exactly like the hotlines, and they are what a
       resident is shown the moment a certificate is marked ready for pickup — so a wrong

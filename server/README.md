@@ -375,6 +375,7 @@ npm run test:blotter      # the barangay book: who may open it, the roles, and t
 npm run test:households   # the register of inhabitants: scoping, the figures, and no account links
 npm run test:announcements  # the board: who may post, who may ring every phone, expiry on read
 npm run test:barangay-office  # the hall's details, who may correct them, and when a certificate lapses
+npm run test:kagawad      # the council's view: figures not people, and the escalation line
 ```
 
 Run them one at a time, or clear `login_attempts` between them. Every suite signs

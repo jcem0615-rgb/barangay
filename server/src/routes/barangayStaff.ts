@@ -1,7 +1,12 @@
+import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
-import { authenticate, requireRole } from '../auth.ts'
+import { authenticate, hashPassword, requireRole } from '../auth.ts'
+import { issueResetToken } from '../resetTokens.ts'
+import { resetEmail, sendMail } from '../mailer.ts'
+import { env } from '../env.ts'
+import { servedMunicipality } from '../identity.ts'
 import { toCentavos, toPesos } from '../serialize.ts'
 import { deliverNotification, recordNotification } from '../notifications.ts'
 import { serializeBarangayRequest, serializeBarangayOffice, type BarangayOfficeRow } from './barangay.ts'
@@ -375,22 +380,165 @@ barangayStaffRouter.put('/fees/:typeId', requireRole('barangay_admin'), async (r
   res.json({ ok: true, fee: parsed.data.fee })
 })
 
-/** Who works here. Officers are issued, never self-registered. */
+// ------------------------------------------------- who may sign in for us
+//
+// The barangay issues its own officer and kagawad accounts. It cannot issue an
+// administrator, and that single exception is what keeps this from being a way
+// to manufacture authority: making an administrator stays a municipal act, so a
+// barangay cannot mint its own, and a captain who has been revoked cannot have
+// left one behind. Everything else here follows the rule the rest of this
+// console follows — the barangay comes off the signed-in account's own row, so
+// another barangay's account is not found rather than refused.
+
+const INVITE_TTL_MINUTES = 7 * 24 * 60 // a week, like the municipal invitation
+
+/** The roles a barangay administrator may create. Never `barangay_admin`. */
+const ISSUABLE = ['barangay_officer', 'barangay_kagawad'] as const
+
+const OFFICER_ROLES = ['barangay_admin', 'barangay_officer', 'barangay_kagawad']
+
+/** Who works here, and who sits on the council. */
 barangayStaffRouter.get('/officers', requireRole('barangay_admin'), async (req, res) => {
   const barangay = await ownBarangay(req.user!.id)
   if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
   const rows = await query<{ id: string; full_name: string; email: string; role: string; deactivated_at: string | null }>(
     `select id, full_name, email, role, deactivated_at
        from users
-      where barangay_id = $1 and role in ('barangay_admin', 'barangay_officer')
+      where barangay_id = $1 and role = any($2::user_role[])
       order by role, full_name`,
-    [barangay.id]
+    [barangay.id, OFFICER_ROLES]
   )
   res.json(
     rows.map((r) => ({
       id: r.id, fullName: r.full_name, email: r.email, role: r.role, active: r.deactivated_at === null,
     }))
   )
+})
+
+const issueSchema = z.object({
+  email: z.email(),
+  fullName: z.string().min(2).max(120),
+  role: z.enum(ISSUABLE),
+})
+
+/**
+ * Issuing one.
+ *
+ * The administrator never sets or sees a password: the row starts with an
+ * unusable random one and the person chooses their own through the ordinary
+ * reset flow, exactly as a municipal account does. The barangay and the
+ * municipality are both stamped from the server — a barangay account without
+ * the first answers 409 to everything in its own console, and one without the
+ * second is the single kind of account that signs in anywhere.
+ */
+barangayStaffRouter.post('/officers', requireRole('barangay_admin'), async (req, res) => {
+  const parsed = issueSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  const body = parsed.data
+
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const existing = await one(`select 1 from users where lower(email) = lower($1)`, [body.email])
+  if (existing) return res.status(409).json({ error: 'That email already has an account.' })
+
+  const placeholder = await hashPassword(randomBytes(32).toString('base64url'))
+  const municipality = await servedMunicipality()
+
+  const created = await one<{ id: string }>(
+    `insert into users (email, password_hash, role, full_name, municipality_code, barangay_id)
+     values ($1, $2, $3, $4, $5, $6) returning id`,
+    [body.email, placeholder, body.role, body.fullName, municipality.code, barangay.id]
+  )
+
+  const token = await issueResetToken(created!.id, INVITE_TTL_MINUTES)
+  let invited = true
+  try {
+    await sendMail({
+      to: body.email,
+      ...resetEmail(`${env.publicUrl}/?reset=${token}`, INVITE_TTL_MINUTES),
+    })
+  } catch (err) {
+    console.error('failed to send barangay invitation', err)
+    invited = false
+  }
+
+  // invited:false tells the captain to follow up rather than assume it arrived
+  // — the same honesty the municipal screen shows.
+  res.status(201).json({
+    id: created!.id, fullName: body.fullName, email: body.email,
+    role: body.role, active: true, invited,
+  })
+})
+
+/**
+ * Finds one of this barangay's own issuable accounts.
+ *
+ * Scoped to the barangay *and* to the two roles a barangay may issue, in the
+ * same statement. An administrator's row is therefore not found rather than
+ * refused: a captain cannot revoke the secretary and a secretary cannot revoke
+ * the captain, because neither is reachable from here at all.
+ */
+async function issuableAccount(barangayId: string, id: unknown) {
+  return one<{ id: string; email: string; deactivated_at: string | null }>(
+    `select id, email, deactivated_at from users
+      where id = $1 and barangay_id = $2 and role = any($3::user_role[])`,
+    [id, barangayId, ISSUABLE]
+  )
+}
+
+/** Revoking access without deleting the person — their name stays on their work. */
+barangayStaffRouter.post('/officers/:id/deactivate', requireRole('barangay_admin'), async (req, res) => {
+  if (req.params.id === req.user!.id) {
+    return res.status(409).json({ error: 'You cannot revoke your own account.' })
+  }
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const row = await issuableAccount(barangay.id, req.params.id)
+  if (!row || row.deactivated_at) {
+    return res.status(404).json({ error: 'Account not found, or already revoked.' })
+  }
+  await query(`update users set deactivated_at = now() where id = $1`, [row.id])
+  // An outstanding invitation is a way back in, so revoking spends it.
+  await query(
+    `update password_reset_tokens set used_at = now() where user_id = $1 and used_at is null`,
+    [row.id]
+  )
+  res.status(204).end()
+})
+
+barangayStaffRouter.post('/officers/:id/reactivate', requireRole('barangay_admin'), async (req, res) => {
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const row = await issuableAccount(barangay.id, req.params.id)
+  if (!row || !row.deactivated_at) {
+    return res.status(404).json({ error: 'Account not found, or already active.' })
+  }
+  await query(`update users set deactivated_at = null where id = $1`, [row.id])
+  res.status(204).end()
+})
+
+/** A fresh link, for somebody who never set a password or lost theirs. */
+barangayStaffRouter.post('/officers/:id/send-reset', requireRole('barangay_admin'), async (req, res) => {
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const row = await issuableAccount(barangay.id, req.params.id)
+  if (!row || row.deactivated_at) return res.status(404).json({ error: 'Account not found.' })
+
+  const token = await issueResetToken(row.id, INVITE_TTL_MINUTES)
+  try {
+    await sendMail({
+      to: row.email,
+      ...resetEmail(`${env.publicUrl}/?reset=${token}`, INVITE_TTL_MINUTES),
+    })
+  } catch (err) {
+    console.error('failed to send barangay invitation', err)
+    return res.json({ sent: false })
+  }
+  res.json({ sent: true })
 })
 
 /** A simple count of what the barangay has done, for the captain. */

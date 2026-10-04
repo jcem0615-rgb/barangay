@@ -36,6 +36,7 @@
     "test:households": "node test/households.mjs",
     "test:announcements": "node test/announcements.mjs",
     "test:barangay-office": "node test/barangay-office.mjs",
+    "test:kagawad": "node test/kagawad.mjs",
     "test:residency": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/residency.mjs",
     "test:id-verification": "node test/id-verification.mjs",
     "test:hotlines": "node test/hotlines.mjs",

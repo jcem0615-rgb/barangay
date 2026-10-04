@@ -14,6 +14,7 @@ import { paymentsRouter, paymentWebhookRouter } from './routes/payments.ts'
 import { incidentsRouter } from './routes/incidents.ts'
 import { barangayRouter, barangayPublicRouter } from './routes/barangay.ts'
 import { barangayStaffRouter } from './routes/barangayStaff.ts'
+import { barangayKagawadRouter } from './routes/barangayKagawad.ts'
 import { appointmentsRouter } from './routes/appointments.ts'
 import { feedbackRouter } from './routes/feedback.ts'
 import { privacyRouter } from './routes/privacy.ts'
@@ -97,6 +98,8 @@ app.use('/api/incidents', incidentsRouter)
 app.use('/api/barangays', barangayPublicRouter)
 app.use('/api/barangay', barangayRouter)
 app.use('/api/barangay-staff', barangayStaffRouter)
+// Its own mount, not a branch of the staff router: see barangayKagawad.ts.
+app.use('/api/barangay-kagawad', barangayKagawadRouter)
 app.use('/api/appointments', appointmentsRouter)
 app.use('/api/feedback', feedbackRouter)
 app.use('/api/privacy', privacyRouter)
