@@ -525,6 +525,25 @@ export const en = {
   'brgy.sentFee': 'Pay the {amount} fee at the barangay hall when you collect it.',
   'brgy.sentFree': 'There is no fee for this one.',
 
+  // The hall itself — the answer to "come and collect it".
+  'brgy.hall': 'Your barangay hall',
+  'brgy.hallWhere': 'Where',
+  'brgy.hallHours': 'Open',
+  'brgy.hallCaptain': 'Punong Barangay',
+  'brgy.hallSecretary': 'Barangay Secretary',
+  'brgy.hallCall': 'Call the hall',
+  'brgy.hallNotStated': 'Not stated. Ask at the hall.',
+  'brgy.hallRingFirst': 'Ring before you travel — a barangay hall closes for assemblies and relief work.',
+
+  // How long a certificate is good for.
+  'brgy.validFor': 'Good for {days} days once issued',
+  'brgy.validForYear': 'Good for one year once issued',
+  'brgy.validForMonths': 'Good for {months} months once issued',
+  'brgy.validNone': 'Your barangay states no validity period for this one.',
+  'brgy.validUntil': 'Valid until {date}',
+  'brgy.lapsed': 'Lapsed on {date}',
+  'brgy.lapsedBlurb': 'Offices will ask for a fresh one. Request it again above.',
+
   // id card
   'id.title': 'Digital ID',
   'id.photoTitle': 'ID photo',
@@ -1043,6 +1062,23 @@ export const fil: Record<StringKey, string> = {
   'brgy.sentBlurb': 'Ang reference mo ay {ref}. Nakikita na ito ng barangay.',
   'brgy.sentFee': 'Bayaran ang {amount} sa barangay hall kapag kukunin mo.',
   'brgy.sentFree': 'Walang bayad ang isang ito.',
+
+  'brgy.hall': 'Ang barangay hall mo',
+  'brgy.hallWhere': 'Nasaan',
+  'brgy.hallHours': 'Bukas',
+  'brgy.hallCaptain': 'Punong Barangay',
+  'brgy.hallSecretary': 'Kalihim ng Barangay',
+  'brgy.hallCall': 'Tawagan ang hall',
+  'brgy.hallNotStated': 'Hindi nakasaad. Magtanong sa hall.',
+  'brgy.hallRingFirst': 'Tumawag muna bago maglakad — nagsasara ang barangay hall kapag may asamblea o relief.',
+
+  'brgy.validFor': 'Magagamit nang {days} araw matapos ilabas',
+  'brgy.validForYear': 'Magagamit nang isang taon matapos ilabas',
+  'brgy.validForMonths': 'Magagamit nang {months} buwan matapos ilabas',
+  'brgy.validNone': 'Walang itinakdang bisa ang barangay mo para sa isang ito.',
+  'brgy.validUntil': 'Balido hanggang {date}',
+  'brgy.lapsed': 'Nag-expire noong {date}',
+  'brgy.lapsedBlurb': 'Magpapakuha ng bago ang mga tanggapan. Hilingin itong muli sa itaas.',
 
   'id.title': 'Digital ID',
   'id.photoTitle': 'Larawan sa ID',

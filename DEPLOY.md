@@ -148,6 +148,18 @@ usually `1` behind a single load balancer or ingress.
       indigency and the first-time jobseeker certificate are free by law
 - [ ] Every barangay has at least one account that someone there can actually sign into, and
       the seeded barangay passwords have been changed like the municipal ones
+- [ ] **Every barangay hall's address, hours and phone are its real ones.** They are
+      seeded as invented placeholders, exactly like the hotlines, and they are what a
+      resident is shown the moment a certificate is marked ready for pickup — so a wrong
+      line sends somebody to a closed hall, which is the trip this app exists to save
+      them. Ring each number. Each barangay administrator can correct their own in the
+      console, which is the right way to do it for seventy-three of them
+- [ ] **Each certificate's validity period matches what offices here actually honour.**
+      `validityDays` in `mockData.ts` is a placeholder on the same footing as the fees;
+      nothing in law sets most of them. The exception is the first-time jobseeker
+      certificate's one year (RA 11261) — and note that the same law's one-time-availment
+      rule is **not** enforced by this app, so a barangay that cares about it still checks
+      by hand
 - [ ] **Somebody in each barangay knows that an urgent notice rings every resident's
       phone**, and that only the administrator account can post one. A notice marked urgent
       writes a notification to every resident of that barangay and the text goes out on a

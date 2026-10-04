@@ -60,7 +60,8 @@ src/
   components/            Reusable UI: IDCard, WorkflowTracker, StatusPill, FormField, etc.
   screens/                One component per Screen variant in nav.tsx
     barangay/             The barangay's own console: the certificate queue, the board of
-                          notices, the blotter and the register of inhabitants
+                          notices, the blotter, the register of inhabitants and the
+                          hall's own details
   App.tsx                 Providers + ScreenRouter switch + bottom nav visibility
 ```
 
@@ -351,6 +352,71 @@ follows for whose move it is. Amber, not red: red belongs to the emergency hotli
 urgent notice is worth stopping for without being the button you press when the house is on
 fire. The board renders nothing at all when it is empty, rather than keeping a permanent
 "no announcements" card in front of the certificates.
+
+## The hall, and how long a certificate lasts
+
+Two facts were missing from the barangay tier, and both belong to the same moment: the
+one where a resident has to get up and go somewhere.
+
+**"For pickup" is the only status in this app that asks somebody to travel**, and for a
+long time the only thing attached to it was the barangay's name. No hours, no address, no
+number to ring first. A `barangays` row carried a captain and a secretary — because those
+are printed on certificates — and nothing a resident could act on. So the row now carries
+the hall's address, its hours, a phone and an email, seeded from `BARANGAYS`
+(`src/data/mockData.ts`) and corrected in the barangay's own console thereafter, exactly
+as the municipal office details are.
+
+**They are published where they are needed, not everywhere.** `GET /api/barangays` is
+public because the sign-up screen needs the list before anybody has an account, and it
+still carries only id, name and captain. The hall's details ride on `GET /barangay/me`,
+which is the screen that has to answer "come and collect it". The hours are repeated on
+the `ready` row itself and in the `ready` notification — a resident deciding whether to
+go should not have to scroll to find out whether the office is open.
+
+**The barangay's own name is not editable, and that is the municipality rule one tier
+down.** What a place is called belongs to the register. What a barangay corrects is who
+holds its two offices and how to reach it — facts it knows, that change at every barangay
+election, and that the municipal hall cannot maintain for seventy-three barangays. The
+schema is strict, so an unknown key refuses the whole request rather than quietly saving
+something different.
+
+**Only the administrator writes; both roles read.** An officer who cannot see what
+residents are being told cannot notice that it is wrong, so the tab is theirs too, with
+the fields locked and a line saying who changes them. The API refuses their write
+regardless, which is the half that matters.
+
+**Every edit is audited in the same transaction**, with the row as it was — `admin_audit`,
+the same table and the same reasoning as the municipal hotlines. An administrator can
+point the hall's number anywhere, and the only defence against a mistake nobody notices is
+a record that still has the old one in it. Phone validation is the same deliberately loose
+`looksDialable`: it rules out the unusable and leaves the rest to somebody ringing it.
+
+**The second fact is that a certificate was good forever, which no barangay certificate
+is.** `validityDays` on the certificate type says how long the document is honoured, and
+`valid_until` on the request says when this particular one lapses.
+
+**It is stamped when the barangay marks it ready, not when it is collected.** `ready` is
+the point at which the secretary has prepared and dated the paper, and the paper is what a
+bank reads — so a resident who collects three weeks later holds a certificate already
+three weeks into its life, and the app says the same thing the document does. Dating it
+from collection would have the app claim more validity than the certificate carries, which
+is the one error here that costs somebody a trip. It is frozen onto the row like the fee,
+so changing a type's period never rewrites what an issued certificate says.
+
+**`expired` is derived on read**, like `expired` on a programme record and age in the
+register. A lapsed certificate says "Lapsed on 27 Sep 2026" in words and tells the resident
+to ask for a fresh one — amber, not red, and never colour alone.
+
+**A certificate with no stated period says so.** `validityDays` is optional, and null
+renders as "your barangay states no validity period for this one" rather than as a silence
+a resident would read as "forever". The round trip keeps it null rather than defaulting it
+somewhere.
+
+**The periods are placeholders, like the fees and the hotlines.** Nothing in law sets most
+of them — what a bank or an employer accepts is practice, and practice differs. The one
+exception is the first-time jobseeker certificate, where RA 11261 gives a year; that the
+law also makes it a one-time availment is *not* enforced here. Set the rest from what the
+deploying LGU's own offices actually ask for.
 
 ## How to get a document
 
@@ -1308,6 +1374,21 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   barangay hall on collection. The payment machinery is all municipal; pointing it at a
   barangay means deciding who the money goes to, which is a treasury question rather than a
   code one.
+- **A certificate's validity period is a placeholder**, like the fees and the hotlines —
+  and unlike the fees, a barangay cannot override it, because what a bank or an employer
+  honours is not a thing one barangay decides. Set `validityDays` in `mockData.ts` from
+  what the deploying LGU's offices actually ask for. The one period with a legal source is
+  the first-time jobseeker certificate's year (RA 11261); **that the same law makes it a
+  one-time availment is not enforced here**, so nothing stops a resident requesting a
+  second.
+- **Nothing warns a resident that a certificate is about to lapse.** It reads as lapsed on
+  the day, which is honest, but a notification a week out is the thing that would actually
+  save the trip — and it is a scheduled job, which this app does not have anywhere yet.
+- **The hall's hours are prose, not a schedule.** That is right for a barangay, whose week
+  is not a grid and whose hall shuts for an assembly without telling anybody — which is why
+  the screen says to ring first rather than pretending to know. It does mean nothing can
+  compute whether the hall is open right now, and a deployment that wants that needs real
+  opening hours, which is a different and larger thing to maintain.
 - **Barangay accounts are issued by the municipal administrator, in the database.** The
   console lists who can sign in for a barangay but cannot add or revoke one — the
   `StaffAccounts` screen only makes municipal staff. A barangay that can issue its own

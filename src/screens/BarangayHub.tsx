@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Building, CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
+import { Building, CalendarClock, CheckCircle2, ChevronRight, Clock, Loader2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import TierSwitch from '../components/TierSwitch'
 import AnnouncementBoard from '../components/AnnouncementBoard'
+import BarangayHallCard from '../components/BarangayHallCard'
 import { api, ApiError, type BarangayRequest } from '../lib/api'
 import { formatPeso } from '../lib/money'
+import { formatValidUntil } from '../lib/validity'
 import { useNav } from '../lib/nav'
 import { useT } from '../lib/i18n'
 
@@ -22,8 +24,7 @@ import { useT } from '../lib/i18n'
  * way it always has.
  */
 export default function BarangayHub() {
-  const { push } = useNav()
-  const { t } = useT()
+  const { t, language } = useT()
   const [mine, setMine] = useState<Awaited<ReturnType<typeof api.myBarangay>> | null>(null)
   const [options, setOptions] = useState<Array<{ id: string; name: string }>>([])
   const [requests, setRequests] = useState<BarangayRequest[]>([])
@@ -55,6 +56,8 @@ export default function BarangayHub() {
       setError(err instanceof ApiError ? err.message : t('brgy.loadFailed'))
     }
   }
+
+  const locale = language === 'fil' ? 'fil-PH' : 'en-PH'
 
   return (
     <div className="animate-tap-in pb-24">
@@ -97,79 +100,136 @@ export default function BarangayHub() {
         )}
 
         {!busy && mine?.barangay && (
-          <>
-            {/* What the barangay is telling you, before what you can ask it for. */}
-            <AnnouncementBoard />
-
-            <p className="mb-2 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">
-              {t('brgy.certificates')}
-            </p>
-            <div className="space-y-2.5">
-              {mine.certificates.map((type) => (
-                <button
-                  key={type.id}
-                  onClick={() => push({ name: 'barangay-request', typeId: type.id })}
-                  className="flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left active:bg-slate-50"
-                >
-                  <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50">
-                    <Building size={16} className="text-emerald-700" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[calc(14.5px_*_var(--text-scale))] font-bold text-navy-950">
-                      {type.name}
-                    </span>
-                    <span className="block text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-600">
-                      {type.description}
-                    </span>
-                  </span>
-                  {/* Free is worth saying in a word rather than as ₱0.00. */}
-                  <span className="shrink-0 text-[calc(13px_*_var(--text-scale))] font-bold text-navy-800">
-                    {type.fee === 0 ? t('brgy.free') : formatPeso(type.fee)}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <p className="mb-2 mt-6 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">
-              {t('brgy.myRequests')}
-            </p>
-            {requests.length === 0 ? (
-              <p className="rounded-2xl border border-slate-200 bg-white p-4 text-[calc(13.5px_*_var(--text-scale))] text-slate-500">
-                {t('brgy.noRequests')}
-              </p>
-            ) : (
-              <ul className="space-y-2.5">
-                {requests.map((item) => (
-                  <li key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">
-                          {item.typeName}
-                        </p>
-                        <p className="mt-0.5 font-mono text-[calc(12px_*_var(--text-scale))] text-slate-500">
-                          {item.referenceNo}
-                        </p>
-                      </div>
-                      <BarangayPill status={item.status} />
-                    </div>
-                    {item.status === 'ready' && (
-                      <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-emerald-900">
-                        <CheckCircle2 size={14} className="mt-0.5 shrink-0" /> {t('brgy.readyBlurb')}
-                      </p>
-                    )}
-                    {item.note && item.status === 'rejected' && (
-                      <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-rose-800">
-                        {item.note}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
+          <BarangayView mine={{ ...mine, barangay: mine.barangay }} requests={requests} locale={locale} />
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Split out so the barangay is a non-null prop rather than a narrowed piece of
+ * state: the request list needs the hall's hours inside a callback, where
+ * TypeScript cannot keep a narrowing that a re-render could invalidate.
+ */
+function BarangayView({
+  mine, requests, locale,
+}: {
+  mine: NonNullable<Awaited<ReturnType<typeof api.myBarangay>>> & {
+    barangay: NonNullable<Awaited<ReturnType<typeof api.myBarangay>>['barangay']>
+  }
+  requests: BarangayRequest[]
+  locale: string
+}) {
+  const { t } = useT()
+  const { push } = useNav()
+  return (
+      <>
+        {/* What the barangay is telling you, before what you can ask it for. */}
+        <AnnouncementBoard />
+
+        <p className="mb-2 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">
+          {t('brgy.certificates')}
+        </p>
+        <div className="space-y-2.5">
+          {mine.certificates.map((type) => (
+            <button
+              key={type.id}
+              onClick={() => push({ name: 'barangay-request', typeId: type.id })}
+              className="flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left active:bg-slate-50"
+            >
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50">
+                <Building size={16} className="text-emerald-700" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[calc(14.5px_*_var(--text-scale))] font-bold text-navy-950">
+                  {type.name}
+                </span>
+                <span className="block text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-600">
+                  {type.description}
+                </span>
+              </span>
+              {/* Free is worth saying in a word rather than as ₱0.00. */}
+              <span className="shrink-0 text-[calc(13px_*_var(--text-scale))] font-bold text-navy-800">
+                {type.fee === 0 ? t('brgy.free') : formatPeso(type.fee)}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <p className="mb-2 mt-6 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">
+          {t('brgy.myRequests')}
+        </p>
+        {requests.length === 0 ? (
+          <p className="rounded-2xl border border-slate-200 bg-white p-4 text-[calc(13.5px_*_var(--text-scale))] text-slate-500">
+            {t('brgy.noRequests')}
+          </p>
+        ) : (
+          <ul className="space-y-2.5">
+            {requests.map((item) => (
+              <li key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-navy-950">
+                      {item.typeName}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[calc(12px_*_var(--text-scale))] text-slate-500">
+                      {item.referenceNo}
+                    </p>
+                  </div>
+                  <BarangayPill status={item.status} />
+                </div>
+                {/* The one status that asks the resident to travel, so it
+                    is the one that says when the hall is open. Repeating the
+                    hours here rather than only in the card below is
+                    deliberate: this is where somebody decides to go. */}
+                {item.status === 'ready' && (
+                  <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-emerald-900">
+                    <p className="flex items-start gap-1.5">
+                      <CheckCircle2 size={14} className="mt-0.5 shrink-0" /> {t('brgy.readyBlurb')}
+                    </p>
+                    {mine.barangay.officeHours && (
+                      <p className="mt-1 flex items-start gap-1.5 font-semibold">
+                        <Clock size={14} className="mt-0.5 shrink-0" />
+                        {t('brgy.hallHours')} {mine.barangay.officeHours}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* How long it is good for, once it exists. Said on the
+                    request rather than only on the catalogue screen,
+                    because the date is the thing an office will check. */}
+                {item.validUntil && (
+                  <p
+                    className={`mt-2 flex items-start gap-1.5 rounded-lg px-3 py-2 text-[calc(12.5px_*_var(--text-scale))] leading-snug ${
+                      item.expired ? 'bg-amber-50 text-amber-900' : 'bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    <CalendarClock size={14} className="mt-0.5 shrink-0" />
+                    <span>
+                      {item.expired
+                        ? t('brgy.lapsed', { date: formatValidUntil(item.validUntil, locale) })
+                        : t('brgy.validUntil', { date: formatValidUntil(item.validUntil, locale) })}
+                      {item.expired && <> {t('brgy.lapsedBlurb')}</>}
+                    </span>
+                  </p>
+                )}
+                {item.note && item.status === 'rejected' && (
+                  <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-rose-800">
+                    {item.note}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Reference material, so it sits at the bottom: somebody who came
+            here to request something should not have to scroll past the
+            office's address to do it. */}
+        <BarangayHallCard office={mine.barangay} />
+      </>
   )
 }
 

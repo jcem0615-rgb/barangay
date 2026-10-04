@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  BadgeCheck, BookText, Building, Home, Megaphone, CheckCircle2, Inbox, Loader2, LogOut, PhilippinePeso,
-  RefreshCw, Users,
+  BadgeCheck, BookText, Building, Home, Landmark, Megaphone, CheckCircle2, Inbox, Loader2, LogOut,
+  PhilippinePeso, RefreshCw, Users,
 } from 'lucide-react'
 import { api, ApiError, type BarangayRequest } from '../../lib/api'
 import BarangayBlotter from './BarangayBlotter'
 import BarangayHouseholds from './BarangayHouseholds'
 import BarangayAnnouncements from './BarangayAnnouncements'
+import BarangayOffice from './BarangayOffice'
 import { useAuth } from '../../lib/auth'
 import { formatPeso } from '../../lib/money'
 
@@ -45,7 +46,9 @@ const NEXT: Record<BarangayRequest['status'], Array<{ status: string; label: str
   rejected: [],
 }
 
-type View = 'queue' | 'announcements' | 'blotter' | 'households' | 'summary' | 'fees' | 'officers'
+type View =
+  | 'queue' | 'announcements' | 'blotter' | 'households' | 'office'
+  | 'summary' | 'fees' | 'officers'
 
 export default function BarangayConsole() {
   const { user, logout } = useAuth()
@@ -71,6 +74,10 @@ export default function BarangayConsole() {
     // Both roles again: the clerk keeps the register, the administrator decides
     // when a household leaves it.
     ['households', 'Households', Home],
+    // Both roles read the hall's own details; only the administrator saves
+    // them. An officer who cannot see what residents are told cannot notice
+    // that it is wrong.
+    ['office', 'The hall', Landmark],
     ...(isAdmin
       ? ([
           ['summary', 'Summary', BadgeCheck],
@@ -133,6 +140,7 @@ export default function BarangayConsole() {
         {view === 'announcements' && <BarangayAnnouncements />}
         {view === 'blotter' && <BarangayBlotter />}
         {view === 'households' && <BarangayHouseholds />}
+        {view === 'office' && <BarangayOffice readOnly={!isAdmin} />}
         {view === 'summary' && <Summary />}
         {view === 'fees' && <Fees />}
         {view === 'officers' && <Officers />}

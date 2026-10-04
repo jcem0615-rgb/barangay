@@ -24,6 +24,31 @@ export const barangayRouter = Router()
 /** Public: the sign-up screen needs the list before anybody has an account. */
 export const barangayPublicRouter = Router()
 
+/**
+ * The hall as a resident needs it: who holds its two offices, where it is, when
+ * it is open and what answers. Shared with the barangay's own console, so the
+ * administrator edits exactly the fields residents read.
+ */
+export interface BarangayOfficeRow {
+  captain: string | null
+  secretary: string | null
+  hall_address: string | null
+  office_hours: string | null
+  phone: string | null
+  email: string | null
+}
+
+export function serializeBarangayOffice(row: BarangayOfficeRow) {
+  return {
+    captain: row.captain,
+    secretary: row.secretary,
+    hallAddress: row.hall_address,
+    officeHours: row.office_hours,
+    phone: row.phone,
+    email: row.email,
+  }
+}
+
 barangayPublicRouter.get('/', async (_req, res) => {
   const rows = await query<{ id: string; name: string; captain: string | null }>(
     `select id, name, captain from barangays order by name`
@@ -34,25 +59,34 @@ barangayPublicRouter.get('/', async (_req, res) => {
 barangayPublicRouter.get('/certificates', async (_req, res) => {
   const rows = await query<{
     id: string; name: string; description: string; fee_centavos: number
-    purpose_hint: string; steps: unknown[]
+    purpose_hint: string; steps: unknown[]; validity_days: number | null
   }>(
-    `select id, name, description, fee_centavos, purpose_hint, steps
+    `select id, name, description, fee_centavos, purpose_hint, steps, validity_days
        from barangay_certificate_types where active = true order by sort_order, name`
   )
   res.json(
     rows.map((r) => ({
       id: r.id, name: r.name, description: r.description,
       fee: toPesos(r.fee_centavos), purposeHint: r.purpose_hint, steps: r.steps,
+      validityDays: r.validity_days,
     }))
   )
 })
 
 barangayRouter.use(authenticate, requireRole('resident'))
 
-/** The resident's own barangay, and what it charges. */
+/**
+ * The resident's own barangay, what it charges, and how to reach it.
+ *
+ * The hall's details are here rather than on the public list because this is
+ * where they are needed: a resident told "come and collect it" has to know when
+ * the hall is open and what to ring first. The public list is for the sign-up
+ * screen, which only needs to know what the barangays are called.
+ */
 barangayRouter.get('/me', async (req, res) => {
-  const row = await one<{ id: string; name: string; captain: string | null }>(
-    `select b.id, b.name, b.captain
+  const row = await one<BarangayOfficeRow & { id: string; name: string }>(
+    `select b.id, b.name, b.captain, b.secretary,
+            b.hall_address, b.office_hours, b.phone, b.email
        from users u join barangays b on b.id = u.barangay_id
       where u.id = $1`,
     [req.user!.id]
@@ -61,9 +95,9 @@ barangayRouter.get('/me', async (req, res) => {
 
   const types = await query<{
     id: string; name: string; description: string; fee_centavos: number
-    purpose_hint: string; steps: unknown[]
+    purpose_hint: string; steps: unknown[]; validity_days: number | null
   }>(
-    `select t.id, t.name, t.description, t.purpose_hint, t.steps,
+    `select t.id, t.name, t.description, t.purpose_hint, t.steps, t.validity_days,
             coalesce(f.fee_centavos, t.fee_centavos) as fee_centavos
        from barangay_certificate_types t
        left join barangay_certificate_fees f on f.type_id = t.id and f.barangay_id = $1
@@ -72,10 +106,11 @@ barangayRouter.get('/me', async (req, res) => {
     [row.id]
   )
   res.json({
-    barangay: { id: row.id, name: row.name, captain: row.captain },
+    barangay: { id: row.id, name: row.name, ...serializeBarangayOffice(row) },
     certificates: types.map((t) => ({
       id: t.id, name: t.name, description: t.description,
       fee: toPesos(t.fee_centavos), purposeHint: t.purpose_hint, steps: t.steps,
+      validityDays: t.validity_days,
     })),
   })
 })
@@ -183,10 +218,11 @@ barangayRouter.get('/requests', async (req, res) => {
     id: string; reference_no: string; type_id: string; type_name: string
     purpose: string; fee_centavos: number; status: string
     requested_at: string; updated_at: string; note: string | null; barangay_name: string
+    valid_until: string | null
   }>(
     `select r.id, r.reference_no, r.type_id, t.name as type_name, r.purpose,
             r.fee_centavos, r.status, r.requested_at, r.updated_at, r.note,
-            b.name as barangay_name
+            r.valid_until, b.name as barangay_name
        from barangay_requests r
        join barangay_certificate_types t on t.id = r.type_id
        join barangays b on b.id = r.barangay_id
@@ -198,12 +234,25 @@ barangayRouter.get('/requests', async (req, res) => {
   res.json(rows.map(serializeBarangayRequest))
 })
 
+/** The day the office is on, for comparing a date against today. */
+function officeDay(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+}
+
 export function serializeBarangayRequest(row: {
   id: string; reference_no: string; type_id: string; type_name: string
   purpose: string; fee_centavos: number; status: string
   requested_at: string; updated_at: string; note: string | null
   barangay_name?: string; resident_name?: string
+  valid_until?: string | Date | null
 }) {
+  // A date column comes back as a Date from pg; take the calendar day off it
+  // rather than an ISO timestamp, which would shift it in another time zone.
+  const validUntil =
+    row.valid_until instanceof Date
+      ? row.valid_until.toLocaleDateString('en-CA')
+      : (row.valid_until ?? null)
+
   return {
     id: row.id,
     referenceNo: row.reference_no,
@@ -217,6 +266,11 @@ export function serializeBarangayRequest(row: {
     note: row.note,
     barangayName: row.barangay_name,
     residentName: row.resident_name,
+    validUntil,
+    // Derived on read, like `expired` on a programme record and age in the
+    // register: a stored flag is wrong the day after it is written, and the
+    // whole point of saying this is to say it on the day it becomes true.
+    expired: validUntil !== null && validUntil < officeDay(),
   }
 }
 

@@ -23,6 +23,26 @@ export interface BarangayRequest {
   note: string | null
   barangayName?: string
   residentName?: string
+  /** The day it lapses, stamped when the barangay marked it ready. */
+  validUntil?: string | null
+  /** Derived on read by the server, never stored. */
+  expired?: boolean
+}
+
+/**
+ * The hall as a resident needs it. Every field is nullable because a barangay
+ * that has not filled one in should read as "not stated" rather than as an empty
+ * line pretending to be an address.
+ */
+export interface BarangayOffice {
+  id: string
+  name: string
+  captain: string | null
+  secretary: string | null
+  hallAddress: string | null
+  officeHours: string | null
+  phone: string | null
+  email: string | null
 }
 
 export interface BlotterEntry {
@@ -720,16 +740,20 @@ export const api = {
   barangayCertificates: () =>
     request<Array<{
       id: string; name: string; description: string; fee: number
-      purposeHint: string; steps: ServiceStep[]
+      purposeHint: string; steps: ServiceStep[]; validityDays: number | null
     }>>('/barangays/certificates'),
 
-  /** The resident's own barangay, and what it charges for each certificate. */
+  /**
+   * The resident's own barangay — what it charges, and how to reach it. The
+   * hall's details ride along here rather than on the public list because this
+   * is the screen that has to answer "come and collect it".
+   */
   myBarangay: () =>
     request<{
-      barangay: { id: string; name: string; captain: string | null } | null
+      barangay: BarangayOffice | null
       certificates: Array<{
         id: string; name: string; description: string; fee: number
-        purposeHint: string; steps: ServiceStep[]
+        purposeHint: string; steps: ServiceStep[]; validityDays: number | null
       }>
     }>('/barangay/me'),
 
@@ -767,6 +791,14 @@ export const api = {
   setBarangayFee: (typeId: string, fee: number) =>
     request<{ ok: true; fee: number }>(`/barangay-staff/fees/${typeId}`, {
       method: 'PUT', body: JSON.stringify({ fee }),
+    }),
+
+  /** The hall's own details: both roles read, only the administrator writes. */
+  barangayOffice: () => request<BarangayOffice>('/barangay-staff/office'),
+
+  updateBarangayOffice: (patch: Partial<Omit<BarangayOffice, 'id' | 'name'>>) =>
+    request<BarangayOffice>('/barangay-staff/office', {
+      method: 'PATCH', body: JSON.stringify(patch),
     }),
 
   barangayOfficers: () =>

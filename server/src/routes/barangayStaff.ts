@@ -4,7 +4,8 @@ import { one, query, transaction } from '../db.ts'
 import { authenticate, requireRole } from '../auth.ts'
 import { toCentavos, toPesos } from '../serialize.ts'
 import { deliverNotification, recordNotification } from '../notifications.ts'
-import { serializeBarangayRequest } from './barangay.ts'
+import { serializeBarangayRequest, serializeBarangayOffice, type BarangayOfficeRow } from './barangay.ts'
+import { looksDialable, recordAudit } from '../municipality.ts'
 import { blotterRouter } from './blotter.ts'
 import { householdsRouter } from './households.ts'
 import { announcementsStaffRouter } from './announcements.ts'
@@ -24,8 +25,11 @@ barangayStaffRouter.use(authenticate, requireRole('barangay_admin', 'barangay_of
 
 /** The barangay this account works for. Null is a misconfigured account. */
 async function ownBarangay(userId: string) {
-  return one<{ id: string; name: string; captain: string | null; secretary: string | null }>(
-    `select b.id, b.name, b.captain, b.secretary
+  return one<{
+    id: string; name: string; captain: string | null; secretary: string | null
+    office_hours: string | null; phone: string | null
+  }>(
+    `select b.id, b.name, b.captain, b.secretary, b.office_hours, b.phone
        from users u join barangays b on b.id = u.barangay_id
       where u.id = $1`,
     [userId]
@@ -44,7 +48,127 @@ barangayStaffRouter.get('/me', async (req, res) => {
   if (!barangay) {
     return res.status(409).json({ error: 'This account is not attached to a barangay.' })
   }
-  res.json({ barangay, role: req.user!.role })
+  // Named fields rather than the row, so the office columns `ownBarangay` now
+  // carries for the notification do not leak out of here in their database
+  // spelling. `/office` below is where they are published.
+  res.json({
+    barangay: {
+      id: barangay.id, name: barangay.name,
+      captain: barangay.captain, secretary: barangay.secretary,
+    },
+    role: req.user!.role,
+  })
+})
+
+// -------------------------------------------------- the hall's own details
+
+/**
+ * What a resident is told about this barangay: who holds its two offices, where
+ * the hall is, when it is open and what answers.
+ *
+ * Both roles read it — an officer who cannot see the hours cannot check what a
+ * resident is being shown — and only the administrator changes it.
+ */
+barangayStaffRouter.get('/office', async (req, res) => {
+  const row = await one<BarangayOfficeRow & { id: string; name: string }>(
+    `select b.id, b.name, b.captain, b.secretary,
+            b.hall_address, b.office_hours, b.phone, b.email
+       from users u join barangays b on b.id = u.barangay_id
+      where u.id = $1`,
+    [req.user!.id]
+  )
+  if (!row) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+  res.json({ id: row.id, name: row.name, ...serializeBarangayOffice(row) })
+})
+
+/**
+ * Correcting them.
+ *
+ * **The barangay's name is not in here**, and that is the same rule that stops a
+ * browser naming the municipality: what a place is called belongs to the
+ * register. What the barangay may correct is who holds its offices and how to
+ * reach it — facts it knows and the municipal hall cannot maintain for
+ * seventy-three barangays, and which change at every barangay election.
+ *
+ * The schema is strict, so an unknown key refuses the whole request rather than
+ * quietly saving something different — the municipal office rule, one tier down.
+ * Phone validation is the same deliberately loose check: it rules out the
+ * unusable and leaves the rest to somebody ringing it.
+ *
+ * Audited in the same transaction as the change, with the row as it was. An
+ * administrator can point the hall's number anywhere, and the only defence
+ * against a mistake nobody notices is a record that still has the old one.
+ */
+const officeSchema = z.strictObject({
+  captain: z.string().max(120).nullable().optional(),
+  secretary: z.string().max(120).nullable().optional(),
+  hallAddress: z.string().max(300).nullable().optional(),
+  officeHours: z.string().max(200).nullable().optional(),
+  phone: z.string().max(40).nullable().optional(),
+  // An empty string clears it, the same as null — every other field here reads
+  // blank as "not stated", and an email that refused the one way a form sends
+  // "I have removed this" would be the odd one out. A non-empty value still has
+  // to look like an address.
+  email: z.union([z.literal(''), z.email().max(160)]).nullable().optional(),
+})
+
+barangayStaffRouter.patch('/office', requireRole('barangay_admin'), async (req, res) => {
+  const parsed = officeSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  const body = parsed.data
+  if (Object.keys(body).length === 0) return res.status(400).json({ error: 'Nothing to change.' })
+
+  if (body.phone && !looksDialable(body.phone)) {
+    return res.status(400).json({ error: 'That phone number is not dialable. Ring it before saving it.' })
+  }
+
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const blank = (value: string | null | undefined) =>
+    value === undefined ? undefined : value === null || value.trim() === '' ? null : value.trim()
+
+  const updated = await transaction(async (client) => {
+    const current = await client.query<BarangayOfficeRow & { id: string; name: string }>(
+      `select id, name, captain, secretary, hall_address, office_hours, phone, email
+         from barangays where id = $1 for update`,
+      [barangay.id]
+    )
+    const before = current.rows[0]!
+
+    const after = await client.query<BarangayOfficeRow & { id: string; name: string }>(
+      `update barangays
+          set captain      = case when $2 then $3 else captain end,
+              secretary    = case when $4 then $5 else secretary end,
+              hall_address = case when $6 then $7 else hall_address end,
+              office_hours = case when $8 then $9 else office_hours end,
+              phone        = case when $10 then $11 else phone end,
+              email        = case when $12 then $13 else email end
+        where id = $1
+        returning id, name, captain, secretary, hall_address, office_hours, phone, email`,
+      [
+        barangay.id,
+        'captain' in body, blank(body.captain) ?? null,
+        'secretary' in body, blank(body.secretary) ?? null,
+        'hallAddress' in body, blank(body.hallAddress) ?? null,
+        'officeHours' in body, blank(body.officeHours) ?? null,
+        'phone' in body, blank(body.phone) ?? null,
+        'email' in body, blank(body.email) ?? null,
+      ]
+    )
+
+    await recordAudit(client, {
+      actorId: req.user!.id,
+      actorName: req.user!.fullName,
+      action: 'barangay_office.update',
+      target: barangay.id,
+      before: serializeBarangayOffice(before),
+      after: serializeBarangayOffice(after.rows[0]!),
+    })
+    return after.rows[0]!
+  })
+
+  res.json({ id: updated.id, name: updated.name, ...serializeBarangayOffice(updated) })
 })
 
 const queueSchema = z.object({
@@ -60,10 +184,12 @@ barangayStaffRouter.get('/requests', async (req, res) => {
   const rows = await query<{
     id: string; reference_no: string; type_id: string; type_name: string
     purpose: string; fee_centavos: number; status: string
+    valid_until: string | null
     requested_at: string; updated_at: string; note: string | null; resident_name: string
   }>(
     `select r.id, r.reference_no, r.type_id, t.name as type_name, r.purpose,
             r.fee_centavos, r.status, r.requested_at, r.updated_at, r.note,
+            r.valid_until,
             u.full_name as resident_name
        from barangay_requests r
        join barangay_certificate_types t on t.id = r.type_id
@@ -126,11 +252,37 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
       return { error: 'order' as const, from: row.status }
     }
 
+    /**
+     * How long the certificate is honoured, stamped on the move to `ready`.
+     *
+     * `ready` is the point at which the secretary has prepared and dated the
+     * paper, so dating it from here is what the document itself says. Dating it
+     * from collection would have the app promise more validity than the
+     * certificate carries, and a resident acting on that makes the wasted trip
+     * this whole tier exists to prevent.
+     *
+     * Read off the type here and frozen onto the row, like the fee: changing a
+     * type's validity must never rewrite what an issued certificate says.
+     */
+    const validity =
+      status === 'ready'
+        ? (
+            await client.query<{ validity_days: number | null }>(
+              `select validity_days from barangay_certificate_types where id = $1`,
+              [row.type_id]
+            )
+          ).rows[0]?.validity_days ?? null
+        : null
+
     await client.query(
       `update barangay_requests
-          set status = $2, note = coalesce($3, note), handled_by = $4, updated_at = now()
+          set status = $2, note = coalesce($3, note), handled_by = $4, updated_at = now(),
+              valid_until = case
+                when $5::integer is null then valid_until
+                else (now() at time zone 'Asia/Manila')::date + $5::integer
+              end
         where id = $1`,
-      [row.id, status, note ?? null, req.user!.id]
+      [row.id, status, note ?? null, req.user!.id, validity]
     )
 
     const title =
@@ -139,9 +291,14 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
         : status === 'ready'
           ? `${row.reference_no} — ready for pickup`
           : `${row.reference_no} — ${status}`
+    // "Ready" is the only status that asks the resident to travel, so it is the
+    // one that carries the hall's hours. Telling somebody to come and collect
+    // something without saying when the office is open is how the trip gets
+    // wasted twice.
     const body =
       status === 'ready'
-        ? `Your certificate is ready at Barangay ${barangay.name}. Bring a valid ID.`
+        ? `Your certificate is ready at Barangay ${barangay.name}. Bring a valid ID.` +
+          (barangay.office_hours ? ` Open ${barangay.office_hours}.` : '')
         : note?.trim()
           ? note.trim()
           : `Your barangay certificate request is now ${status}.`

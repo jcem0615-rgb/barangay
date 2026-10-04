@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, Loader2 } from 'lucide-react'
+import { CalendarClock, CheckCircle2, Loader2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import GuideLink from '../components/GuideLink'
 import { api, ApiError } from '../lib/api'
 import { formatPeso } from '../lib/money'
+import { formatValidity } from '../lib/validity'
 import { useNav } from '../lib/nav'
 import { useT } from '../lib/i18n'
 
@@ -19,7 +20,10 @@ export default function BarangayRequestForm({ typeId }: { typeId: string }) {
   const { replace } = useNav()
   const { t } = useT()
   const [type, setType] = useState<
-    { name: string; description: string; fee: number; purposeHint: string; steps?: unknown[] } | null
+    {
+      name: string; description: string; fee: number; purposeHint: string
+      steps?: unknown[]; validityDays?: number | null
+    } | null
   >(null)
   const [purpose, setPurpose] = useState('')
   const [busy, setBusy] = useState(false)
@@ -91,6 +95,16 @@ export default function BarangayRequestForm({ typeId }: { typeId: string }) {
                 {type.fee === 0 ? t('brgy.free') : formatPeso(type.fee)}
               </span>
             </div>
+
+            {/* Said before the request rather than only after it. Somebody who
+                needs a clearance for something three months away should know
+                that asking now may mean asking twice — and somebody whose
+                certificate has no stated period should be told that, rather
+                than left to read a silence as "forever". */}
+            <p className="mt-2.5 flex items-start gap-1.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-500">
+              <CalendarClock size={14} className="mt-0.5 shrink-0" />
+              {formatValidity(type.validityDays, t) ?? t('brgy.validNone')}
+            </p>
           </>
         )}
 

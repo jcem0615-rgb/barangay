@@ -121,27 +121,41 @@ async function main() {
 
     // The barangays, and what they issue. Upserted by id so correcting a
     // captain's name is a re-seed rather than a migration.
+    //
+    // The hall's own details are seeded and then editable in the barangay's
+    // console, like the municipal office details — so a reseed restores the
+    // authored set rather than preserving what a barangay corrected. That is the
+    // same trade `mockData.ts` makes everywhere: it is the authoring source for
+    // a fresh database, not a mirror of a live one.
     for (const barangay of BARANGAYS) {
       await client.query(
-        `insert into barangays (id, name, municipality_code, captain, secretary)
-         values ($1, $2, $3, $4, $5)
+        `insert into barangays
+           (id, name, municipality_code, captain, secretary,
+            hall_address, office_hours, phone, email)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          on conflict (id) do update set
-           name = excluded.name, captain = excluded.captain, secretary = excluded.secretary`,
-        [barangay.id, barangay.name, MUNICIPALITY.code, barangay.captain, barangay.secretary]
+           name = excluded.name, captain = excluded.captain, secretary = excluded.secretary,
+           hall_address = excluded.hall_address, office_hours = excluded.office_hours,
+           phone = excluded.phone, email = excluded.email`,
+        [
+          barangay.id, barangay.name, MUNICIPALITY.code, barangay.captain, barangay.secretary,
+          barangay.hallAddress, barangay.officeHours, barangay.phone, barangay.email,
+        ]
       )
     }
     for (const [index, type] of BARANGAY_CERTIFICATES.entries()) {
       await client.query(
         `insert into barangay_certificate_types
-           (id, name, description, fee_centavos, purpose_hint, sort_order, steps)
-         values ($1, $2, $3, $4, $5, $6, $7)
+           (id, name, description, fee_centavos, purpose_hint, sort_order, steps, validity_days)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)
          on conflict (id) do update set
            name = excluded.name, description = excluded.description,
            fee_centavos = excluded.fee_centavos, purpose_hint = excluded.purpose_hint,
-           sort_order = excluded.sort_order, steps = excluded.steps`,
+           sort_order = excluded.sort_order, steps = excluded.steps,
+           validity_days = excluded.validity_days`,
         [
           type.id, type.name, type.description, toCentavos(type.fee), type.purposeHint,
-          index, JSON.stringify(type.steps ?? []),
+          index, JSON.stringify(type.steps ?? []), type.validityDays ?? null,
         ]
       )
     }

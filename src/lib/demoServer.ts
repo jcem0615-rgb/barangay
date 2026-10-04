@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v19'
+const STORE_KEY = 'elgu-demo-state-v20'
 
 interface DemoIncident {
   id: string
@@ -168,6 +168,8 @@ interface DemoState {
   barangayRequests: DemoBarangayRequest[]
   /** barangay id -> certificate id -> fee in pesos. Only what a barangay changed. */
   barangayFees: Record<string, Record<string, number>>
+  /** barangay id -> the hall's details, for the same reason the offices are here. */
+  barangayOffices: Record<string, DemoBarangayOffice>
   /**
    * The blotter. Held like everything else here, and read by nothing but the
    * barangay console — the demo mirrors that rule because a demo that leaked it
@@ -223,6 +225,19 @@ interface DemoBarangayRequest {
   typeId: string; typeName: string; purpose: string; fee: number
   status: 'pending' | 'processing' | 'ready' | 'released' | 'rejected'
   requestedAt: string; updatedAt: string; note: string | null
+  /** Stamped on the move to `ready`, like the server. A calendar day. */
+  validUntil: string | null
+}
+
+/**
+ * A barangay's own hall details, held in state rather than read off the seed —
+ * the same reason the municipal office details are: a demo that showed an edit
+ * saving and then not appearing anywhere would teach the wrong thing.
+ */
+interface DemoBarangayOffice {
+  captain: string | null; secretary: string | null
+  hallAddress: string | null; officeHours: string | null
+  phone: string | null; email: string | null
 }
 
 interface DemoFeedback {
@@ -379,6 +394,15 @@ function seed(): DemoState {
     complaintCounter: 0,
     barangayRequests: [],
     barangayFees: {},
+    // Seeded from the authored roster and editable from the console after that,
+    // exactly like the municipal office contacts.
+    barangayOffices: Object.fromEntries(
+      BARANGAYS.map((b) => [b.id, {
+        captain: b.captain, secretary: b.secretary,
+        hallAddress: b.hallAddress, officeHours: b.officeHours,
+        phone: b.phone, email: b.email,
+      }])
+    ),
     blotter: [],
     households: [],
     announcements: [],
@@ -446,6 +470,14 @@ function seed(): DemoState {
       requestedAt: at,
       updatedAt: at,
       note: null,
+      // The released one was issued when it was requested, so it is already
+      // partway through its validity — which is the case worth showing, since a
+      // certificate that always looks fresh never demonstrates the lapse.
+      validUntil:
+        status === 'released' && type.validityDays
+          ? new Date(now - 86400000 * daysAgo + 86400000 * type.validityDays)
+              .toLocaleDateString('en-CA')
+          : null,
     })
   }
 
@@ -772,6 +804,20 @@ const barangayFee = (barangayId: string, typeId: string) =>
   BARANGAY_CERTIFICATES.find((c) => c.id === typeId)?.fee ??
   0
 
+/**
+ * The hall's details as they now stand. Read from state so an edit in the
+ * console shows up on the resident's screen, with the authored row as the
+ * fallback for a browser whose state predates this.
+ */
+const barangayOffice = (barangayId: string): DemoBarangayOffice => {
+  const seeded = BARANGAYS.find((b) => b.id === barangayId)
+  return state.barangayOffices?.[barangayId] ?? {
+    captain: seeded?.captain ?? null, secretary: seeded?.secretary ?? null,
+    hallAddress: seeded?.hallAddress ?? null, officeHours: seeded?.officeHours ?? null,
+    phone: seeded?.phone ?? null, email: seeded?.email ?? null,
+  }
+}
+
 const serializeAnnouncement = (a: DemoAnnouncement) => ({
   id: a.id, kind: a.kind, title: a.title, body: a.body, urgent: a.urgent,
   expiresAt: a.expiresAt, archivedAt: a.archivedAt,
@@ -804,7 +850,22 @@ const serializeBarangayRequest = (r: DemoBarangayRequest) => ({
   note: r.note,
   barangayName: BARANGAYS.find((b) => b.id === r.barangayId)?.name,
   residentName: r.residentName,
+  validUntil: r.validUntil,
+  // Derived on read, as on the server: a stored flag would be wrong the day
+  // after it was written.
+  expired: r.validUntil !== null && r.validUntil < officeDay(),
 })
+
+/** Today where the office is, for comparing a stored calendar day against it. */
+const officeDay = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+
+/** The day a certificate marked ready today would lapse. */
+const lapseDay = (days: number | null | undefined) => {
+  if (days === null || days === undefined) return null
+  const day = new Date()
+  day.setDate(day.getDate() + days)
+  return day.toLocaleDateString('en-CA')
+}
 
 /**
  * Memberships in catalogue order, with `expired` derived on read — the same
@@ -1177,7 +1238,10 @@ async function route(
   /** Public: the list is needed before anybody has an account. */
   if (parts[0] === 'barangays') {
     if (parts[1] === 'certificates') {
-      return { status: 200, body: BARANGAY_CERTIFICATES }
+      return {
+        status: 200,
+        body: BARANGAY_CERTIFICATES.map((c) => ({ ...c, validityDays: c.validityDays ?? null })),
+      }
     }
     return {
       status: 200,
@@ -1201,9 +1265,12 @@ async function route(
       return {
         status: 200,
         body: {
-          barangay: { id: own.id, name: own.name, captain: own.captain },
+          // The hall's details ride along here, because this is the screen that
+          // has to answer "come and collect it".
+          barangay: { id: own.id, name: own.name, ...barangayOffice(own.id) },
           certificates: BARANGAY_CERTIFICATES.map((c) => ({
             ...c, fee: barangayFee(own.id, c.id),
+            validityDays: c.validityDays ?? null,
           })),
         },
       }
@@ -1245,6 +1312,8 @@ async function route(
           requestedAt: now,
           updatedAt: now,
           note: null,
+          // Nothing has been issued yet, so there is nothing to lapse.
+          validUntil: null,
         }
         state.barangayRequests.unshift(created)
         persist()
@@ -1276,13 +1345,62 @@ async function route(
     }
 
     if (parts[1] === 'me') {
+      const office = barangayOffice(own.id)
       return {
         status: 200,
         body: {
-          barangay: { id: own.id, name: own.name, captain: own.captain, secretary: own.secretary },
+          barangay: {
+            id: own.id, name: own.name,
+            captain: office.captain, secretary: office.secretary,
+          },
           role: user.role,
         },
       }
+    }
+
+    // ---- the hall's own details ----
+    //
+    // Both roles read; only the administrator saves. The barangay's *name* is
+    // not editable, the same rule that stops a browser naming the municipality.
+    if (parts[1] === 'office') {
+      if (method === 'PATCH') {
+        adminOnly()
+        const allowed = ['captain', 'secretary', 'hallAddress', 'officeHours', 'phone', 'email'] as const
+        const keys = Object.keys(body ?? {})
+        if (keys.length === 0) throw new DemoError(400, 'Nothing to change.')
+        if (keys.some((k) => !(allowed as readonly string[]).includes(k))) {
+          throw new DemoError(400, 'Unrecognised field.')
+        }
+        const phone = body?.phone === null ? null : body?.phone ? String(body.phone).trim() : undefined
+        if (phone && !/\d/.test(phone)) {
+          throw new DemoError(400, 'That phone number is not dialable. Ring it before saving it.')
+        }
+        // Blank clears it; anything else has to look like an address, as on the
+        // server. The demo mirrors the refusals as well as the successes.
+        const email = body?.email === null ? null : body?.email ? String(body.email).trim() : undefined
+        if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+          throw new DemoError(400, 'Invalid email address.')
+        }
+        const current = barangayOffice(own.id)
+        const next = { ...current }
+        for (const key of allowed) {
+          if (!(key in (body ?? {}))) continue
+          const value = body[key]
+          next[key] = value === null || String(value).trim() === '' ? null : String(value).trim()
+        }
+        state.barangayOffices[own.id] = next
+        // Recorded with the row as it was, like the municipal edits: the only
+        // defence against a wrong number nobody notices is the old one still
+        // being written down.
+        state.audit.unshift({
+          id: state.audit.length + 1, actorName: user.fullName,
+          action: 'barangay_office.update', target: own.id,
+          before: current, after: next, createdAt: new Date().toISOString(),
+        })
+        persist()
+        return { status: 200, body: { id: own.id, name: own.name, ...next } }
+      }
+      return { status: 200, body: { id: own.id, name: own.name, ...barangayOffice(own.id) } }
     }
 
     if (parts[1] === 'requests' && !parts[2]) {
@@ -1321,6 +1439,14 @@ async function route(
       row.status = next as DemoBarangayRequest['status']
       if (note) row.note = note
       row.updatedAt = new Date().toISOString()
+      // Stamped on `ready`, as on the server: that is when the paper is
+      // prepared and dated, and the paper is what an office reads.
+      if (next === 'ready') {
+        row.validUntil = lapseDay(
+          BARANGAY_CERTIFICATES.find((c) => c.id === row.typeId)?.validityDays ?? null
+        )
+      }
+      const hours = barangayOffice(own.id).officeHours
       notify(
         row.residentId,
         null,
@@ -1331,7 +1457,8 @@ async function route(
             ? `${row.referenceNo} — ready for pickup`
             : `${row.referenceNo} — ${next}`,
         next === 'ready'
-          ? `Your certificate is ready at Barangay ${own.name}. Bring a valid ID.`
+          ? `Your certificate is ready at Barangay ${own.name}. Bring a valid ID.` +
+            (hours ? ` Open ${hours}.` : '')
           : note || `Your barangay certificate request is now ${next}.`
       )
       persist()

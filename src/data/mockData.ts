@@ -44,21 +44,47 @@ export const MUNICIPALITY = {
  * not typed out from memory. The captain and secretary names are placeholders
  * too, and they are printed on every certificate the barangay issues — so they
  * are the first thing to correct.
+ *
+ * **The hall's own details are seeded here and corrected in the barangay's
+ * console**, not by reseeding — the same move the municipal office details made.
+ * They are the answer to "come and collect it", which is the one status that
+ * asks a resident to travel, so a wrong set of hours costs the trip this app
+ * exists to save. Every address, time and number below is invented, exactly like
+ * the hotlines: the municipality named on the screen is real, which is precisely
+ * why a resident will believe them.
  */
 export interface BarangaySeed {
   id: string
   name: string
   captain: string
   secretary: string
+  /** Where the hall is, as somebody would be told to find it. */
+  hallAddress: string
+  /** When it is open. Prose, because a barangay hall's week is not a grid. */
+  officeHours: string
+  phone: string
+  email: string
 }
 
 export const BARANGAYS: BarangaySeed[] = [
-  { id: 'poblacion', name: 'Poblacion', captain: 'Hon. Ramon T. Agustin', secretary: 'Luzviminda P. Cruz' },
-  { id: 'san-julian', name: 'San Julian', captain: 'Hon. Ernesto B. Dizon', secretary: 'Marites R. Flores' },
-  { id: 'nalsian', name: 'Nalsian', captain: 'Hon. Teresita M. Ramos', secretary: 'Allan G. Sison' },
-  { id: 'tolonguat', name: 'Tolonguat', captain: 'Hon. Benigno S. Padilla', secretary: 'Cecilia V. Mendoza' },
-  { id: 'cabatling', name: 'Cabatling', captain: 'Hon. Alfredo C. Bautista', secretary: 'Rosalinda T. Garcia' },
-  { id: 'bacundao-weste', name: 'Bacundao Weste', captain: 'Hon. Lourdes A. Navarro', secretary: 'Dante E. Ocampo' },
+  { id: 'poblacion', name: 'Poblacion', captain: 'Hon. Ramon T. Agustin', secretary: 'Luzviminda P. Cruz',
+    hallAddress: 'Barangay Hall, Mabini St, Poblacion', officeHours: 'Mon–Fri, 8:00am–5:00pm',
+    phone: '(075) 632-1180', email: 'poblacion@malasiqui.gov.ph'  },
+  { id: 'san-julian', name: 'San Julian', captain: 'Hon. Ernesto B. Dizon', secretary: 'Marites R. Flores',
+    hallAddress: 'Barangay Hall, San Julian Road, San Julian', officeHours: 'Mon–Fri, 8:00am–5:00pm',
+    phone: '(075) 632-1184', email: 'sanjulian@malasiqui.gov.ph'  },
+  { id: 'nalsian', name: 'Nalsian', captain: 'Hon. Teresita M. Ramos', secretary: 'Allan G. Sison',
+    hallAddress: 'Barangay Hall, Nalsian Centro', officeHours: 'Mon–Fri, 8:00am–5:00pm',
+    phone: '(075) 632-1188', email: 'nalsian@malasiqui.gov.ph'  },
+  { id: 'tolonguat', name: 'Tolonguat', captain: 'Hon. Benigno S. Padilla', secretary: 'Cecilia V. Mendoza',
+    hallAddress: 'Barangay Hall, Tolonguat Proper', officeHours: 'Mon–Fri, 8:00am–12:00nn and 1:00–5:00pm',
+    phone: '0917 845 2210', email: 'tolonguat@malasiqui.gov.ph'  },
+  { id: 'cabatling', name: 'Cabatling', captain: 'Hon. Alfredo C. Bautista', secretary: 'Rosalinda T. Garcia',
+    hallAddress: 'Barangay Hall, Cabatling', officeHours: 'Mon–Fri, 8:00am–5:00pm; Sat, 8:00am–12:00nn',
+    phone: '0917 845 2214', email: 'cabatling@malasiqui.gov.ph'  },
+  { id: 'bacundao-weste', name: 'Bacundao Weste', captain: 'Hon. Lourdes A. Navarro', secretary: 'Dante E. Ocampo',
+    hallAddress: 'Barangay Hall, Bacundao Weste', officeHours: 'Mon–Fri, 8:00am–5:00pm',
+    phone: '0917 845 2218', email: 'bacundaoweste@malasiqui.gov.ph'  },
 ]
 
 /**
@@ -69,6 +95,13 @@ export const BARANGAYS: BarangaySeed[] = [
  * offices each invent their own would make a resident's certificate depend on
  * which street they live on. Fees are the one thing that genuinely varies, so
  * they are the one thing a barangay can override.
+ *
+ * **`validityDays` is how long the document is honoured once it is issued**, and
+ * it is as much a placeholder as the fees. Nothing in law sets most of these —
+ * what a bank or an employer accepts is practice, and practice differs — so a
+ * deployment sets each one from what its own offices actually ask for. Leaving it
+ * out means the barangay states no validity, which the screen says in those words
+ * rather than implying the certificate lasts forever.
  */
 export interface BarangayCertificateType {
   id: string
@@ -78,6 +111,11 @@ export interface BarangayCertificateType {
   fee: number
   /** What the resident has to say before it can be issued. */
   purposeHint: string
+  /**
+   * How long it is good for once issued. Omitted where the barangay states no
+   * period — a different thing from forever, and said so on screen.
+   */
+  validityDays?: number
   /** How to get it, in order. */
   steps: ServiceStep[]
 }
@@ -89,6 +127,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'The one almost everything else asks for first — employment, a permit, a bank.',
     fee: 50,
     purposeHint: 'e.g. local employment, bank requirement',
+    /** Six months is what most employers and banks here will accept; past that they ask for a fresh one. */
+    validityDays: 180,
     steps: [
       {
         label: 'Be a resident of this barangay',
@@ -120,6 +160,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'Proof that you live in this barangay, and for how long.',
     fee: 30,
     purposeHint: 'e.g. school enrolment, PhilHealth',
+    /** Says where you live, and that changes — so it is read as a recent statement rather than a permanent one. */
+    validityDays: 180,
     steps: [
       {
         label: 'Be a resident of this barangay',
@@ -152,6 +194,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     // kind of thing this certificate exists to relieve.
     fee: 0,
     purposeHint: 'e.g. hospital bill, DSWD assistance',
+    /** The shortest of these on purpose: it states a household's circumstances, which an office will want stated recently. */
+    validityDays: 90,
     steps: [
       {
         label: 'Be a resident of this barangay',
@@ -183,6 +227,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'Required before the municipal business permit — the BOSS asks for it.',
     fee: 100,
     purposeHint: 'e.g. new sari-sari store, renewal',
+    /** Tied to the permit year, because this is what the municipal business permit asks for. */
+    validityDays: 365,
     steps: [
       {
         label: 'Be a resident, or have the business located in this barangay',
@@ -213,6 +259,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'Usually for a school, a scholarship, or a first job.',
     fee: 30,
     purposeHint: 'e.g. scholarship application',
+    /** Same reading as the clearance — a statement about now, not a record of character. */
+    validityDays: 180,
     steps: [
       {
         label: 'Be a resident of this barangay',
@@ -243,6 +291,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     description: 'Under RA 11261, which also makes it free and waives other fees.',
     fee: 0,
     purposeHint: 'e.g. first employment requirements',
+    /** RA 11261 gives the certificate a year, and it may be availed of once. The year is in the law; the one-time rule is not enforced here. */
+    validityDays: 365,
     steps: [
       {
         label: 'Be a resident of this barangay for at least six months',

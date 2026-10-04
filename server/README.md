@@ -374,6 +374,7 @@ npm run test:document-steps  # the route to each document: live links, no cycles
 npm run test:blotter      # the barangay book: who may open it, the roles, and that no resident can
 npm run test:households   # the register of inhabitants: scoping, the figures, and no account links
 npm run test:announcements  # the board: who may post, who may ring every phone, expiry on read
+npm run test:barangay-office  # the hall's details, who may correct them, and when a certificate lapses
 ```
 
 Run them one at a time, or clear `login_attempts` between them. Every suite signs
