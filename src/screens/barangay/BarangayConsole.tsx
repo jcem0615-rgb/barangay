@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  BadgeCheck, BookText, Building, CheckCircle2, Inbox, Loader2, LogOut, PhilippinePeso,
+  BadgeCheck, BookText, Building, Home, CheckCircle2, Inbox, Loader2, LogOut, PhilippinePeso,
   RefreshCw, Users,
 } from 'lucide-react'
 import { api, ApiError, type BarangayRequest } from '../../lib/api'
 import BarangayBlotter from './BarangayBlotter'
+import BarangayHouseholds from './BarangayHouseholds'
 import { useAuth } from '../../lib/auth'
 import { formatPeso } from '../../lib/money'
 
@@ -43,7 +44,7 @@ const NEXT: Record<BarangayRequest['status'], Array<{ status: string; label: str
   rejected: [],
 }
 
-type View = 'queue' | 'blotter' | 'summary' | 'fees' | 'officers'
+type View = 'queue' | 'blotter' | 'households' | 'summary' | 'fees' | 'officers'
 
 export default function BarangayConsole() {
   const { user, logout } = useAuth()
@@ -63,6 +64,9 @@ export default function BarangayConsole() {
     // Both roles: the clerk writes the book, the administrator calls hearings
     // on it. The split lives inside the screen rather than in who may open it.
     ['blotter', 'Blotter', BookText],
+    // Both roles again: the clerk keeps the register, the administrator decides
+    // when a household leaves it.
+    ['households', 'Households', Home],
     ...(isAdmin
       ? ([
           ['summary', 'Summary', BadgeCheck],
@@ -123,6 +127,7 @@ export default function BarangayConsole() {
         )}
         {view === 'queue' && <Queue />}
         {view === 'blotter' && <BarangayBlotter />}
+        {view === 'households' && <BarangayHouseholds />}
         {view === 'summary' && <Summary />}
         {view === 'fees' && <Fees />}
         {view === 'officers' && <Officers />}

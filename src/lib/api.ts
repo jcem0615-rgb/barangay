@@ -57,6 +57,35 @@ export interface BlotterSummons {
   issuedBy: string | null
 }
 
+export interface Household {
+  id: string
+  householdNo: number
+  address: string
+  purok: string | null
+  headName: string
+  contact: string | null
+  status: 'active' | 'moved' | 'archived'
+  statusNote: string | null
+  updatedAt: string
+  memberCount?: number
+}
+
+export interface HouseholdMember {
+  id: string
+  fullName: string
+  birthDate: string | null
+  /** Worked out from the birth date on read, never stored. */
+  age: number | null
+  sex: 'female' | 'male' | null
+  relationship: string
+  civilStatus: string | null
+  occupation: string | null
+  /** What the barangay noted, not the sectoral register CSWDO issues. */
+  isPwd: boolean
+  isFourPs: boolean
+  isVoter: boolean
+}
+
 const DEMO = import.meta.env.VITE_DEMO === '1'
 
 /** True in the demo build only. Used to label the UI honestly. */
@@ -782,6 +811,60 @@ export const api = {
       id: string; blotterId: string; sequence: number; hearingAt: string; venue: string
       servedAt: string | null; referenceNo: string; complainant: string; respondent: string
     }>>('/barangay-staff/blotter/calendar/upcoming'),
+
+  // ---- the record of barangay inhabitants ----
+  //
+  // The one directory in the app. Barangay staff only, scoped server-side to
+  // their own barangay, and never reachable from the resident shell.
+
+  households: (params: { status?: string; purok?: string; q?: string } = {}) => {
+    const search = new URLSearchParams()
+    for (const [k, v] of Object.entries(params)) if (v) search.set(k, v)
+    const qs = search.toString()
+    return request<Household[]>(`/barangay-staff/households${qs ? `?${qs}` : ''}`)
+  },
+
+  household: (id: string) =>
+    request<Household & { notes: string | null; members: HouseholdMember[] }>(
+      `/barangay-staff/households/${id}`
+    ),
+
+  addHousehold: (body: {
+    address: string; purok?: string; headName: string; contact?: string; notes?: string
+  }) => request<{ id: string; householdNo: number }>('/barangay-staff/households', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+
+  editHousehold: (id: string, body: Record<string, string | undefined>) =>
+    request<{ ok: true }>(`/barangay-staff/households/${id}`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
+  setHouseholdStatus: (id: string, status: string, statusNote?: string) =>
+    request<{ ok: true }>(`/barangay-staff/households/${id}/status`, {
+      method: 'PATCH', body: JSON.stringify({ status, statusNote }),
+    }),
+
+  addHouseholdMember: (id: string, body: Partial<HouseholdMember> & { fullName: string; relationship: string }) =>
+    request<HouseholdMember>(`/barangay-staff/households/${id}/members`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+
+  editHouseholdMember: (id: string, memberId: string, body: Partial<HouseholdMember>) =>
+    request<HouseholdMember>(`/barangay-staff/households/${id}/members/${memberId}`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
+  removeHouseholdMember: (id: string, memberId: string) =>
+    request<{ ok: true }>(`/barangay-staff/households/${id}/members/${memberId}`, { method: 'DELETE' }),
+
+  householdFigures: () =>
+    request<{
+      barangay: string; households: number; population: number
+      female: number; male: number; children: number; adults: number; seniors: number
+      withoutBirthDate: number; pwd: number; fourPs: number; voters: number
+      byPurok: Array<{ purok: string | null; households: number; population: number }>
+    }>('/barangay-staff/households/figures/summary'),
 
   // ---- incident reports ----
 

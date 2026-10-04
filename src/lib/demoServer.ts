@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v17'
+const STORE_KEY = 'elgu-demo-state-v18'
 
 interface DemoIncident {
   id: string
@@ -174,6 +174,22 @@ interface DemoState {
    * would teach the opposite of what the real server does.
    */
   blotter: DemoBlotterEntry[]
+  /** The register of inhabitants, scoped to a barangay exactly as on the server. */
+  households: DemoHousehold[]
+}
+
+interface DemoHouseholdMember {
+  id: string; fullName: string; birthDate: string | null; sex: 'female' | 'male' | null
+  relationship: string; civilStatus: string | null; occupation: string | null
+  isPwd: boolean; isFourPs: boolean; isVoter: boolean
+}
+
+interface DemoHousehold {
+  id: string; barangayId: string; householdNo: number
+  address: string; purok: string | null; headName: string
+  contact: string | null; notes: string | null
+  status: 'active' | 'moved' | 'archived'; statusNote: string | null
+  updatedAt: string; members: DemoHouseholdMember[]
 }
 
 interface DemoBlotterEntry {
@@ -354,6 +370,7 @@ function seed(): DemoState {
     barangayRequests: [],
     barangayFees: {},
     blotter: [],
+    households: [],
   }
 
   const boss = SERVICES.find((s) => s.id === 'boss-application')!
@@ -468,6 +485,57 @@ function seed(): DemoState {
       })
     }
     state.blotter.push(entry)
+  }
+
+  // A few households so the register opens on figures rather than zeroes, and
+  // so the age bands have something in them. Deliberately includes one member
+  // with no date of birth, because that is the ordinary case in a real register
+  // and the screen says so rather than quietly undercounting.
+  const years = (n: number) => {
+    const d = new Date(now)
+    d.setFullYear(d.getFullYear() - n)
+    return d.toISOString().slice(0, 10)
+  }
+  const member = (
+    fullName: string, relationship: string, age: number | null,
+    sex: 'female' | 'male' | null, extra: Partial<DemoHouseholdMember> = {}
+  ): DemoHouseholdMember => ({
+    id: uid(), fullName, relationship, sex,
+    birthDate: age === null ? null : years(age),
+    civilStatus: null, occupation: null,
+    isPwd: false, isFourPs: false, isVoter: age !== null && age >= 18,
+    ...extra,
+  })
+
+  const householdSeed: Array<[string, string, string, DemoHouseholdMember[]]> = [
+    ['Rosa D. Mendoza', '12 Mabini St', 'Purok 3', [
+      member('Rosa D. Mendoza', 'Head', 44, 'female', { occupation: 'Sari-sari store owner' }),
+      member('Elmer P. Mendoza', 'Spouse', 47, 'male', { occupation: 'Tricycle driver' }),
+      member('Ana D. Mendoza', 'Daughter', 9, 'female', { isFourPs: true }),
+      member('Nena V. Dizon', 'Parent', 72, 'female', { isPwd: true }),
+    ]],
+    ['Benito S. Aquino', '14 Mabini St', 'Purok 3', [
+      member('Benito S. Aquino', 'Head', 61, 'male', { occupation: 'Farmer' }),
+      member('Luzviminda R. Aquino', 'Spouse', 58, 'female'),
+      // No date of birth on record, which the figures panel reports rather than
+      // hiding.
+      member('Tiyo Ramon', 'Relative', null, 'male'),
+    ]],
+    ['Grace T. Villanueva', '3 Rizal Ave', 'Purok 1', [
+      member('Grace T. Villanueva', 'Head', 33, 'female', { occupation: 'Teacher' }),
+      member('Kyle T. Villanueva', 'Son', 6, 'male'),
+    ]],
+  ]
+  for (const [headName, address, purok, members] of householdSeed) {
+    const key = `hh-${BARANGAYS[0]!.id}`
+    state.counters[key] = (state.counters[key] ?? 0) + 1
+    state.households.push({
+      id: uid(), barangayId: BARANGAYS[0]!.id, householdNo: state.counters[key]!,
+      address, purok, headName, contact: null, notes: null,
+      status: 'active', statusNote: null,
+      updatedAt: new Date(now - 86400000 * 30).toISOString(),
+      members,
+    })
   }
 
   seedHistory(state, resident, now)
@@ -1204,6 +1272,198 @@ async function route(
       )
       persist()
       return { status: 200, body: { ok: true } }
+    }
+
+    // ---- the register of inhabitants ----
+    //
+    // The one directory, contained by the barangay boundary exactly as on the
+    // server. Members are free text here too — the demo must not teach that a
+    // clerk can look up an account.
+    if (parts[1] === 'households') {
+      const mine = () => state.households.filter((h) => h.barangayId === own.id)
+      const ageOn = (birthDate: string | null) => {
+        if (!birthDate) return null
+        const born = new Date(birthDate)
+        const today = new Date()
+        let age = today.getFullYear() - born.getFullYear()
+        const before =
+          today.getMonth() < born.getMonth() ||
+          (today.getMonth() === born.getMonth() && today.getDate() < born.getDate())
+        if (before) age -= 1
+        return age >= 0 && age < 130 ? age : null
+      }
+      const member = (m: DemoHouseholdMember) => ({ ...m, age: ageOn(m.birthDate) })
+      const summary = (h: DemoHousehold) => ({
+        id: h.id, householdNo: h.householdNo, address: h.address, purok: h.purok,
+        headName: h.headName, contact: h.contact, status: h.status, statusNote: h.statusNote,
+        updatedAt: h.updatedAt, memberCount: h.members.length,
+      })
+      const adminOnlyHere = () => {
+        if (user.role !== 'barangay_admin') {
+          throw new DemoError(403, 'You do not have access to this area.')
+        }
+      }
+
+      // what the register is for
+      if (parts[2] === 'figures' && parts[3] === 'summary') {
+        const active = mine().filter((h) => h.status === 'active')
+        const people = active.flatMap((h) => h.members.map((m) => ({ ...m, purok: h.purok })))
+        const ages = people.map((m) => ageOn(m.birthDate))
+        const known = ages.filter((a): a is number => a !== null)
+        const puroks = [...new Set(active.map((h) => h.purok))]
+        return {
+          status: 200,
+          body: {
+            barangay: own.name,
+            households: active.length,
+            population: people.length,
+            female: people.filter((m) => m.sex === 'female').length,
+            male: people.filter((m) => m.sex === 'male').length,
+            children: known.filter((a) => a < 18).length,
+            adults: known.filter((a) => a >= 18 && a < 60).length,
+            seniors: known.filter((a) => a >= 60).length,
+            withoutBirthDate: ages.length - known.length,
+            pwd: people.filter((m) => m.isPwd).length,
+            fourPs: people.filter((m) => m.isFourPs).length,
+            voters: people.filter((m) => m.isVoter).length,
+            byPurok: puroks.map((purok) => ({
+              purok,
+              households: active.filter((h) => h.purok === purok).length,
+              population: people.filter((m) => m.purok === purok).length,
+            })),
+          },
+        }
+      }
+
+      if (!parts[2] && method === 'POST') {
+        const address = String(body?.address ?? '').trim()
+        const headName = String(body?.headName ?? '').trim()
+        if (address.length < 2) throw new DemoError(400, 'Where is the household?')
+        if (headName.length < 2) throw new DemoError(400, 'Who is the head of the household?')
+        const key = `hh-${own.id}`
+        state.counters[key] = (state.counters[key] ?? 0) + 1
+        const household: DemoHousehold = {
+          id: uid(), barangayId: own.id, householdNo: state.counters[key]!,
+          address, purok: body?.purok ? String(body.purok) : null, headName,
+          contact: body?.contact ? String(body.contact) : null,
+          notes: body?.notes ? String(body.notes) : null,
+          status: 'active', statusNote: null, updatedAt: new Date().toISOString(),
+          // The head is a member, so the figures can count them.
+          members: [{
+            id: uid(), fullName: headName, birthDate: null, sex: null, relationship: 'Head',
+            civilStatus: null, occupation: null, isPwd: false, isFourPs: false, isVoter: false,
+          }],
+        }
+        state.households.push(household)
+        persist()
+        return { status: 201, body: { id: household.id, householdNo: household.householdNo } }
+      }
+
+      if (!parts[2]) {
+        const status = query.get('status')
+        const q = (query.get('q') ?? '').trim().toLowerCase()
+        return {
+          status: 200,
+          body: mine()
+            .filter((h) => !status || h.status === status)
+            .filter((h) => !q ||
+              h.headName.toLowerCase().includes(q) ||
+              h.address.toLowerCase().includes(q) ||
+              h.members.some((m) => m.fullName.toLowerCase().includes(q)))
+            .sort((a, b) => a.status.localeCompare(b.status) || a.householdNo - b.householdNo)
+            .map(summary),
+        }
+      }
+
+      const household = state.households.find((h) => h.id === parts[2] && h.barangayId === own.id)
+      if (!household) throw new DemoError(404, 'Household not found.')
+
+      if (!parts[3] && method === 'GET') {
+        return {
+          status: 200,
+          body: { ...summary(household), notes: household.notes, members: household.members.map(member) },
+        }
+      }
+
+      if (!parts[3] && method === 'PATCH') {
+        if (body?.address !== undefined) household.address = String(body.address)
+        if (body?.purok !== undefined) household.purok = String(body.purok) || null
+        if (body?.headName !== undefined) household.headName = String(body.headName)
+        if (body?.contact !== undefined) household.contact = String(body.contact) || null
+        if (body?.notes !== undefined) household.notes = String(body.notes) || null
+        household.updatedAt = new Date().toISOString()
+        persist()
+        return { status: 200, body: { ok: true } }
+      }
+
+      if (parts[3] === 'status' && method === 'PATCH') {
+        adminOnlyHere()
+        const next = String(body?.status ?? '')
+        const note = body?.statusNote ? String(body.statusNote).trim() : ''
+        if (!['active', 'moved', 'archived'].includes(next)) {
+          throw new DemoError(400, 'Choose what to set it to.')
+        }
+        if (next !== 'active' && !note) {
+          throw new DemoError(400, 'Say why it is leaving the active register.')
+        }
+        household.status = next as DemoHousehold['status']
+        household.statusNote = note || null
+        household.updatedAt = new Date().toISOString()
+        persist()
+        return { status: 200, body: { ok: true } }
+      }
+
+      if (parts[3] === 'members' && !parts[4] && method === 'POST') {
+        const fullName = String(body?.fullName ?? '').trim()
+        if (fullName.length < 2) throw new DemoError(400, 'Who is it?')
+        if (body?.birthDate && new Date(body.birthDate).getTime() > Date.now()) {
+          throw new DemoError(400, 'A date of birth cannot be in the future.')
+        }
+        const added: DemoHouseholdMember = {
+          id: uid(), fullName,
+          birthDate: body?.birthDate ? String(body.birthDate) : null,
+          sex: (body?.sex as DemoHouseholdMember['sex']) ?? null,
+          relationship: String(body?.relationship ?? 'Other'),
+          civilStatus: body?.civilStatus ? String(body.civilStatus) : null,
+          occupation: body?.occupation ? String(body.occupation) : null,
+          isPwd: Boolean(body?.isPwd), isFourPs: Boolean(body?.isFourPs), isVoter: Boolean(body?.isVoter),
+        }
+        household.members.push(added)
+        household.updatedAt = new Date().toISOString()
+        persist()
+        return { status: 201, body: member(added) }
+      }
+
+      if (parts[3] === 'members' && parts[4]) {
+        const index = household.members.findIndex((m) => m.id === parts[4])
+        if (index === -1) throw new DemoError(404, 'Member not found.')
+        const existing = household.members[index]!
+
+        if (method === 'DELETE') {
+          if (existing.relationship === 'Head') {
+            throw new DemoError(409, 'The head is the household. Change who the head is instead of removing them.')
+          }
+          household.members.splice(index, 1)
+          household.updatedAt = new Date().toISOString()
+          persist()
+          return { status: 200, body: { ok: true } }
+        }
+
+        if (method === 'PATCH') {
+          if (body?.fullName !== undefined) existing.fullName = String(body.fullName)
+          if (body?.birthDate !== undefined) existing.birthDate = String(body.birthDate) || null
+          if (body?.sex !== undefined) existing.sex = (body.sex || null) as DemoHouseholdMember['sex']
+          if (body?.relationship !== undefined) existing.relationship = String(body.relationship)
+          if (body?.civilStatus !== undefined) existing.civilStatus = String(body.civilStatus) || null
+          if (body?.occupation !== undefined) existing.occupation = String(body.occupation) || null
+          for (const key of ['isPwd', 'isFourPs', 'isVoter'] as const) {
+            if (body?.[key] !== undefined) existing[key] = Boolean(body[key])
+          }
+          household.updatedAt = new Date().toISOString()
+          persist()
+          return { status: 200, body: member(existing) }
+        }
+      }
     }
 
     // ---- the blotter ----

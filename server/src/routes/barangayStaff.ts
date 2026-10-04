@@ -6,6 +6,7 @@ import { toCentavos, toPesos } from '../serialize.ts'
 import { deliverNotification, recordNotification } from '../notifications.ts'
 import { serializeBarangayRequest } from './barangay.ts'
 import { blotterRouter } from './blotter.ts'
+import { householdsRouter } from './households.ts'
 
 /**
  * The barangay's own portal: the officer who processes certificates, and the
@@ -34,6 +35,7 @@ async function ownBarangay(userId: string) {
 // authentication, the two roles and — the part that matters — the habit of
 // taking the barangay from the account rather than from the caller.
 barangayStaffRouter.use('/blotter', blotterRouter)
+barangayStaffRouter.use('/households', householdsRouter)
 
 barangayStaffRouter.get('/me', async (req, res) => {
   const barangay = await ownBarangay(req.user!.id)

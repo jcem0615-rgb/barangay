@@ -128,6 +128,11 @@ usually `1` behind a single load balancer or ingress.
       `barangay_officer` or `barangay_admin` role for that barangay can read the whole book.
       Issue those accounts to the people who actually hold the office, and revoke them when
       they leave — the app has no finer permission than the role
+- [ ] **The register of inhabitants has a lawful basis and a retention period.** It is a
+      list of every resident with their age, household and what the barangay noted about
+      them — the largest concentration of personal data in the deployment. The DPO should
+      sign off on why it is held and for how long, and the same accounts that may open the
+      blotter can read all of it
 - [ ] **The retention of blotter entries matches the LGU's own records policy**, and
       somebody owns deleting what is past it. Nothing here expires an entry, and a book of
       accusations kept forever is a liability rather than a record

@@ -33,6 +33,7 @@
     "test:barangay": "node test/barangay.mjs",
     "test:document-steps": "node test/document-steps.mjs",
     "test:blotter": "node test/blotter.mjs",
+    "test:households": "node test/households.mjs",
     "test:residency": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/residency.mjs",
     "test:id-verification": "node test/id-verification.mjs",
     "test:hotlines": "node test/hotlines.mjs",

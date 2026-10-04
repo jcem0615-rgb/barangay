@@ -182,6 +182,57 @@ account without one answers 409 to everything.
 **The console stays English**, like the municipal one and for the same reason. The resident
 side is translated; certificate names are not, exactly like "Cedula" and "Building Permit".
 
+## Household records (the Record of Barangay Inhabitants)
+
+The Local Government Code makes the barangay secretary keep an updated record of every
+inhabitant, and it is what a barangay actually plans from: who to feed, who to evacuate,
+how many seniors live on which purok. The `Households` tab is that book.
+
+**This is the one place in the app that is deliberately a directory**, and that is worth
+stating plainly because everything else here refuses to be one. The municipal side has no
+resident lookup *on purpose* — programme enrolment is reached through a request precisely so
+that no endpoint lists residents to search. The register cannot hold that line, since
+listing inhabitants is its whole function, so the containment is the barangay boundary
+instead: its own book, every statement scoped to the account's own barangay, nothing
+readable by the municipality, by another barangay, or by any resident.
+
+**Members are free text, never linked to resident accounts.** This is the same decision the
+blotter makes and it matters more here: a link would turn the register into a view onto the
+user table, handing a barangay clerk a way to look up any account in the municipality. The
+paper register is the barangay's own compilation of who lives where, and keeping it that way
+is what keeps the no-lookup rule true everywhere else.
+
+**The figures lead the screen**, because the questions a barangay is asked are always
+counts. They are computed over the active register on every read rather than stored — the
+same trade the municipal reports make, for the same reason.
+
+**A member with no date of birth is counted in the population and in no age band, and the
+screen says so.** A barangay planning a feeding programme off a silently short count is the
+harm; `withoutBirthDate` is reported rather than hidden. Age itself is derived on read, like
+`expired` on a programme record: a stored age is wrong the day after it is written.
+
+**PWD and 4Ps here are the barangay's own note, not the sectoral register.** A record that
+carries a statutory discount or a cash grant is issued by CSWDO and lives in
+`resident_programs`; a tick in the RBI is what the barangay wrote down when it visited. They
+are labelled "(noted)" in the console so a clerk's checkbox can never read as an entitlement
+at a counter.
+
+**Household numbers are per barangay**, which is the one place this app does *not* use a
+municipality-wide counter — and the difference is the point. A certificate reference is
+quoted down a phone and typed into a municipal search box, so it has to identify one thing
+municipality-wide; a household number is an index into one barangay's own book and is never
+said outside it. "Household 142" means the 142nd here, which is what a purok leader expects.
+
+**Nothing is deleted.** A household that moved away keeps its row and its number, because
+next year's figures have to be comparable with this year's. Taking one out of the active
+register is the administrator's and needs a reason — recording who lives where is the day's
+work, deciding a household no longer counts changes what the barangay reports upward.
+
+**The head is a member of their own household**, added automatically, because a register
+whose head is only a column cannot count its own population. Removing them is refused: the
+head is the household, so changing who it is is an edit to the household rather than a
+member removal.
+
 ## The blotter and the summons
 
 Katarungang Pambarangay (RA 7160, Chapter 7): a dispute is brought to the barangay, the
@@ -1206,9 +1257,19 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   The periods the law sets (15 days to mediate, 15 more for the Pangkat) are not enforced or
   counted either; a deployment that wants them should treat them like the expected-ready
   dates, over the same working-day calendar.
-- **Household records, announcements and the barangay ID are not here.** Each is its own
-  feature with its own rules, and bolting them on as fields of the certificate or the
-  blotter would get them all wrong.
+- **Announcements and the barangay ID are not here.** Each is its own feature with its own
+  rules, and bolting them on as fields of the certificate, the blotter or the register would
+  get them all wrong.
+- **The register has no export, deliberately.** A barangay genuinely needs printed lists for
+  relief distribution, and a CSV button is the single action that turns a scoped register
+  into a spreadsheet on somebody's laptop — which is how registers leak. A deployment that
+  adds one should log who exported and when, the way `admin_audit` records municipal edits,
+  rather than treating it as a download.
+- **Nothing reconciles the register against resident accounts.** A person can be in a
+  household and hold an account and the app will never connect the two, by design. The cost
+  is that a barangay cannot see which of its inhabitants use the portal, which is a real
+  question somebody will eventually ask; answering it means designing a link that does not
+  become a lookup.
 - **The document routes are a reading of common practice, not a charter.** Every `steps`
   chain is placeholder content on the same footing as the hotlines and the holiday
   calendar: plausible, carefully ordered, and not verified against what this municipality
