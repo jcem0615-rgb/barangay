@@ -90,10 +90,28 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     fee: 50,
     purposeHint: 'e.g. local employment, bank requirement',
     steps: [
-      { label: 'Be a resident of this barangay', where: 'Your barangay', note: 'The barangay checks this against its own records at the counter.' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Say what it is for', where: 'On the next screen', note: 'The purpose is written on the certificate, so it has to match what you will use it for.' },
-      { label: 'Collect and pay at the barangay hall', where: 'Your barangay' },
+      {
+        label: 'Be a resident of this barangay',
+        where: 'Your barangay',
+        note: 'The barangay checks this against its own records at the counter.',
+        fil: { label: 'Taga-barangay na ito', where: 'Sa barangay mo', note: 'Itinatapat ito ng barangay sa sarili nitong tala sa counter.' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Say what it is for',
+        where: 'On the next screen',
+        note: 'The purpose is written on the certificate, so it has to match what you will use it for.',
+        fil: { label: 'Sabihin kung para saan ito', where: 'Sa susunod na screen', note: 'Nakasulat sa sertipiko ang layunin, kaya dapat tugma ito sa pagkakagamitan mo.' },
+      },
+      {
+        label: 'Collect and pay at the barangay hall',
+        where: 'Your barangay',
+        fil: { label: 'Kunin at bayaran sa barangay hall', where: 'Sa barangay mo' },
+      },
     ],
   },
   {
@@ -103,10 +121,27 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     fee: 30,
     purposeHint: 'e.g. school enrolment, PhilHealth',
     steps: [
-      { label: 'Be a resident of this barangay', where: 'Your barangay', note: 'Some barangays ask how long you have lived there, so know the date you moved in.' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Say what it is for', where: 'On the next screen' },
-      { label: 'Collect and pay at the barangay hall', where: 'Your barangay' },
+      {
+        label: 'Be a resident of this barangay',
+        where: 'Your barangay',
+        note: 'Some barangays ask how long you have lived there, so know the date you moved in.',
+        fil: { label: 'Taga-barangay na ito', where: 'Sa barangay mo', note: 'May mga barangay na nagtatanong kung gaano ka na katagal doon, kaya alamin ang petsa ng paglipat mo.' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Say what it is for',
+        where: 'On the next screen',
+        fil: { label: 'Sabihin kung para saan ito', where: 'Sa susunod na screen' },
+      },
+      {
+        label: 'Collect and pay at the barangay hall',
+        where: 'Your barangay',
+        fil: { label: 'Kunin at bayaran sa barangay hall', where: 'Sa barangay mo' },
+      },
     ],
   },
   {
@@ -118,10 +153,28 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     fee: 0,
     purposeHint: 'e.g. hospital bill, DSWD assistance',
     steps: [
-      { label: 'Be a resident of this barangay', where: 'Your barangay' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Say what it is for', where: 'On the next screen', note: 'Name the assistance you are applying for — the office receiving it will look for that.' },
-      { label: 'Collect it at the barangay hall', where: 'Your barangay', note: 'Free. A barangay may not charge for proof of poverty.' },
+      {
+        label: 'Be a resident of this barangay',
+        where: 'Your barangay',
+        fil: { label: 'Taga-barangay na ito', where: 'Sa barangay mo' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Say what it is for',
+        where: 'On the next screen',
+        note: 'Name the assistance you are applying for — the office receiving it will look for that.',
+        fil: { label: 'Sabihin kung para saan ito', where: 'Sa susunod na screen', note: 'Pangalanan ang tulong na inaaplayan mo — iyon ang hahanapin ng tanggapang tatanggap nito.' },
+      },
+      {
+        label: 'Collect it at the barangay hall',
+        where: 'Your barangay',
+        note: 'Free. A barangay may not charge for proof of poverty.',
+        fil: { label: 'Kunin ito sa barangay hall', where: 'Sa barangay mo', note: 'Libre. Hindi puwedeng singilin ng barangay ang patunay ng kahirapan.' },
+      },
     ],
   },
   {
@@ -131,10 +184,27 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     fee: 100,
     purposeHint: 'e.g. new sari-sari store, renewal',
     steps: [
-      { label: 'Be a resident, or have the business located in this barangay', where: 'Your barangay' },
-      { label: 'Proof of the business address', where: 'Your lease contract or land title' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Collect and pay at the barangay hall', where: 'Your barangay', note: 'Get this before the municipal business permit — the BOSS will ask for it.' },
+      {
+        label: 'Be a resident, or have the business located in this barangay',
+        where: 'Your barangay',
+        fil: { label: 'Taga-rito ka, o nasa barangay na ito ang negosyo', where: 'Sa barangay mo' },
+      },
+      {
+        label: 'Proof of the business address',
+        where: 'Your lease contract or land title',
+        fil: { label: 'Patunay ng address ng negosyo', where: 'Kontrata sa upa o titulo ng lupa mo' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Collect and pay at the barangay hall',
+        where: 'Your barangay',
+        note: 'Get this before the municipal business permit — the BOSS will ask for it.',
+        fil: { label: 'Kunin at bayaran sa barangay hall', where: 'Sa barangay mo', note: 'Kunin ito bago ang business permit sa munisipyo — hihingin ito ng BOSS.' },
+      },
     ],
   },
   {
@@ -144,10 +214,27 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     fee: 30,
     purposeHint: 'e.g. scholarship application',
     steps: [
-      { label: 'Be a resident of this barangay', where: 'Your barangay', note: 'The barangay will check its blotter, so this is not issued on the spot everywhere.' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Say what it is for', where: 'On the next screen' },
-      { label: 'Collect and pay at the barangay hall', where: 'Your barangay' },
+      {
+        label: 'Be a resident of this barangay',
+        where: 'Your barangay',
+        note: 'The barangay will check its blotter, so this is not issued on the spot everywhere.',
+        fil: { label: 'Taga-barangay na ito', where: 'Sa barangay mo', note: 'Titingnan ng barangay ang blotter nito, kaya hindi ito agad-agad ibinibigay sa lahat ng lugar.' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Say what it is for',
+        where: 'On the next screen',
+        fil: { label: 'Sabihin kung para saan ito', where: 'Sa susunod na screen' },
+      },
+      {
+        label: 'Collect and pay at the barangay hall',
+        where: 'Your barangay',
+        fil: { label: 'Kunin at bayaran sa barangay hall', where: 'Sa barangay mo' },
+      },
     ],
   },
   {
@@ -157,10 +244,28 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     fee: 0,
     purposeHint: 'e.g. first employment requirements',
     steps: [
-      { label: 'Be a resident of this barangay for at least six months', where: 'Your barangay', note: 'RA 11261 sets the residency period, not the barangay.' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Say what it is for', where: 'On the next screen' },
-      { label: 'Collect it at the barangay hall', where: 'Your barangay', note: 'Free by law, and it waives the fees on the documents you need for that first job.' },
+      {
+        label: 'Be a resident of this barangay for at least six months',
+        where: 'Your barangay',
+        note: 'RA 11261 sets the residency period, not the barangay.',
+        fil: { label: 'Taga-barangay na ito nang hindi bababa sa anim na buwan', where: 'Sa barangay mo', note: 'Ang RA 11261 ang nagtatakda ng haba ng paninirahan, hindi ang barangay.' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Say what it is for',
+        where: 'On the next screen',
+        fil: { label: 'Sabihin kung para saan ito', where: 'Sa susunod na screen' },
+      },
+      {
+        label: 'Collect it at the barangay hall',
+        where: 'Your barangay',
+        note: 'Free by law, and it waives the fees on the documents you need for that first job.',
+        fil: { label: 'Kunin ito sa barangay hall', where: 'Sa barangay mo', note: 'Libre ayon sa batas, at inaalis nito ang bayad sa mga dokumentong kailangan mo para sa unang trabahong iyon.' },
+      },
     ],
   },
 ]
@@ -267,12 +372,42 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['DTI / SEC registration', 'Barangay Business Clearance', 'Lease contract or land title', 'Fire Safety Inspection Certificate'],
     searchTerms: ['business permit', 'mayor’s permit', 'negosyo', 'sari-sari store', 'tindahan', 'new business', 'renewal', 'business registration', 'permit sa negosyo'],
     steps: [
-      { label: 'Barangay Business Clearance', where: 'Your barangay', certificateId: 'business-clearance', note: 'The barangay has to clear the location before the municipality will look at the permit.' },
-      { label: 'DTI registration (sole proprietor) or SEC registration (corporation or partnership)', where: 'DTI / SEC — not the municipality', note: 'Register the business name nationally first. The municipality licenses the business; it does not name it.' },
-      { label: 'Lease contract, or land title if you own the place', where: 'Your lessor, or the Registry of Deeds' },
-      { label: 'Fire Safety Inspection Certificate', where: 'Bureau of Fire Protection', note: 'Issued after an inspection, so book it early — this is the step most often waited on.' },
-      { label: 'Sanitary Permit', where: 'Municipal Health Office', serviceId: 'sanitary-permit', onlyIf: 'you will handle food or drink' },
-      { label: 'File the application here', where: 'Business Permits (BOSS)' },
+      {
+        label: 'Barangay Business Clearance',
+        where: 'Your barangay',
+        certificateId: 'business-clearance',
+        note: 'The barangay has to clear the location before the municipality will look at the permit.',
+        fil: { label: 'Barangay Business Clearance', where: 'Sa barangay mo', note: 'Kailangan munang aprubahan ng barangay ang lokasyon bago titingnan ng munisipyo ang permit.' },
+      },
+      {
+        label: 'DTI registration (sole proprietor) or SEC registration (corporation or partnership)',
+        where: 'DTI / SEC — not the municipality',
+        note: 'Register the business name nationally first. The municipality licenses the business; it does not name it.',
+        fil: { label: 'DTI registration (kung ikaw lang ang may-ari) o SEC registration (kung korporasyon o partnership)', where: 'DTI / SEC — hindi sa munisipyo', note: 'Irehistro muna ang pangalan ng negosyo sa pambansang tanggapan. Ang munisipyo ang nagbibigay ng lisensya sa negosyo; hindi ito ang nagpapangalan nito.' },
+      },
+      {
+        label: 'Lease contract, or land title if you own the place',
+        where: 'Your lessor, or the Registry of Deeds',
+        fil: { label: 'Kontrata sa upa, o titulo ng lupa kung ikaw ang may-ari', where: 'Sa nagpapaupa, o sa Registry of Deeds' },
+      },
+      {
+        label: 'Fire Safety Inspection Certificate',
+        where: 'Bureau of Fire Protection',
+        note: 'Issued after an inspection, so book it early — this is the step most often waited on.',
+        fil: { label: 'Fire Safety Inspection Certificate', where: 'Bureau of Fire Protection', note: 'Ibinibigay ito pagkatapos ng inspeksyon, kaya maaga pa lang ay magpaiskedyul na — ito ang hakbang na madalas pinakamatagal hintayin.' },
+      },
+      {
+        label: 'Sanitary Permit',
+        where: 'Municipal Health Office',
+        serviceId: 'sanitary-permit',
+        onlyIf: 'you will handle food or drink',
+        fil: { label: 'Sanitary Permit', where: 'Municipal Health Office', onlyIf: 'may pagkain o inumin ang hahawakan mo' },
+      },
+      {
+        label: 'File the application here',
+        where: 'Business Permits (BOSS)',
+        fil: { label: 'Dito isumite ang aplikasyon', where: 'Business Permits (BOSS)' },
+      },
     ],
     fields: [
       { id: 'businessName', label: 'Business name', type: 'text', placeholder: 'e.g. Santos Sari-Sari Store', required: true },
@@ -295,10 +430,29 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Certificate of Indigency', 'Case-specific proof (medical abstract, death certificate, etc.)'],
     searchTerms: ['ayuda', 'financial assistance', 'tulong', 'medical assistance', 'burial assistance', 'libing', 'pamasahe', 'crisis', 'AICS', 'cash aid'],
     steps: [
-      { label: 'Certificate of Indigency', where: 'Your barangay', certificateId: 'indigency', note: 'Free, and free by law — a barangay may not charge for proof of poverty.' },
-      { label: 'Proof of what happened', where: 'The hospital, funeral home, or clinic', note: 'A medical abstract, a billing statement, a death certificate — whatever matches what you are asking help for.' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'File the application here', where: 'Social Welfare (CSWDO)' },
+      {
+        label: 'Certificate of Indigency',
+        where: 'Your barangay',
+        certificateId: 'indigency',
+        note: 'Free, and free by law — a barangay may not charge for proof of poverty.',
+        fil: { label: 'Certificate of Indigency', where: 'Sa barangay mo', note: 'Libre, at libre ayon sa batas — hindi puwedeng singilin ng barangay ang patunay ng kahirapan.' },
+      },
+      {
+        label: 'Proof of what happened',
+        where: 'The hospital, funeral home, or clinic',
+        note: 'A medical abstract, a billing statement, a death certificate — whatever matches what you are asking help for.',
+        fil: { label: 'Patunay ng nangyari', where: 'Sa ospital, punerarya, o klinika', note: 'Medical abstract, billing statement, death certificate — kung alin man ang tugma sa hinihinging tulong.' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'File the application here',
+        where: 'Social Welfare (CSWDO)',
+        fil: { label: 'Dito isumite ang aplikasyon', where: 'Social Welfare (CSWDO)' },
+      },
     ],
     fields: [
       { id: 'assistanceType', label: 'Type of assistance', type: 'select', options: ['Medical Assistance', 'Burial Assistance', 'Transportation Assistance', 'Food Assistance'], required: true },
@@ -319,11 +473,34 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Birth certificate or proof of age', 'Medical certificate (for PWD)', '1x1 ID photo'],
     searchTerms: ['senior citizen', 'matanda', 'PWD', 'person with disability', 'may kapansanan', 'discount card', 'OSCA', 'senior ID'],
     steps: [
-      { label: 'Birth certificate, or any document proving your age', where: 'Local Civil Registrar', serviceId: 'birth-certificate' },
-      { label: 'Medical certificate stating the disability', where: 'A licensed physician', onlyIf: 'you are applying as a person with disability' },
-      { label: 'One 1x1 ID photo', where: 'Any photo shop' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'File the application here', where: 'Social Welfare (CSWDO)', note: 'Free. A senior citizen or PWD ID is never sold.' },
+      {
+        label: 'Birth certificate, or any document proving your age',
+        where: 'Local Civil Registrar',
+        serviceId: 'birth-certificate',
+        fil: { label: 'Birth certificate, o anumang dokumentong nagpapatunay ng edad mo', where: 'Local Civil Registrar' },
+      },
+      {
+        label: 'Medical certificate stating the disability',
+        where: 'A licensed physician',
+        onlyIf: 'you are applying as a person with disability',
+        fil: { label: 'Medical certificate na nagsasaad ng kapansanan', where: 'Sa lisensyadong doktor', onlyIf: 'nag-aaplay ka bilang person with disability' },
+      },
+      {
+        label: 'One 1x1 ID photo',
+        where: 'Any photo shop',
+        fil: { label: 'Isang 1x1 na ID picture', where: 'Sa kahit anong photo shop' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'File the application here',
+        where: 'Social Welfare (CSWDO)',
+        note: 'Free. A senior citizen or PWD ID is never sold.',
+        fil: { label: 'Dito isumite ang aplikasyon', where: 'Social Welfare (CSWDO)', note: 'Libre. Hindi kailanman ipinagbibili ang senior citizen o PWD ID.' },
+      },
     ],
     fields: [
       { id: 'idType', label: 'ID type', type: 'select', options: ['Senior Citizen ID', 'PWD ID'], required: true },
@@ -344,9 +521,22 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Complete name and date of birth of registrant'],
     searchTerms: ['birth certificate', 'birth cert', 'kapanganakan', 'PSA birth', 'NSO', 'born', 'live birth'],
     steps: [
-      { label: "The registrant's complete name and date of birth", where: 'Write it exactly as it was registered', note: 'A middle name spelled differently from the register is the usual reason a copy comes back not found.' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Request it here', where: 'Local Civil Registrar' },
+      {
+        label: "The registrant's complete name and date of birth",
+        where: 'Write it exactly as it was registered',
+        note: 'A middle name spelled differently from the register is the usual reason a copy comes back not found.',
+        fil: { label: 'Buong pangalan at petsa ng kapanganakan ng nakarehistro', where: 'Isulat nang eksakto kung paano ito nakarehistro', note: 'Ang maling baybay ng gitnang apelyido ang karaniwang dahilan kung bakit hindi makita ang kopya.' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Request it here',
+        where: 'Local Civil Registrar',
+        fil: { label: 'Dito ito hingin', where: 'Local Civil Registrar' },
+      },
     ],
     fields: [
       { id: 'registrantName', label: 'Full name of registrant', type: 'text', required: true },
@@ -368,9 +558,21 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Full names of both spouses and date of marriage'],
     searchTerms: ['marriage certificate', 'kasal', 'marriage cert', 'PSA marriage', 'wedding'],
     steps: [
-      { label: 'Full names of both spouses and the date of marriage', where: 'Write them as they were registered' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Request it here', where: 'Local Civil Registrar' },
+      {
+        label: 'Full names of both spouses and the date of marriage',
+        where: 'Write them as they were registered',
+        fil: { label: 'Buong pangalan ng mag-asawa at petsa ng kasal', where: 'Isulat ang mga ito kung paano nakarehistro' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Request it here',
+        where: 'Local Civil Registrar',
+        fil: { label: 'Dito ito hingin', where: 'Local Civil Registrar' },
+      },
     ],
     fields: [
       { id: 'spouse1', label: "Spouse 1 full name", type: 'text', required: true },
@@ -392,10 +594,26 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Full name of deceased and date of death', 'Proof of relationship to the deceased'],
     searchTerms: ['death certificate', 'namatay', 'death cert', 'PSA death', 'burial papers'],
     steps: [
-      { label: 'Full name of the deceased and the date of death', where: 'Write it as it was registered' },
-      { label: 'Proof that you are related to them', where: 'A birth or marriage certificate showing the link' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Request it here', where: 'Local Civil Registrar' },
+      {
+        label: 'Full name of the deceased and the date of death',
+        where: 'Write it as it was registered',
+        fil: { label: 'Buong pangalan ng yumao at petsa ng pagkamatay', where: 'Isulat ito kung paano nakarehistro' },
+      },
+      {
+        label: 'Proof that you are related to them',
+        where: 'A birth or marriage certificate showing the link',
+        fil: { label: 'Patunay na kamag-anak ka nila', where: 'Birth o marriage certificate na nagpapakita ng ugnayan' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Request it here',
+        where: 'Local Civil Registrar',
+        fil: { label: 'Dito ito hingin', where: 'Local Civil Registrar' },
+      },
     ],
     fields: [
       { id: 'deceasedName', label: 'Full name of deceased', type: 'text', required: true },
@@ -417,9 +635,23 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Proof of address'],
     searchTerms: ['cedula', 'community tax', 'sedula', 'CTC', 'residence certificate', 'buwis sa paninirahan'],
     steps: [
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Proof of your address', where: 'A utility bill, or your barangay', certificateId: 'residency' },
-      { label: 'Get it here', where: "Municipal Treasurer's Office", note: 'Many other transactions ask for a cedula, so this is often the first thing to get rather than the last.' },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Proof of your address',
+        where: 'A utility bill, or your barangay',
+        certificateId: 'residency',
+        fil: { label: 'Patunay ng tirahan mo', where: 'Bill ng kuryente o tubig, o sa barangay mo' },
+      },
+      {
+        label: 'Get it here',
+        where: "Municipal Treasurer's Office",
+        note: 'Many other transactions ask for a cedula, so this is often the first thing to get rather than the last.',
+        fil: { label: 'Dito ito kunin', where: "Municipal Treasurer's Office", note: 'Marami pang ibang transaksyon ang humihingi ng cedula, kaya madalas ito ang unang kunin at hindi ang huli.' },
+      },
     ],
     fields: [
       { id: 'purpose', label: 'Purpose', type: 'select', options: ['Employment', 'Government Transaction', 'Bank / Loan Requirement', 'School Requirement', 'Other'], required: true },
@@ -440,9 +672,22 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Tax Declaration number', 'Latest official receipt (if previously paid)'],
     searchTerms: ['real property tax', 'amilyar', 'land tax', 'property assessment', 'tax declaration', 'lupa'],
     steps: [
-      { label: 'Your Tax Declaration number', where: 'On your last tax receipt or declaration' },
-      { label: 'The latest official receipt, if you have paid before', where: 'Your own records' },
-      { label: 'Request the assessment here', where: "Municipal Treasurer's Office", note: 'Free. This tells you what is owed; it does not pay it.' },
+      {
+        label: 'Your Tax Declaration number',
+        where: 'On your last tax receipt or declaration',
+        fil: { label: 'Ang Tax Declaration number mo', where: 'Nasa huling resibo o deklarasyon mo ng buwis' },
+      },
+      {
+        label: 'The latest official receipt, if you have paid before',
+        where: 'Your own records',
+        fil: { label: 'Ang pinakahuling opisyal na resibo, kung nakapagbayad ka na dati', where: 'Sa sarili mong mga tala' },
+      },
+      {
+        label: 'Request the assessment here',
+        where: "Municipal Treasurer's Office",
+        note: 'Free. This tells you what is owed; it does not pay it.',
+        fil: { label: 'Dito hingin ang assessment', where: "Municipal Treasurer's Office", note: 'Libre. Sinasabi nito kung magkano ang utang; hindi nito binabayaran iyon.' },
+      },
     ],
     fields: [
       { id: 'taxDecNo', label: 'Tax Declaration number', type: 'text', placeholder: 'e.g. 03-0012-00456', required: true },
@@ -464,10 +709,28 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Tax Declaration number', 'Latest real property tax official receipt', 'Valid government ID'],
     searchTerms: ['tax clearance', 'real property clearance', 'amilyar clearance', 'no tax due', 'property clearance'],
     steps: [
-      { label: 'Know what is owed', where: "Municipal Treasurer's Office", serviceId: 'rpt-assessment' },
-      { label: 'Settle the real property tax in full', where: "Municipal Treasurer's Office", note: 'A clearance says nothing is owed, so nothing can be owed. Keep the receipt.' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Request the clearance here', where: "Municipal Treasurer's Office" },
+      {
+        label: 'Know what is owed',
+        where: "Municipal Treasurer's Office",
+        serviceId: 'rpt-assessment',
+        fil: { label: 'Alamin kung magkano ang babayaran', where: "Municipal Treasurer's Office" },
+      },
+      {
+        label: 'Settle the real property tax in full',
+        where: "Municipal Treasurer's Office",
+        note: 'A clearance says nothing is owed, so nothing can be owed. Keep the receipt.',
+        fil: { label: 'Bayaran nang buo ang real property tax', where: "Municipal Treasurer's Office", note: 'Ang sinasabi ng clearance ay walang utang, kaya dapat talagang wala. Itago ang resibo.' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Request the clearance here',
+        where: "Municipal Treasurer's Office",
+        fil: { label: 'Dito hingin ang clearance', where: "Municipal Treasurer's Office" },
+      },
     ],
     fields: [
       { id: 'taxDecNo', label: 'Tax Declaration number', type: 'text', placeholder: 'e.g. 03-0012-00456', required: true },
@@ -488,10 +751,28 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Tax Declaration or land title', 'Vicinity map / sketch plan', 'Real Property Tax Clearance'],
     searchTerms: ['zoning', 'locational clearance', 'land use', 'zoning clearance', 'pwesto'],
     steps: [
-      { label: 'Land title, or the Tax Declaration for the lot', where: 'Registry of Deeds, or the Assessor' },
-      { label: 'Real Property Tax Clearance', where: "Municipal Treasurer's Office", serviceId: 'rpt-clearance' },
-      { label: 'Vicinity map or sketch plan of the lot', where: 'A geodetic engineer, or your plans' },
-      { label: 'Apply here', where: 'Building & Zoning (OBO)', note: 'Zoning comes before the building permit: it answers whether you may build that there at all.' },
+      {
+        label: 'Land title, or the Tax Declaration for the lot',
+        where: 'Registry of Deeds, or the Assessor',
+        fil: { label: 'Titulo ng lupa, o ang Tax Declaration ng lote', where: 'Registry of Deeds, o sa Assessor' },
+      },
+      {
+        label: 'Real Property Tax Clearance',
+        where: "Municipal Treasurer's Office",
+        serviceId: 'rpt-clearance',
+        fil: { label: 'Real Property Tax Clearance', where: "Municipal Treasurer's Office" },
+      },
+      {
+        label: 'Vicinity map or sketch plan of the lot',
+        where: 'A geodetic engineer, or your plans',
+        fil: { label: 'Vicinity map o sketch plan ng lote', where: 'Sa geodetic engineer, o nasa plano mo na' },
+      },
+      {
+        label: 'Apply here',
+        where: 'Building & Zoning (OBO)',
+        note: 'Zoning comes before the building permit: it answers whether you may build that there at all.',
+        fil: { label: 'Dito mag-apply', where: 'Building & Zoning (OBO)', note: 'Nauuna ang zoning sa building permit: sinasagot nito kung puwede ba talagang magtayo roon.' },
+      },
     ],
     fields: [
       { id: 'projectType', label: 'Intended use', type: 'select', options: ['Residential', 'Commercial', 'Industrial', 'Institutional', 'Mixed Use'], required: true },
@@ -518,12 +799,41 @@ export const SERVICES: ServiceDefinition[] = [
     ],
     searchTerms: ['building permit', 'construction', 'magpapatayo', 'bahay', 'renovation', 'pagpapagawa', 'structure'],
     steps: [
-      { label: 'Zoning / Locational Clearance', where: 'Building & Zoning (OBO)', serviceId: 'zoning-clearance', note: 'Do this one first. If zoning says no, nothing after it matters.' },
-      { label: 'Land title, or the Tax Declaration for the lot', where: 'Registry of Deeds, or the Assessor' },
-      { label: 'Real Property Tax Clearance', where: "Municipal Treasurer's Office", serviceId: 'rpt-clearance' },
-      { label: 'Five sets of plans, signed and sealed', where: 'A licensed architect or civil engineer', note: 'Signed and sealed by the professional who prepared them — unsigned plans are returned.' },
-      { label: 'Structural computations', where: 'The same licensed professional' },
-      { label: 'Apply here', where: 'Building & Zoning (OBO)', note: 'Apply before any work starts. A permit does not cover what has already been built.' },
+      {
+        label: 'Zoning / Locational Clearance',
+        where: 'Building & Zoning (OBO)',
+        serviceId: 'zoning-clearance',
+        note: 'Do this one first. If zoning says no, nothing after it matters.',
+        fil: { label: 'Zoning / Locational Clearance', where: 'Building & Zoning (OBO)', note: 'Ito ang unahin. Kung hindi papayag ang zoning, wala nang saysay ang lahat ng susunod.' },
+      },
+      {
+        label: 'Land title, or the Tax Declaration for the lot',
+        where: 'Registry of Deeds, or the Assessor',
+        fil: { label: 'Titulo ng lupa, o ang Tax Declaration ng lote', where: 'Registry of Deeds, o sa Assessor' },
+      },
+      {
+        label: 'Real Property Tax Clearance',
+        where: "Municipal Treasurer's Office",
+        serviceId: 'rpt-clearance',
+        fil: { label: 'Real Property Tax Clearance', where: "Municipal Treasurer's Office" },
+      },
+      {
+        label: 'Five sets of plans, signed and sealed',
+        where: 'A licensed architect or civil engineer',
+        note: 'Signed and sealed by the professional who prepared them — unsigned plans are returned.',
+        fil: { label: 'Limang set ng plano, may pirma at selyo', where: 'Sa lisensyadong arkitekto o civil engineer', note: 'Dapat may pirma at selyo ng propesyonal na gumawa nito — isinasauli ang planong walang pirma.' },
+      },
+      {
+        label: 'Structural computations',
+        where: 'The same licensed professional',
+        fil: { label: 'Structural computations', where: 'Sa parehong lisensyadong propesyonal' },
+      },
+      {
+        label: 'Apply here',
+        where: 'Building & Zoning (OBO)',
+        note: 'Apply before any work starts. A permit does not cover what has already been built.',
+        fil: { label: 'Dito mag-apply', where: 'Building & Zoning (OBO)', note: 'Mag-apply bago magsimula ang anumang gawain. Hindi sakop ng permit ang naitayo na.' },
+      },
     ],
     fields: [
       { id: 'workType', label: 'Scope of work', type: 'select', options: ['New Construction', 'Renovation / Alteration', 'Addition', 'Repair', 'Demolition'], required: true },
@@ -546,11 +856,34 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Approved Building Permit', 'Certificate of Completion', 'As-built plans', 'Fire Safety Inspection Certificate'],
     searchTerms: ['occupancy permit', 'certificate of occupancy', 'move in', 'tapos na bahay', 'final inspection'],
     steps: [
-      { label: 'Approved Building Permit', where: 'Building & Zoning (OBO)', serviceId: 'building-permit' },
-      { label: 'Certificate of Completion', where: 'Your architect or engineer' },
-      { label: 'As-built plans', where: 'Your architect or engineer', note: 'What was actually built, which is not always what was drawn.' },
-      { label: 'Fire Safety Inspection Certificate', where: 'Bureau of Fire Protection' },
-      { label: 'Apply here', where: 'Building & Zoning (OBO)', note: 'This is what makes the building legal to occupy. Get it before anyone moves in.' },
+      {
+        label: 'Approved Building Permit',
+        where: 'Building & Zoning (OBO)',
+        serviceId: 'building-permit',
+        fil: { label: 'Aprubadong Building Permit', where: 'Building & Zoning (OBO)' },
+      },
+      {
+        label: 'Certificate of Completion',
+        where: 'Your architect or engineer',
+        fil: { label: 'Certificate of Completion', where: 'Sa arkitekto o inhinyero mo' },
+      },
+      {
+        label: 'As-built plans',
+        where: 'Your architect or engineer',
+        note: 'What was actually built, which is not always what was drawn.',
+        fil: { label: 'As-built plans', where: 'Sa arkitekto o inhinyero mo', note: 'Ang talagang naitayo, na hindi laging katulad ng iginuhit.' },
+      },
+      {
+        label: 'Fire Safety Inspection Certificate',
+        where: 'Bureau of Fire Protection',
+        fil: { label: 'Fire Safety Inspection Certificate', where: 'Bureau of Fire Protection' },
+      },
+      {
+        label: 'Apply here',
+        where: 'Building & Zoning (OBO)',
+        note: 'This is what makes the building legal to occupy. Get it before anyone moves in.',
+        fil: { label: 'Dito mag-apply', where: 'Building & Zoning (OBO)', note: 'Ito ang nagpapahintulot na legal nang tirhan ang gusali. Kunin ito bago may lumipat.' },
+      },
     ],
     fields: [
       { id: 'buildingPermitNo', label: 'Building Permit number', type: 'text', placeholder: 'e.g. BP-2026-00214', required: true },
@@ -571,11 +904,32 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Chest X-ray result', 'Stool and urinalysis results', 'Completed medical examination'],
     searchTerms: ['health certificate', 'health card', 'yellow card', 'food handler', 'sanitary health', 'medical clearance'],
     steps: [
-      { label: 'Chest X-ray', where: 'Any accredited clinic or hospital' },
-      { label: 'Stool and urinalysis', where: 'The same clinic', note: 'Results take a day or two, so have these done before anything else here.' },
-      { label: 'Medical examination', where: 'Municipal Health Office, or an accredited clinic' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'Apply here', where: 'Municipal Health Office' },
+      {
+        label: 'Chest X-ray',
+        where: 'Any accredited clinic or hospital',
+        fil: { label: 'Chest X-ray', where: 'Sa kahit anong akreditadong klinika o ospital' },
+      },
+      {
+        label: 'Stool and urinalysis',
+        where: 'The same clinic',
+        note: 'Results take a day or two, so have these done before anything else here.',
+        fil: { label: 'Stool at urinalysis', where: 'Sa parehong klinika', note: 'Isa hanggang dalawang araw bago lumabas ang resulta, kaya ito ang ipagawa bago ang iba.' },
+      },
+      {
+        label: 'Medical examination',
+        where: 'Municipal Health Office, or an accredited clinic',
+        fil: { label: 'Medical examination', where: 'Municipal Health Office, o akreditadong klinika' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'Apply here',
+        where: 'Municipal Health Office',
+        fil: { label: 'Dito mag-apply', where: 'Municipal Health Office' },
+      },
     ],
     fields: [
       { id: 'employer', label: 'Employer / establishment', type: 'text', placeholder: 'e.g. Santos Sari-Sari Store', required: true },
@@ -596,14 +950,29 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Business permit application', 'Health Certificates of all workers', 'Water potability test result'],
     searchTerms: ['sanitary permit', 'sanitation', 'kalinisan', 'food establishment', 'restaurant permit', 'karinderya'],
     steps: [
-      { label: 'A Health Certificate for every worker', where: 'Municipal Health Office', serviceId: 'health-certificate', note: 'Every one of them, not just the owner. This is usually the slowest part.' },
-      { label: 'Water potability test result', where: 'An accredited laboratory' },
-      // Deliberately not a link back to the business permit, though it is the
-      // same transaction: the two genuinely reference each other, and a guide
-      // that lets you tap between them forever is worse than one that says so
-      // in a sentence. The link runs one way, from the permit to this.
-      { label: 'Your business permit application', where: 'Business Permits (BOSS)', note: 'These two are filed together — the BOSS asks for this permit, and this one asks for that application. Start at the BOSS.' },
-      { label: 'Apply here', where: 'Municipal Health Office' },
+      {
+        label: 'A Health Certificate for every worker',
+        where: 'Municipal Health Office',
+        serviceId: 'health-certificate',
+        note: 'Every one of them, not just the owner. This is usually the slowest part.',
+        fil: { label: 'Health Certificate para sa bawat manggagawa', where: 'Municipal Health Office', note: 'Bawat isa sa kanila, hindi lang ang may-ari. Ito ang kadalasang pinakamabagal na bahagi.' },
+      },
+      {
+        label: 'Water potability test result',
+        where: 'An accredited laboratory',
+        fil: { label: 'Resulta ng water potability test', where: 'Sa akreditadong laboratoryo' },
+      },
+      {
+        label: 'Your business permit application',
+        where: 'Business Permits (BOSS)',
+        note: 'These two are filed together — the BOSS asks for this permit, and this one asks for that application. Start at the BOSS.',
+        fil: { label: 'Ang aplikasyon mo sa business permit', where: 'Business Permits (BOSS)', note: 'Magkasabay isinusumite ang dalawang ito — hinihingi ng BOSS ang permit na ito, at hinihingi naman nito ang aplikasyong iyon. Sa BOSS magsimula.' },
+      },
+      {
+        label: 'Apply here',
+        where: 'Municipal Health Office',
+        fil: { label: 'Dito mag-apply', where: 'Municipal Health Office' },
+      },
     ],
     fields: [
       { id: 'businessName', label: 'Establishment name', type: 'text', placeholder: 'e.g. Santos Sari-Sari Store', required: true },
@@ -625,11 +994,34 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Community Tax Certificate (Cedula)', 'Health Certificate', 'Certificate of employment'],
     searchTerms: ['occupational permit', 'working permit', 'worker permit', 'employment permit', 'trabaho'],
     steps: [
-      { label: 'Community Tax Certificate (Cedula)', where: "Municipal Treasurer's Office", serviceId: 'cedula' },
-      { label: 'Health Certificate', where: 'Municipal Health Office', serviceId: 'health-certificate', note: 'Needs laboratory results of its own, so start it before the rest.' },
-      { label: 'Certificate of employment from your employer', where: 'Your employer' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'File the application here', where: 'Business Permits (BOSS)' },
+      {
+        label: 'Community Tax Certificate (Cedula)',
+        where: "Municipal Treasurer's Office",
+        serviceId: 'cedula',
+        fil: { label: 'Community Tax Certificate (Cedula)', where: "Municipal Treasurer's Office" },
+      },
+      {
+        label: 'Health Certificate',
+        where: 'Municipal Health Office',
+        serviceId: 'health-certificate',
+        note: 'Needs laboratory results of its own, so start it before the rest.',
+        fil: { label: 'Health Certificate', where: 'Municipal Health Office', note: 'May sariling kailangang resulta ng laboratoryo, kaya simulan ito bago ang iba.' },
+      },
+      {
+        label: 'Certificate of employment from your employer',
+        where: 'Your employer',
+        fil: { label: 'Certificate of employment mula sa pinapasukan mo', where: 'Sa employer mo' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'File the application here',
+        where: 'Business Permits (BOSS)',
+        fil: { label: 'Dito isumite ang aplikasyon', where: 'Business Permits (BOSS)' },
+      },
     ],
     fields: [
       { id: 'employer', label: 'Employer', type: 'text', placeholder: 'e.g. Malasiqui Trading Corp.', required: true },
@@ -656,12 +1048,41 @@ export const SERVICES: ServiceDefinition[] = [
     ],
     searchTerms: ['marriage license', 'ikakasal', 'wedding license', 'apply to marry', 'pakasal'],
     steps: [
-      { label: 'PSA birth certificate of both of you', where: 'Local Civil Registrar', serviceId: 'birth-certificate' },
-      { label: 'CENOMAR for both of you', where: 'PSA', note: 'Certificate of No Marriage Record. Order it early — it comes from the national office, not this one.' },
-      { label: 'Pre-marriage counselling certificate', where: 'Social Welfare (CSWDO) or the Health Office' },
-      { label: 'Parental consent, or parental advice', where: 'Your parents, in writing', note: 'Consent if either of you is 18 to 20; advice if 21 to 24.', onlyIf: 'either of you is under 25' },
-      { label: 'Valid government IDs for both of you', where: 'You already have these' },
-      { label: 'Apply here', where: 'Local Civil Registrar', note: 'The application is posted publicly for 10 days before the licence is released. Count that in.' },
+      {
+        label: 'PSA birth certificate of both of you',
+        where: 'Local Civil Registrar',
+        serviceId: 'birth-certificate',
+        fil: { label: 'PSA birth certificate ninyong dalawa', where: 'Local Civil Registrar' },
+      },
+      {
+        label: 'CENOMAR for both of you',
+        where: 'PSA',
+        note: 'Certificate of No Marriage Record. Order it early — it comes from the national office, not this one.',
+        fil: { label: 'CENOMAR ninyong dalawa', where: 'PSA', note: 'Certificate of No Marriage Record. Maaga pa lang ay ipahanda na — sa pambansang tanggapan ito nanggagaling, hindi dito.' },
+      },
+      {
+        label: 'Pre-marriage counselling certificate',
+        where: 'Social Welfare (CSWDO) or the Health Office',
+        fil: { label: 'Sertipiko ng pre-marriage counselling', where: 'Social Welfare (CSWDO) o Health Office' },
+      },
+      {
+        label: 'Parental consent, or parental advice',
+        where: 'Your parents, in writing',
+        note: 'Consent if either of you is 18 to 20; advice if 21 to 24.',
+        onlyIf: 'either of you is under 25',
+        fil: { label: 'Pahintulot o payo ng magulang', where: 'Mula sa magulang ninyo, nakasulat', note: 'Pahintulot kung 18 hanggang 20 ang isa sa inyo; payo naman kung 21 hanggang 24.', onlyIf: 'wala pang 25 ang isa sa inyo' },
+      },
+      {
+        label: 'Valid government IDs for both of you',
+        where: 'You already have these',
+        fil: { label: 'Balidong government ID ninyong dalawa', where: 'Nasa inyo na ito' },
+      },
+      {
+        label: 'Apply here',
+        where: 'Local Civil Registrar',
+        note: 'The application is posted publicly for 10 days before the licence is released. Count that in.',
+        fil: { label: 'Dito mag-apply', where: 'Local Civil Registrar', note: 'Ipinapaskil muna sa publiko ang aplikasyon nang 10 araw bago ilabas ang lisensya. Isama iyon sa bilang.' },
+      },
     ],
     fields: [
       { id: 'applicantName', label: 'Your full name', type: 'text', required: true },
@@ -684,11 +1105,35 @@ export const SERVICES: ServiceDefinition[] = [
     requirements: ['Valid government ID', 'Birth certificate of child / children', 'Proof of solo parent status', 'Certificate of no marriage or death certificate of spouse (if applicable)'],
     searchTerms: ['solo parent', 'single parent', 'solo parent ID', 'nag-iisang magulang', 'RA 8972'],
     steps: [
-      { label: 'Birth certificate of each child', where: 'Local Civil Registrar', serviceId: 'birth-certificate' },
-      { label: 'Barangay certification that you are raising them alone', where: 'Your barangay', note: 'Ask at the barangay hall — not every barangay calls it the same thing.' },
-      { label: 'CENOMAR, or the death certificate of your spouse', where: 'PSA, or the Local Civil Registrar', serviceId: 'death-certificate', onlyIf: 'you were married' },
-      { label: 'Any valid government ID', where: 'You already have this' },
-      { label: 'File the application here', where: 'Social Welfare (CSWDO)' },
+      {
+        label: 'Birth certificate of each child',
+        where: 'Local Civil Registrar',
+        serviceId: 'birth-certificate',
+        fil: { label: 'Birth certificate ng bawat anak', where: 'Local Civil Registrar' },
+      },
+      {
+        label: 'Barangay certification that you are raising them alone',
+        where: 'Your barangay',
+        note: 'Ask at the barangay hall — not every barangay calls it the same thing.',
+        fil: { label: 'Sertipikasyon ng barangay na ikaw lang ang nag-aalaga sa kanila', where: 'Sa barangay mo', note: 'Magtanong sa barangay hall — hindi pare-pareho ang tawag dito sa bawat barangay.' },
+      },
+      {
+        label: 'CENOMAR, or the death certificate of your spouse',
+        where: 'PSA, or the Local Civil Registrar',
+        serviceId: 'death-certificate',
+        onlyIf: 'you were married',
+        fil: { label: 'CENOMAR, o death certificate ng asawa mo', where: 'PSA, o Local Civil Registrar', onlyIf: 'naikasal ka noon' },
+      },
+      {
+        label: 'Any valid government ID',
+        where: 'You already have this',
+        fil: { label: 'Anumang balidong government ID', where: 'Nasa iyo na ito' },
+      },
+      {
+        label: 'File the application here',
+        where: 'Social Welfare (CSWDO)',
+        fil: { label: 'Dito isumite ang aplikasyon', where: 'Social Welfare (CSWDO)' },
+      },
     ],
     fields: [
       { id: 'groundForSoloParent', label: 'Ground for solo parent status', type: 'select', options: ['Death of Spouse', 'Separation / Abandonment', 'Annulled Marriage', 'Solo Adoptive Parent', 'Other'], required: true },

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, CheckCircle2, ClipboardList, CloudOff, Loader2, Paperclip, Send, Trash2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import GuideLink from '../components/GuideLink'
+import { formatProcessingTime } from '../lib/schedule'
 import PushToggle from '../components/PushToggle'
 import FormField from '../components/FormField'
 import OfflineBanner from '../components/OfflineBanner'
@@ -176,7 +177,7 @@ export default function ServiceForm({ serviceId }: { serviceId: string }) {
 
   return (
     <div className="animate-tap-in pb-32">
-      <TopBar title={service.name} subtitle={service.processingTime} />
+      <TopBar title={service.name} subtitle={formatProcessingTime(service.processingDaysMin, service.processingDaysMax, t)} />
 
       <div className="space-y-4 px-4 pt-4">
         {!isOnline && <OfflineBanner />}

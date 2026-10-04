@@ -32,6 +32,49 @@ check('every step says what it is and who issues it',
   allSteps.every(([, s]) => s.label?.trim() && s.where?.trim()),
   JSON.stringify(allSteps.find(([, s]) => !s.label?.trim() || !s.where?.trim())))
 
+console.log('\n== both languages, every step ==')
+
+// The type makes `fil` required, so an English-only step cannot compile. What it
+// cannot express is a note written on one side and not the other, which renders
+// as a step that silently loses its warning in Filipino — so that is checked
+// here instead.
+const missingFil = allSteps.filter(([, s]) => !s.fil?.label?.trim() || !s.fil?.where?.trim())
+check('every step is written in Filipino too', missingFil.length === 0,
+  JSON.stringify(missingFil[0]))
+
+const lostNote = allSteps.filter(([, s]) => s.note?.trim() && !s.fil?.note?.trim())
+check('no note is dropped in translation', lostNote.length === 0,
+  lostNote.map(([owner, s]) => `${owner}: ${s.label}`).join(' | '))
+
+const lostCondition = allSteps.filter(([, s]) => s.onlyIf?.trim() && !s.fil?.onlyIf?.trim())
+check('no condition is dropped in translation', lostCondition.length === 0,
+  lostCondition.map(([owner, s]) => `${owner}: ${s.label}`).join(' | '))
+
+const spuriousNote = allSteps.filter(([, s]) => s.fil?.note?.trim() && !s.note?.trim())
+check('and none is added only in Filipino', spuriousNote.length === 0,
+  spuriousNote.map(([owner, s]) => `${owner}: ${s.label}`).join(' | '))
+
+// A "translation" identical to the English is usually one somebody forgot. The
+// legitimate exception is a proper noun: an office or agency keeps its name in
+// both languages, exactly like "Cedula" and "Building Permit".
+//
+// The municipal offices come from the catalogue rather than a list here, so
+// renaming one in the seed cannot quietly turn this check into a false alarm.
+// Only the agencies outside this municipality have to be named.
+// A heuristic, and deliberately a loose one: it is here to catch a `where` that
+// was copied rather than written, not to police wording. An office is matched by
+// containment, so "Social Welfare (CSWDO)" and "Building & Zoning (OBO)" count as
+// the catalogue's own offices without the test holding a second copy of their
+// names to drift from.
+const offices = catalogue.departments.flatMap((d) => [d.name, d.officeName])
+const agencies = ['DTI', 'SEC', 'PSA', 'Bureau of Fire Protection', 'Registry of Deeds']
+const isProperNoun = (where) =>
+  [...offices, ...agencies].some((name) => where.includes(name))
+const untranslated = allSteps.filter(([, s]) => s.fil.where === s.where && !isProperNoun(s.where))
+check('where a step points is written in Filipino unless it is a proper noun',
+  untranslated.length === 0,
+  untranslated.map(([owner, s]) => `${owner}: ${s.where}`).join(' | '))
+
 console.log('\n== every link goes somewhere ==')
 
 const linked = allSteps.filter(([, s]) => s.serviceId || s.certificateId)

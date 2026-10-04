@@ -8,6 +8,7 @@ import { useNav } from '../lib/nav'
 import { useT } from '../lib/i18n'
 import { searchServices } from '../lib/search'
 import { formatPeso } from '../lib/money'
+import { formatProcessingTime } from '../lib/schedule'
 
 /**
  * The service catalogue, with a way in by name.
@@ -110,7 +111,7 @@ export default function Services() {
                         {' · '}
                         {service.fee > 0 ? formatPeso(service.fee) : t('form.free')}
                         {' · '}
-                        {service.processingTime}
+                        {formatProcessingTime(service.processingDaysMin, service.processingDaysMax, t)}
                       </p>
                     </button>
                   </li>

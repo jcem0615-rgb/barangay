@@ -1,8 +1,11 @@
 import { ChevronRight, Clock3, Wallet } from 'lucide-react'
 import type { ServiceDefinition } from '../types'
 import { formatPeso } from '../lib/money'
+import { formatProcessingTime } from '../lib/schedule'
+import { useT } from '../lib/i18n'
 
 export default function ServiceListItem({ service, onTap }: { service: ServiceDefinition; onTap: () => void }) {
+  const { t } = useT()
   return (
     <button
       onClick={onTap}
@@ -15,7 +18,7 @@ export default function ServiceListItem({ service, onTap }: { service: ServiceDe
       <p className="mt-1.5 text-[calc(13.5px_*_var(--text-scale))] leading-snug text-slate-500">{service.shortDescription}</p>
       <div className="mt-3 flex items-center gap-4">
         <span className="flex items-center gap-1.5 text-[calc(12.5px_*_var(--text-scale))] font-medium text-slate-500">
-          <Clock3 size={13} /> {service.processingTime}
+          <Clock3 size={13} /> {formatProcessingTime(service.processingDaysMin, service.processingDaysMax, t)}
         </span>
         <span className="flex items-center gap-1.5 text-[calc(12.5px_*_var(--text-scale))] font-medium text-slate-500">
           <Wallet size={13} /> {service.requiresPayment ? formatPeso(service.fee) : 'Free'}

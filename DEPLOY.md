@@ -123,6 +123,9 @@ usually `1` behind a single load balancer or ingress.
       reconcile them. A resident who follows a wrong order makes exactly the wasted trip
       the guide exists to prevent, and the municipality's name on the screen is why they
       trusted it
+- [ ] **The Filipino routes have been read by somebody who speaks it**, not only the
+      English. Both are authored in `mockData.ts` and a wrong instruction translates
+      perfectly well; the Filipino is the version most residents will actually read
 - [ ] **The barangay roster is the municipality's real one.** The seed ships six sample
       barangays with invented captains and secretaries; Malasiqui has 73. Take the list from
       the PSGC listing for this municipality, and get the officials' names from the hall —

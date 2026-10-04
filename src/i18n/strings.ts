@@ -463,6 +463,14 @@ export const en = {
 
   'auth.barangayPick': 'Choose your barangay',
 
+  // How long a service takes, rendered from the catalogue's own day counts so it
+  // reads in the resident's language rather than only in the language it was
+  // authored in.
+  'time.sameDay': 'Same day',
+  'time.day': '{n} working day',
+  'time.days': '{n} working days',
+  'time.range': '{min}\u2013{max} working days',
+
   // the step-by-step route to one document
   'guide.title': 'How to get this',
   'guide.subtitle': 'Step by step, in order',
@@ -472,7 +480,6 @@ export const en = {
   'guide.howToGetBarangay': 'Get this from your barangay',
   'guide.fee': 'Fee',
   'guide.takes': 'Takes',
-  'guide.sameDay': 'Same day',
   'guide.start': 'Start this application',
   'guide.confirm': 'Requirements change. If you are travelling for this, ring the office first and check.',
   'guide.allNumbers': 'See the office numbers',
@@ -979,6 +986,11 @@ export const fil: Record<StringKey, string> = {
   'sos.call': 'Tawagan ang {agency} sa {phone}',
 
   'auth.barangayPick': 'Piliin ang barangay mo',
+  'time.sameDay': 'Kaparehong araw',
+  'time.day': '{n} araw ng trabaho',
+  'time.days': '{n} na araw ng trabaho',
+  'time.range': '{min}\u2013{max} na araw ng trabaho',
+
   'guide.title': 'Paano ito makuha',
   'guide.subtitle': 'Hakbang-hakbang, ayon sa pagkakasunod',
   'guide.none': 'Wala pang nakalathalang hakbang-hakbang ang tanggapan para dito. Ang mga requirement sa form ang hinihingi nito.',
@@ -987,7 +999,6 @@ export const fil: Record<StringKey, string> = {
   'guide.howToGetBarangay': 'Kunin ito sa barangay mo',
   'guide.fee': 'Bayad',
   'guide.takes': 'Tagal',
-  'guide.sameDay': 'Kaparehong araw',
   'guide.start': 'Simulan ang aplikasyon',
   'guide.confirm': 'Nagbabago ang mga requirement. Kung maglalakbay ka para dito, tumawag muna sa tanggapan at magtanong.',
   'guide.allNumbers': 'Tingnan ang mga numero ng tanggapan',

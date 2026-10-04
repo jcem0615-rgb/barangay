@@ -44,24 +44,39 @@ export interface ServiceField {
  * upload checklist on a filed request, steps is the route to having them, and a
  * step like "pay at the window" is a real step and never an attachment.
  */
-export interface ServiceStep {
+export interface StepText {
   /** What to get or do, in the words a resident would use. */
   label: string
   /** Who issues it, or where it happens. */
   where: string
-  /** The municipal service here that issues it, when one does. */
-  serviceId?: string
-  /** The barangay certificate that issues it, when one does. */
-  certificateId?: string
   /** The one thing about this step worth more than the step itself. */
   note?: string
   /**
-   * True where the step applies only to some applicants — a food business, a
-   * PWD, an applicant aged 18–24. Shown as a condition rather than silently
+   * Set where the step applies only to some applicants — a food business, a
+   * PWD, an applicant under 25. Shown as a condition rather than silently
    * listed, because a resident chasing a document they never needed is the same
    * wasted trip in the other direction.
    */
   onlyIf?: string
+}
+
+export interface ServiceStep extends StepText {
+  /** The municipal service here that issues it, when one does. */
+  serviceId?: string
+  /** The barangay certificate that issues it, when one does. */
+  certificateId?: string
+  /**
+   * The same step in Filipino, and **required** — the rest of the catalogue
+   * renders in whatever language it was authored in, but a step is an
+   * instruction rather than the name of a thing, and a resident reading a
+   * Filipino app has to be able to follow the route. Making it part of the type
+   * means a new service cannot ship with an English-only one.
+   *
+   * Document and office names stay as they are inside it — "Cedula", "Barangay
+   * Business Clearance", "DTI" — exactly as they do everywhere else here, since
+   * those are what people say at the counter.
+   */
+  fil: StepText
 }
 
 export interface ServiceDefinition {

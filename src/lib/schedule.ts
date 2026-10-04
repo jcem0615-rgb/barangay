@@ -55,3 +55,25 @@ export function formatReadyRange(from: string, to: string, locale = 'en-PH'): st
   const right = b.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
   return `${left} – ${right}, ${year}`
 }
+
+/**
+ * How long an office says a service takes, in the resident's language.
+ *
+ * `processingTime` on the catalogue is the same promise as prose, authored in
+ * English, and it is the one piece of service text that is purely a duration
+ * rather than the name of anything — so it is the one that can be rendered from
+ * `processingDaysMin`/`Max` instead of translated. Doing that also retires a
+ * hand-maintained invariant: the prose and the numbers said the same thing twice
+ * and nothing checked they agreed.
+ */
+export function formatProcessingTime(
+  min: number,
+  max: number,
+  t: (key: 'time.sameDay' | 'time.day' | 'time.days' | 'time.range', vars?: Record<string, string>) => string
+): string {
+  if (max <= 0) return t('time.sameDay')
+  if (min === max) {
+    return min === 1 ? t('time.day', { n: '1' }) : t('time.days', { n: String(max) })
+  }
+  return t('time.range', { min: String(min), max: String(max) })
+}

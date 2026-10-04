@@ -4,6 +4,7 @@ import StatusPill from '../components/StatusPill'
 import ReadyDate from '../components/ReadyDate'
 import WorkflowTracker from '../components/WorkflowTracker'
 import CounterChecklist from '../components/CounterChecklist'
+import { formatProcessingTime } from '../lib/schedule'
 import RateTransaction from '../components/RateTransaction'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
@@ -67,7 +68,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
               {app.status === 'draft' ? t('detail.lastEdited') : t('detail.submittedOn')} {formatDate(app.dateSubmitted)}
             </p>
             <p className="mt-0.5 text-[calc(13px_*_var(--text-scale))] font-medium text-slate-500">
-              {service?.processingTime ?? ''}
+              {service ? formatProcessingTime(service.processingDaysMin, service.processingDaysMax, t) : ''}
             </p>
           </div>
           <StatusPill status={app.status} />

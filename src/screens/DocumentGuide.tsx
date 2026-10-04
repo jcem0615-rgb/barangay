@@ -4,9 +4,10 @@ import TopBar from '../components/TopBar'
 import { api } from '../lib/api'
 import { useCatalogue } from '../lib/catalogue'
 import { formatPeso } from '../lib/money'
+import { formatProcessingTime } from '../lib/schedule'
 import { useNav } from '../lib/nav'
 import { useT } from '../lib/i18n'
-import type { ServiceStep } from '../types'
+import type { ServiceStep, StepText } from '../types'
 
 /**
  * How to get one document, in order.
@@ -27,7 +28,7 @@ export default function DocumentGuide({
   serviceId, certificateId,
 }: { serviceId?: string; certificateId?: string }) {
   const { push, replace } = useNav()
-  const { t } = useT()
+  const { t, language } = useT()
   const { services, findCategory } = useCatalogue()
   const [certificates, setCertificates] = useState<
     Array<{ id: string; name: string; fee: number; steps: ServiceStep[] }>
@@ -60,6 +61,11 @@ export default function DocumentGuide({
           <ol className="relative">
             {steps.map((step, index) => {
               const last = index === steps.length - 1
+              // The rest of the catalogue renders in whatever language it was
+              // authored in; a step is an instruction, not the name of a thing,
+              // so it follows the resident's choice. Document and office names
+              // inside it are English in both, exactly as they are at a counter.
+              const text: StepText = language === 'fil' ? step.fil : step
               const target = step.serviceId
                 ? () => replace({ name: 'service-guide', serviceId: step.serviceId })
                 : step.certificateId
@@ -67,7 +73,7 @@ export default function DocumentGuide({
                   : null
 
               return (
-                <li key={`${step.label}-${index}`} className="relative flex gap-3 pb-5 last:pb-0">
+                <li key={`${text.label}-${index}`} className="relative flex gap-3 pb-5 last:pb-0">
                   {/*
                     The connector is what makes this read as a chain rather than
                     a list. It stops at the last node, so the end of the route is
@@ -90,20 +96,20 @@ export default function DocumentGuide({
                   <div className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white p-3.5">
                     {/* A conditional step says so before it says what it is, so
                         nobody chases a document they never needed. */}
-                    {step.onlyIf && (
+                    {text.onlyIf && (
                       <p className="mb-1 inline-block rounded-full bg-gold-100 px-2 py-0.5 text-[calc(11.5px_*_var(--text-scale))] font-bold uppercase tracking-wide text-gold-600">
-                        {t('guide.onlyIf', { condition: step.onlyIf })}
+                        {t('guide.onlyIf', { condition: text.onlyIf })}
                       </p>
                     )}
                     <p className="text-[calc(14px_*_var(--text-scale))] font-bold leading-snug text-navy-950">
-                      {step.label}
+                      {text.label}
                     </p>
                     <p className="mt-0.5 flex items-center gap-1.5 text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
-                      <Landmark size={12} className="shrink-0" /> {step.where}
+                      <Landmark size={12} className="shrink-0" /> {text.where}
                     </p>
-                    {step.note && (
+                    {text.note && (
                       <p className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-600">
-                        {step.note}
+                        {text.note}
                       </p>
                     )}
                     {target && (
@@ -149,7 +155,9 @@ export default function DocumentGuide({
                 {t('guide.takes')}
               </dt>
               <dd className="font-display mt-0.5 text-[calc(15px_*_var(--text-scale))] font-extrabold leading-tight text-navy-950">
-                {service?.processingTime ?? t('guide.sameDay')}
+                {service
+                  ? formatProcessingTime(service.processingDaysMin, service.processingDaysMax, t)
+                  : t('time.sameDay')}
               </dd>
             </div>
           </dl>

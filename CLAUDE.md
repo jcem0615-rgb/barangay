@@ -224,6 +224,16 @@ whole graph to prove no other cycle exists. That suite also refuses a step
 pointing at a service or certificate that does not exist, and a route that ends
 on a prerequisite rather than on applying.
 
+**Steps are translated; the names inside them are not.** `ServiceStep.fil` is a
+*required* field on the type, so a new service cannot ship an English-only route —
+the same guarantee the `fil` dictionary gives the chrome, applied to catalogue
+data for the one case that needed it. A step is an instruction a resident has to
+follow, which is a different thing from "Cedula" or "Bureau of Fire Protection";
+those stay as they are said at a counter, in both languages. What the type cannot
+express is a `note` or `onlyIf` written on one side only, so
+`server/test/document-steps.mjs` checks that instead, along with a loose heuristic
+for a `where` that was copied rather than written.
+
 **The guide ends with the office's phone number, not a disclaimer.** A process
 changes without telling an app, and "confirm before you travel" is useless advice
 without the number to confirm with. Ringing costs a minute; the trip this exists
@@ -267,6 +277,14 @@ Two deliberate boundaries:
   from the service catalogue (the server), not from the dictionaries. Service descriptions,
   requirements, and form field labels are catalogue data too, so they render in whatever
   language the catalogue was authored in.
+- **The two exceptions are both durations and instructions, not names.** A document's
+  `steps` carry a required `fil` (see *How to get a document*), because a step is something
+  a resident has to *follow* rather than ask for by name. And how long a service takes is
+  rendered from `processingDaysMin`/`Max` through `formatProcessingTime`
+  (`src/lib/schedule.ts`) rather than from the authored `processingTime` prose, so "3–5
+  working days" reads as "3–5 na araw ng trabaho". The rule underneath is the same one:
+  translate what a resident has to act on, leave the names of things as they are said at a
+  counter.
 
 ## Attaching requirements
 
@@ -478,6 +496,13 @@ drift from the service it fills in.
 `processingTime` is prose for the counter ("3–5 working days"); `processingDaysMin` and
 `processingDaysMax` are the same promise as numbers, so a date can be worked out instead
 of asking a resident to count weekends. Both are authored in `src/data/mockData.ts`.
+
+**The app renders the duration from the numbers, not from the prose.**
+`formatProcessingTime` (`src/lib/schedule.ts`) turns them into "3–5 working days" or
+"3–5 na araw ng trabaho", which is how that line gets translated at all — and it retires an
+invariant nobody was checking, since the prose and the numbers said the same thing twice
+and could drift apart silently. `processingTime` is still published and is still what a
+deployment authors as the office's own wording; nothing in the app displays it.
 
 Two things make this more than adding days to a date.
 
@@ -1124,7 +1149,9 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
 - **The document routes are a reading of common practice, not a charter.** Every `steps`
   chain is placeholder content on the same footing as the hotlines and the holiday
   calendar: plausible, carefully ordered, and not verified against what this municipality
-  actually asks for. Reconcile them with each office's Citizen's Charter before launch,
+  actually asks for. **That goes for the Filipino as much as the English** — a translation
+  of a wrong instruction is still a wrong instruction, and it is the version most residents
+  will read. Reconcile them with each office's Citizen's Charter before launch,
   and re-check whenever a requirement changes — the app reports the order confidently and
   a resident will act on it.
 - **Nothing checks that a prerequisite was actually obtained.** The guide says to get the
@@ -1132,6 +1159,12 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   and the office catches it. Enforcing the chain server-side would mean knowing that *this*
   resident's clearance is the one the permit needs, which is a document-matching problem
   this app has no way to solve.
+- **Service names, descriptions and requirements are still English in both languages.**
+  Steps and durations are translated because they are instructions; the rest of the
+  catalogue follows the original rule and renders as authored. A deployment that wants a
+  fully Filipino catalogue needs a translated catalogue, not a translated app — which is a
+  bigger decision than it looks, since "Barangay Business Clearance" is what the counter
+  will ask for whichever language the screen is in.
 - Navigation stack resets on reload (in-memory, not URL-based).
 
 ## Demo build
