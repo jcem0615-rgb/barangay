@@ -1507,7 +1507,38 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   fully Filipino catalogue needs a translated catalogue, not a translated app — which is a
   bigger decision than it looks, since "Barangay Business Clearance" is what the counter
   will ask for whichever language the screen is in.
-- Navigation stack resets on reload (in-memory, not URL-based).
+- **Navigation stack resets on reload** (in-memory, not URL-based) — and a service-worker
+  update now reloads the page by itself, so that reset happens on its own schedule rather
+  than only when somebody refreshes. See *Getting a new version onto a phone*. A router
+  would fix both at once.
+
+## Getting a new version onto a phone
+
+`registerType: 'autoUpdate'` installs and activates a new service worker in the
+background. What it has never done is reload the page you are looking at — so a
+returning visitor renders the *old* precached shell while the new worker quietly takes
+over behind it, and the new version appears only on the next load. A deployed change can
+therefore sit live for half a day and still look missing, which is exactly what it did,
+twice.
+
+`src/lib/swUpdate.ts` closes that: `controllerchange` fires when a new worker takes
+control, and the page reloads itself. Registered from `main.tsx` at module load rather
+than in a component, the same reason the install prompt's listener is — the worker can
+take over before React mounts.
+
+**An update is only an update when there was something to update from.** `clientsClaim`
+makes `controllerchange` fire on a *first* install too, because the page started with no
+controller and one took over. Reloading for that is pointless and is the classic way to
+build an infinite refresh loop, so the listener captures whether a controller existed at
+load and ignores the event when one did not.
+
+**This reloads under the resident's fingers, and that cost is accepted rather than
+hidden.** It is survivable because of things the app already does: a half-filled form is
+written to IndexedDB on every keystroke, and the offline outbox is persisted and resumes,
+so neither is lost. What *is* lost is the in-memory navigation stack — the app reopens on
+the dashboard rather than where you were — which is the standing cost of having no router.
+If that becomes the complaint, the answer is a "new version available" bar rather than a
+cleverer reload.
 
 ## Demo build
 
