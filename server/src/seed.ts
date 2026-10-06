@@ -4,7 +4,10 @@
  * Safe to re-run: catalogue rows are upserted, demo accounts are skipped if present.
  */
 import {
-  BARANGAY_CERTIFICATES, BARANGAYS, EMERGENCY_CONTACTS, HOLIDAYS, MUNICIPALITY,
+  configuredAdministrator, configuredBarangays, configuredMunicipality, seedsSampleAccounts,
+} from './deployment.ts'
+import {
+  BARANGAY_CERTIFICATES, EMERGENCY_CONTACTS, HOLIDAYS,
   SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
 } from '../../src/data/mockData.ts'
 import { hashPassword } from './auth.ts'
@@ -25,7 +28,25 @@ const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? 'elgu-demo-2026'
 
 // The administrator manages staff accounts from inside the app; without one,
 // onboarding a new clerk means editing the database by hand.
-const ADMIN = { email: 'admin@malasiqui.gov.ph', name: 'Office of the Mayor — Administrator' }
+const ADMIN = configuredAdministrator()
+
+/**
+ * The town this instance serves, and the barangays it has.
+ *
+ * Read from the environment with the sample data as the fallback, so a second
+ * municipality is a set of variables and a roster file rather than a fork of
+ * this repository. See `deployment.ts`.
+ */
+const TOWN = configuredMunicipality()
+const ROSTER = configuredBarangays()
+
+/**
+ * The sample staff and barangay logins all share one password, which is right
+ * for clicking through a development copy and wrong for a town. Off in
+ * production: provisioning a real LGU creates the administrator and nobody
+ * else, and the hall issues its own staff from inside the app.
+ */
+const SAMPLE_ACCOUNTS = seedsSampleAccounts()
 
 const STAFF: Array<{ email: string; name: string; department: string; position: string }> = [
   { email: 'treasury@malasiqui.gov.ph', name: 'Ana R. Lim', department: 'treasury', position: 'Revenue Officer II' },
@@ -127,7 +148,7 @@ async function main() {
     // authored set rather than preserving what a barangay corrected. That is the
     // same trade `mockData.ts` makes everywhere: it is the authoring source for
     // a fresh database, not a mirror of a live one.
-    for (const barangay of BARANGAYS) {
+    for (const barangay of ROSTER) {
       await client.query(
         `insert into barangays
            (id, name, municipality_code, captain, secretary,
@@ -138,7 +159,7 @@ async function main() {
            hall_address = excluded.hall_address, office_hours = excluded.office_hours,
            phone = excluded.phone, email = excluded.email`,
         [
-          barangay.id, barangay.name, MUNICIPALITY.code, barangay.captain, barangay.secretary,
+          barangay.id, barangay.name, TOWN.code, barangay.captain, barangay.secretary,
           barangay.hallAddress, barangay.officeHours, barangay.phone, barangay.email,
         ]
       )
@@ -171,14 +192,14 @@ async function main() {
        values (true, $1, $2, $3)
        on conflict (only_row) do update set
          name = excluded.name, province = excluded.province`,
-      [MUNICIPALITY.code, MUNICIPALITY.name, MUNICIPALITY.province]
+      [TOWN.code, TOWN.name, TOWN.province]
     )
 
     // Accounts made before residency scoping existed. This deployment has only
     // ever served one municipality, so that is the one they belong to.
     await client.query(
       `update users set municipality_code = $1 where municipality_code is null`,
-      [MUNICIPALITY.code]
+      [TOWN.code]
     )
 
     for (const holiday of HOLIDAYS) {
@@ -191,7 +212,7 @@ async function main() {
     }
   })
   console.log(
-    `catalogue: ${MUNICIPALITY.name}, ${MUNICIPALITY.province} — ` +
+    `catalogue: ${TOWN.name}, ${TOWN.province} — ` +
       `${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services, ` +
       `${SECTORAL_PROGRAMS.length} programmes, ${HOLIDAYS.length} holidays, ` +
       `${EMERGENCY_CONTACTS.length} hotlines`
@@ -210,11 +231,15 @@ async function main() {
     await query(
       `insert into users (email, password_hash, role, full_name, municipality_code)
        values ($1, $2, 'admin', $3, $4)`,
-      [ADMIN.email, passwordHash, ADMIN.name, MUNICIPALITY.code]
+      [ADMIN.email, passwordHash, ADMIN.name, TOWN.code]
     )
     created++
   }
-  for (const staff of STAFF) {
+  // The sample offices and barangay logins, which all share one password. A
+  // real deployment gets the administrator and nobody else: the hall issues its
+  // own staff from the Accounts tab and each barangay issues its own clerks and
+  // kagawads, both of which mail an invitation rather than setting a password.
+  for (const staff of SAMPLE_ACCOUNTS ? STAFF : []) {
     const existing = await one<{ id: string }>(
       `select id from users where lower(email) = lower($1)`, [staff.email]
     )
@@ -231,7 +256,7 @@ async function main() {
       const inserted = await client.query<{ id: string }>(
         `insert into users (email, password_hash, role, full_name, municipality_code)
          values ($1, $2, 'staff', $3, $4) returning id`,
-        [staff.email, passwordHash, staff.name, MUNICIPALITY.code]
+        [staff.email, passwordHash, staff.name, TOWN.code]
       )
       await client.query(
         `insert into staff_assignments (user_id, department_id, position) values ($1, $2, $3)`,
@@ -248,8 +273,8 @@ async function main() {
   // Officers are issued, never self-registered: nothing in the app lets a
   // resident become one, which is the whole reason these are here.
   let barangayAccounts = 0
-  for (const [index, barangay] of BARANGAYS.entries()) {
-    const accounts = [
+  for (const [index, barangay] of ROSTER.entries()) {
+    const accounts = !SAMPLE_ACCOUNTS ? [] : [
       { email: `admin.${barangay.id}@malasiqui.gov.ph`, name: `${barangay.name} Barangay Secretary`, role: 'barangay_admin' },
       ...(index === 0
         ? [
@@ -280,7 +305,7 @@ async function main() {
       await query(
         `insert into users (email, password_hash, role, full_name, municipality_code, barangay_id)
          values ($1, $2, $3, $4, $5, $6)`,
-        [account.email, passwordHash, account.role, account.name, MUNICIPALITY.code, barangay.id]
+        [account.email, passwordHash, account.role, account.name, TOWN.code, barangay.id]
       )
       barangayAccounts++
       created++
@@ -290,7 +315,15 @@ async function main() {
   // Existing accounts keep their own password — saying otherwise would send
   // someone hunting for a login that does not work.
   console.log(`accounts: ${created} created, ${kept} already existed (incl. ${ADMIN.email})`)
-  console.log(`barangays: ${BARANGAYS.length} seeded, ${barangayAccounts} barangay accounts created`)
+  console.log(`barangays: ${ROSTER.length} seeded, ${barangayAccounts} barangay accounts created`)
+  if (!SAMPLE_ACCOUNTS) {
+    // Said plainly, because somebody provisioning a town will otherwise look
+    // for the logins the development copy has and conclude the seed failed.
+    console.log(
+      'sample staff and barangay logins were not created (SEED_SAMPLE_ACCOUNTS is off).\n' +
+      `  sign in as ${ADMIN.email} and issue the rest from the Accounts tab.`
+    )
+  }
   if (created > 0) {
     // Only the development default is safe to print. A supplied SEED_PASSWORD
     // is a real secret and must not end up in deploy logs.

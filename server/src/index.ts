@@ -6,7 +6,8 @@ import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
 import { env } from './env.ts'
-import { isDatabaseReachable, pool } from './db.ts'
+import { configuredMunicipality } from './deployment.ts'
+import { isDatabaseReachable, one, pool } from './db.ts'
 import { authRouter } from './routes/auth.ts'
 import { catalogueRouter } from './routes/catalogue.ts'
 import { requestsRouter } from './routes/requests.ts'
@@ -147,8 +148,53 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: 'Something went wrong on our end. Please try again.' })
 })
 
+/**
+ * Refuse to serve a database that belongs to a different municipality.
+ *
+ * **This is the whole data-isolation guarantee of the one-deployment-per-LGU
+ * model, in one check.** Two towns never share a row, so there is no query that
+ * could forget to scope — the only way one municipality's data reaches
+ * another's staff is if the wrong database is wired to the wrong instance: a
+ * restore into the wrong environment, a copied `DATABASE_URL`, a staging box
+ * pointed at production. That mistake is silent by nature, and what it produces
+ * is a console full of residents nobody in that hall has any business seeing.
+ *
+ * So the instance checks on the way up and dies rather than serving. A database
+ * with no municipality row yet has simply not been seeded, which is the normal
+ * state between `migrate` and `seed` and not a mismatch. And a deployment that
+ * sets no `MUNICIPALITY_CODE` is a development copy running on the sample data,
+ * where there is nothing to confuse.
+ */
+async function refuseAMismatchedDatabase(): Promise<void> {
+  const configured = configuredMunicipality()
+  if (configured.source !== 'environment') return
+
+  const row = await one<{ code: string; name: string }>(
+    `select code, name from municipality limit 1`
+  ).catch(() => null)
+  if (!row) return
+
+  if (row.code !== configured.code) {
+    console.error(
+      `\nThis database belongs to a different municipality.\n` +
+      `  the database holds: ${row.name} (${row.code})\n` +
+      `  this instance is for: ${configured.name} (${configured.code})\n\n` +
+      `Refusing to start. One deployment serves one municipality, and serving ` +
+      `this database here would show one town's residents to another town's ` +
+      `staff. Check DATABASE_URL and MUNICIPALITY_CODE.\n`
+    )
+    process.exit(1)
+  }
+}
+
+await refuseAMismatchedDatabase()
+
 const server = app.listen(env.port, () => {
+  const municipality = configuredMunicipality()
   console.log(`eLGU API listening on http://localhost:${env.port}`)
+  // Said on every boot, because "which municipality is this instance?" is the
+  // question somebody asks exactly when they are about to get it wrong.
+  console.log(`serving ${municipality.name} (${municipality.code}) — from the ${municipality.source}`)
   if (env.serveWeb && existsSync(webRoot)) console.log(`serving web app from ${webRoot}`)
 })
 

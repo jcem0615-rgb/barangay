@@ -1169,12 +1169,19 @@ nothing ever read back, and a person could register as many times as they had em
 addresses — which meant one resident's requests split across two records, and an
 office looking one of them up finding half their history.
 
-**The municipality is the deployment's, never the browser's.** `MUNICIPALITY`
-(`src/data/mockData.ts`) is seeded into a single-row `municipality` table — one row,
-enforced by the primary key, because "which municipality is this?" cannot have two
-answers. Registration stamps `users.municipality_code` and the profile's town and
-province from that row and ignores anything the request body says about it. This is
-the payment lesson applied to identity: the server establishes facts about itself.
+**The municipality is the deployment's, never the browser's.** It is seeded into a
+single-row `municipality` table — one row, enforced by the primary key, because "which
+municipality is this?" cannot have two answers. Registration stamps
+`users.municipality_code` and the profile's town and province from that row and ignores
+anything the request body says about it. This is the payment lesson applied to identity:
+the server establishes facts about itself.
+
+**Which town that is comes from the environment, not from the source.**
+`server/src/deployment.ts` reads `MUNICIPALITY_CODE`/`NAME`/`PROVINCE` and a
+`BARANGAY_ROSTER` JSON file, falling back to `MUNICIPALITY` and `BARANGAYS` in
+`mockData.ts` so a development copy needs no configuration at all. That fallback is the
+only reason the sample data still exists at runtime; a real deployment sets the variables
+and never edits the source. See *Standing up a second municipality* in `DEPLOY.md`.
 
 **Sign-in refuses an account from another register.** It only ever fires where a
 database outlived the deployment that filled it — restored onto another
@@ -1210,6 +1217,42 @@ Refusing a duplicate does tell whoever asks that an account exists for that pers
 Only someone who already knows all three facts can ask, and at that point the
 existence of an account is the least of what they know; the alternative is a resident
 discovering the collision at a counter.
+
+## One deployment, one municipality
+
+The app serves exactly one town, with its own database. **That is the entire
+multi-municipality story, and it is a deliberate choice against the alternative**: a
+`municipality_id` on every table with every query scoped to it would make a forgotten
+`where` clause into a leak of one town's residents to another town's staff, permanently
+and on every future query. Two towns that share no rows cannot leak into each other, so
+the guarantee costs one check instead of a discipline nobody can keep for ever.
+
+What it costs instead is that a second LGU is an operational act rather than a form —
+there is no portal-wide administrator inside this app who creates municipalities, because
+there is nowhere for a second one to live. `server/src/deployment.ts` is what makes that
+act *configuration* rather than a fork of this repository: the town, its barangay roster
+and its first administrator all come from the environment.
+
+**The instance refuses to serve a database that is not its own.** Nothing in the app can
+cross municipalities, so the only way one reaches another is the wrong database wired to
+the wrong instance — a restore into the wrong environment, a copied `DATABASE_URL`, a
+staging box pointed at production. That is silent by nature and produces a console full of
+residents nobody in that hall should see, so `index.ts` compares the `municipality` row
+against `MUNICIPALITY_CODE` on the way up and **exits rather than starting**, naming both
+sides. A database with no row yet is simply unseeded, not a mismatch; a deployment that
+configures nothing is a development copy on the sample data. Every boot prints which
+municipality it is serving, because that is the question somebody asks exactly when they
+are about to get it wrong.
+
+**Provisioning a real LGU creates the administrator and nobody else.** The sample office
+and barangay logins share one password — right for a development copy, wrong for a town —
+so `SEED_SAMPLE_ACCOUNTS` is off whenever `NODE_ENV=production`. The hall issues its own
+staff from the Accounts tab and each barangay issues its own clerks and kagawads, both by
+emailed invitation rather than a password anybody has seen.
+
+**A malformed barangay roster stops the provision rather than seeding part of it.** Half a
+roster means residents of the missing barangays cannot register at all, and nothing in the
+running app would say why.
 
 ## Installing the app
 
@@ -1450,6 +1493,15 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   deployment has its own database — so the same person may hold an account in two
   towns. That is correct for residency and wrong for a national register; PhilSys is
   what would settle it, and PhilSys here is still visual only.
+- **There is no portal-wide administrator, and there is nowhere for one to stand.** Adding
+  a municipality is `npm run provision` against a new database, not a screen — see *One
+  deployment, one municipality*. Anything that wanted to list every town at once (a
+  province-level dashboard, say) is a separate service reading each deployment, not a role
+  inside this one.
+- **The catalogue, the hotlines, the holidays and the document routes do not carry between
+  deployments.** Every per-town fact is seeded from that deployment's own configuration and
+  corrected in its own app, so standing up a second municipality means doing the whole
+  pre-launch checklist again for it. `DEPLOY.md` has the per-municipality list.
 - **Sessions** are 12-hour JWTs with no refresh or general revocation list. Signing out
   clears the token client-side; it stays valid until it expires. The one exception is a
   password change, which `users.password_changed_at` enforces on every request.

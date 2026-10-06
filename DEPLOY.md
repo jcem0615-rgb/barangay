@@ -177,6 +177,93 @@ usually `1` behind a single load balancer or ingress.
       everybody at once, and there is no recall. The board itself seeds empty, so nothing
       has to be cleared; the two sample notices are the clickable demo's only
 
+## Standing up a second municipality
+
+**One deployment serves one municipality, with its own database.** That is the isolation
+model, and it is the reason there is no `municipality_id` on every table: two towns never
+share a row, so there is no query that could forget to scope it and no portal-wide
+administrator who can see across. The whole guarantee costs one check rather than a
+discipline every future query has to keep.
+
+What it costs instead is that a second LGU is an operational act. This used to mean a
+*fork* — the town's name and its barangay roster were TypeScript literals — and
+`server/src/deployment.ts` is what makes it configuration:
+
+```bash
+MUNICIPALITY_CODE=bugallon-pangasinan     # the identity every account is stamped with
+MUNICIPALITY_NAME=Bugallon
+MUNICIPALITY_PROVINCE=Pangasinan
+BARANGAY_ROSTER=/etc/elgu/bugallon-barangays.json
+ADMIN_EMAIL=admin@bugallon.gov.ph
+ADMIN_NAME="Office of the Mayor — Administrator"
+SEED_PASSWORD=…                            # required in production
+npm run provision                          # migrate, then seed
+```
+
+The roster file is a JSON array, which is the shape a PSGC listing exports to and the shape
+a hall can maintain without a developer:
+
+```json
+[
+  { "id": "poblacion", "name": "Poblacion", "captain": "Hon. …", "secretary": "…",
+    "hallAddress": "…", "officeHours": "Mon–Fri, 8:00am–5:00pm",
+    "phone": "(075) …", "email": "poblacion@bugallon.gov.ph" },
+  { "id": "salasa", "name": "Salasa" }
+]
+```
+
+Only `id` and `name` are required; the rest can be filled in later from each barangay's own
+console. **A malformed roster stops the provision rather than seeding part of it** — half a
+roster means residents of the missing barangays cannot register at all, and nothing in the
+running app would say why.
+
+**Provisioning a real LGU creates the administrator and nobody else.** The six sample office
+logins and the barangay ones all share a single password, which is right for clicking
+through a development copy and wrong for a town, so `SEED_SAMPLE_ACCOUNTS` is off whenever
+`NODE_ENV=production`. The hall then issues its own staff from the Accounts tab and each
+barangay issues its own clerks and kagawads — both of which mail an invitation rather than
+setting a password anybody has seen.
+
+**The instance refuses to serve a database that is not its own.** Nothing in the app can
+leak one municipality into another, because they share no rows; the one way it could happen
+is the wrong database reaching the wrong instance — a restore into the wrong environment, a
+copied `DATABASE_URL`, a staging box pointed at production. That mistake is silent by
+nature and what it produces is a console full of residents nobody in that hall has any
+business seeing. So the server compares the `municipality` row against `MUNICIPALITY_CODE`
+on the way up and **exits rather than starting**, naming both sides:
+
+```
+This database belongs to a different municipality.
+  the database holds: Malasiqui (malasiqui-pangasinan)
+  this instance is for: Bugallon (bugallon-pangasinan)
+```
+
+A database with no municipality row has simply not been seeded yet, which is the normal
+state between `migrate` and `seed` and not a mismatch. A deployment that sets no
+`MUNICIPALITY_CODE` is a development copy on the sample data, where there is nothing to
+confuse. Every boot prints which municipality it is serving, because that is the question
+somebody asks exactly when they are about to get it wrong.
+
+**Changing `MUNICIPALITY_CODE` on a live deployment is not a rename.** Every account is
+stamped with the old code and sign-in refuses an account from another register, so it would
+lock out every resident at once. The name and province are safe to correct; the code is not.
+
+### Per-municipality checklist
+
+Everything in the pre-launch list above applies to each deployment separately — the
+hotlines, the holiday calendar, the office details, the document routes, the certificate
+validity periods and the barangay hall details are all per-town data and none of it carries
+over. In particular:
+
+- [ ] `MUNICIPALITY_CODE` is this town's and is final before anybody registers
+- [ ] The barangay roster is the real PSGC list, not the sample six
+- [ ] `SEED_PASSWORD` came from a secret store, and the administrator changed it on first
+      sign-in
+- [ ] Every hotline has been rung — see the main checklist; none of Malasiqui's numbers
+      apply anywhere else
+- [ ] `DATABASE_URL` points at this town's database and nothing else's, and a restore
+      procedure exists that cannot cross them
+
 ## Scaling
 
 The app is stateless — sessions are JWTs and rate-limit counters live in
