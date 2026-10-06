@@ -205,6 +205,7 @@ export default function BarangayBlotter() {
 function NewEntry({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const [form, setForm] = useState({
     complainant: '', complainantContact: '', respondent: '', respondentAddress: '',
+    respondentContact: '',
     nature: NATURES[0]!, narrative: '', occurredAt: '',
   })
   const [busy, setBusy] = useState(false)
@@ -221,6 +222,7 @@ function NewEntry({ onDone, onCancel }: { onDone: () => void; onCancel: () => vo
         complainantContact: form.complainantContact.trim() || undefined,
         respondent: form.respondent.trim(),
         respondentAddress: form.respondentAddress.trim() || undefined,
+        respondentContact: form.respondentContact.trim() || undefined,
         nature: form.nature,
         narrative: form.narrative.trim(),
         occurredAt: form.occurredAt ? new Date(form.occurredAt).toISOString() : undefined,
@@ -257,6 +259,10 @@ function NewEntry({ onDone, onCancel }: { onDone: () => void; onCancel: () => vo
         <Field label="Contact number" value={form.complainantContact} onChange={set('complainantContact')} optional />
         <Field label="Respondent" value={form.respondent} onChange={set('respondent')} />
         <Field label="Respondent's address" value={form.respondentAddress} onChange={set('respondentAddress')} optional />
+        {/* Used for one thing: reminding them of a hearing this barangay calls.
+            It is never matched against an account — the parties here stay free
+            text, which is what keeps this book from becoming a resident lookup. */}
+        <Field label="Respondent's contact" value={form.respondentContact} onChange={set('respondentContact')} optional />
         <label className="block">
           <span className="mb-1 block text-[12px] font-semibold text-slate-600">Nature</span>
           <select
@@ -403,6 +409,9 @@ function EntryPanel({
             <dt className="text-[11.5px] uppercase tracking-wide text-slate-400">Respondent</dt>
             <dd className="mt-0.5 text-navy-950">
               {entry.respondent}
+              {entry.respondentContact && (
+                <span className="text-slate-500"> &middot; {entry.respondentContact}</span>
+              )}
               {entry.respondentAddress && (
                 <span className="text-slate-500"> &middot; {entry.respondentAddress}</span>
               )}
@@ -475,6 +484,19 @@ function EntryPanel({
                 <p className={`mt-1.5 text-[11.5px] font-medium ${s.servedAt ? 'text-emerald-700' : 'text-amber-700'}`}>
                   {s.servedAt ? `Served ${fullDate(s.servedAt)}` : 'Not yet recorded as served'}
                 </p>
+                {/*
+                  Kept visibly apart from service above, and worded so it cannot
+                  be mistaken for it: a text message is a courtesy that makes the
+                  trip more likely to find somebody in, and the law still wants
+                  the barangay to serve the summons itself. What happened to the
+                  reminder is said plainly, because one that silently went
+                  nowhere is worse than none — the barangay stops checking.
+                */}
+                {s.notifyResult && (
+                  <p className="mt-1 text-[11.5px] leading-snug text-slate-500">
+                    Reminder: {s.notifyResult}. This is not service.
+                  </p>
+                )}
                 {s.outcome === 'pending' && isAdmin && (
                   <div className="mt-2.5 space-y-2">
                     {!s.servedAt && (

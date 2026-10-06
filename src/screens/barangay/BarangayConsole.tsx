@@ -3,11 +3,12 @@ import {
   BadgeCheck, BookText, Building, Home, Landmark, Megaphone, CheckCircle2, Inbox, Loader2, LogOut,
   PhilippinePeso, RefreshCw, UserPlus, Users,
 } from 'lucide-react'
-import { api, ApiError, type BarangayRequest } from '../../lib/api'
+import { api, ApiError, type BarangayRequest, type CertificateType } from '../../lib/api'
 import BarangayBlotter from './BarangayBlotter'
 import BarangayHouseholds from './BarangayHouseholds'
 import BarangayAnnouncements from './BarangayAnnouncements'
 import BarangayOffice from './BarangayOffice'
+import CertificateCatalogue, { type CatalogueDraft } from '../../components/CertificateCatalogue'
 import { useAuth } from '../../lib/auth'
 import { formatPeso } from '../../lib/money'
 
@@ -92,7 +93,7 @@ export default function BarangayConsole() {
     ...(isAdmin
       ? ([
           ['summary', 'Summary', BadgeCheck],
-          ['fees', 'Fees', PhilippinePeso],
+          ['fees', 'Certificates', PhilippinePeso],
           ['officers', 'Officers', Users],
         ] as Array<[View, string, typeof Inbox]>)
       : []),
@@ -410,82 +411,122 @@ function Summary() {
 // ---------------------------------------------------------------------- fees
 
 function Fees() {
-  const [types, setTypes] = useState<Array<{ id: string; name: string; fee: number }>>([])
+  const [rows, setRows] = useState<CertificateType[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const list = await api.barangayFees()
-      setTypes(list)
+      const list = await api.barangayCertificateCatalogue()
+      setRows(list)
       setDrafts(Object.fromEntries(list.map((t) => [t.id, String(t.fee)])))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not load the fees.')
+      setError(err instanceof ApiError ? err.message : 'Could not load the certificates.')
     }
   }, [])
 
   useEffect(() => { void load() }, [load])
 
-  const save = async (id: string) => {
+  const run = async (work: () => Promise<unknown>) => {
+    setBusy(true)
     setError(null)
     setSaved(null)
+    try {
+      await work()
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'That did not work.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toBody = (draft: CatalogueDraft) => ({
+    name: draft.name.trim(),
+    description: draft.description.trim(),
+    fee: Number(draft.fee),
+    validityDays: draft.validityDays.trim() === '' ? null : Number(draft.validityDays),
+  })
+
+  const saveFee = async (id: string) => {
     const fee = Number(drafts[id])
     if (!Number.isFinite(fee) || fee < 0) {
       setError('Give a fee in pesos, 0 or more.')
       return
     }
-    try {
+    await run(async () => {
       await api.setBarangayFee(id, fee)
       setSaved(id)
-      await load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save that fee.')
-    }
+    })
   }
 
   return (
-    <div className="max-w-2xl">
-      <p className="mb-4 rounded-xl bg-navy-50 px-4 py-3 text-[12.5px] leading-snug text-navy-900">
-        What this barangay charges. A fee is frozen onto a request when it is
-        filed, so changing one here never rewrites what somebody was already
-        quoted — it applies from the next request on. Set it to 0 for a
-        certificate your barangay issues free.
-      </p>
+    <div className="space-y-8">
+      <CertificateCatalogue
+        rows={rows}
+        // Shared documents are the municipality's. A barangay prices them and
+        // nothing else, which is why only its own rows carry Edit and Withdraw.
+        canEdit={(row) => row.own === true}
+        busy={busy}
+        error={error}
+        note={
+          <>
+            What this barangay issues. The ones marked <strong>Shared</strong> come from
+            the municipal hall and every barangay issues them &mdash; you set what you
+            charge for those below, and nothing else, so a Barangay Clearance means the
+            same thing on every street. The ones marked <strong>Ours</strong> are
+            documents only this barangay issues: yours to add, edit and withdraw, and
+            invisible to every other barangay. Withdrawing takes a certificate off the
+            resident&rsquo;s list without deleting it, so anything already issued keeps
+            its name.
+          </>
+        }
+        onAdd={(draft) => run(() => api.addBarangayCertificate(toBody(draft)))}
+        onEdit={(id, draft) => run(() => api.editBarangayCertificate(id, toBody(draft)))}
+        onWithdraw={(id, restore) => run(() => api.withdrawBarangayCertificate(id, restore))}
+      />
 
-      {error && (
-        <p role="alert" className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-[13px] text-rose-700">{error}</p>
-      )}
-
-      <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
-        {types.map((type) => (
-          <div key={type.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5">
-            <p className="min-w-0 flex-1 text-[13.5px] font-semibold text-navy-950">{type.name}</p>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[13px] text-slate-400">₱</span>
-              <input
-                value={drafts[type.id] ?? ''}
-                onChange={(e) => setDrafts((prev) => ({ ...prev, [type.id]: e.target.value }))}
-                inputMode="decimal"
-                aria-label={`Fee for ${type.name}`}
-                className="w-24 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-right text-[13px] tabular-nums outline-none focus:border-navy-600 focus:bg-white"
-              />
+      <div className="max-w-3xl">
+        <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-slate-500">
+          What this barangay charges
+        </h3>
+        <p className="mb-3 text-[12.5px] leading-snug text-slate-600">
+          A fee is frozen onto a request when it is filed, so changing one here never
+          rewrites what somebody was already quoted &mdash; it applies from the next
+          request on. The municipal treasury sees every change you make here.
+        </p>
+        <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
+          {rows.filter((t) => t.active).map((type) => (
+            <div key={type.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+              <p className="min-w-0 flex-1 text-[13.5px] font-semibold text-navy-950">{type.name}</p>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[13px] text-slate-400">₱</span>
+                <input
+                  value={drafts[type.id] ?? ''}
+                  onChange={(e) => setDrafts((prev) => ({ ...prev, [type.id]: e.target.value }))}
+                  inputMode="decimal"
+                  aria-label={`Fee for ${type.name}`}
+                  className="w-24 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-right text-[13px] tabular-nums outline-none focus:border-navy-600 focus:bg-white"
+                />
+                <button
+                  onClick={() => void saveFee(type.id)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-navy-800 hover:bg-slate-50"
+                >
+                  Save
+                </button>
+                {saved === type.id && (
+                  <span className="text-[12px] font-medium text-emerald-700">Saved</span>
+                )}
+              </div>
             </div>
-            <button
-              onClick={() => void save(type.id)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-semibold text-navy-800 transition hover:bg-slate-50"
-            >
-              Save
-            </button>
-            {saved === type.id && <CheckCircle2 size={15} className="text-emerald-600" />}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )
 }
-
-// ------------------------------------------------------------------ officers
 
 function Officers() {
   const { user } = useAuth()

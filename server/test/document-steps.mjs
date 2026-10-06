@@ -10,6 +10,24 @@ const check = (n, c, x = '') => { if (c) { pass++; console.log(`  PASS  ${n}`) }
 
 const get = async (p) => (await fetch(API + p)).json()
 
+/**
+ * The documents this repo authors.
+ *
+ * "Every document has a route" is an *authoring* rule — it is about what ships
+ * in mockData.ts, and it exists because a resident who is told what to bring
+ * and not what order to get it in makes the wasted trip this feature prevents.
+ * It stopped being a rule about the database the moment an administrator could
+ * add a certificate through a form: a new one legitimately has no route until
+ * somebody writes it, and the app renders that correctly (no chain, just the
+ * request). So the rule is checked against the authored set, and everything
+ * below still checks the live catalogue for links that go nowhere or loop —
+ * which is the half that would actually hurt somebody.
+ */
+const AUTHORED = new Set([
+  'clearance', 'residency', 'indigency',
+  'business-clearance', 'good-moral', 'first-time-jobseeker',
+])
+
 const catalogue = await get('/catalogue')
 const certificates = await get('/barangays/certificates')
 const services = catalogue.services
@@ -21,8 +39,11 @@ console.log('\n== the route is published ==')
 check('the catalogue is public and carries services', services.length > 0)
 check('every service has a route', services.every((s) => Array.isArray(s.steps) && s.steps.length > 0),
   services.filter((s) => !s.steps?.length).map((s) => s.id).join(', '))
-check('every barangay certificate has one too', certificates.every((c) => c.steps?.length > 0),
-  certificates.filter((c) => !c.steps?.length).map((c) => c.id).join(', '))
+const authored = certificates.filter((c) => AUTHORED.has(c.id))
+check('every certificate this repo ships has one too',
+  authored.length === AUTHORED.size && authored.every((c) => c.steps?.length > 0),
+  `${authored.length}/${AUTHORED.size}: ` +
+  authored.filter((c) => !c.steps?.length).map((c) => c.id).join(', '))
 
 const allSteps = [
   ...services.flatMap((s) => s.steps.map((step) => [s.id, step])),

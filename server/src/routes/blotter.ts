@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { requireRole } from '../auth.ts'
+import { sendSummonsNotice } from '../summonsNotice.ts'
 
 /**
  * The barangay blotter and the summons issued from it.
@@ -39,7 +40,8 @@ async function ownBarangay(userId: string) {
 
 interface EntryRow {
   id: string; reference_no: string; complainant: string; complainant_contact: string | null
-  respondent: string; respondent_address: string | null; nature: string; narrative: string
+  respondent: string; respondent_address: string | null; respondent_contact: string | null
+  nature: string; narrative: string
   occurred_at: string | null; status: string; outcome_note: string | null
   recorded_at: string; updated_at: string; recorded_by_name?: string | null
   summons_count?: string; next_hearing?: string | null
@@ -53,6 +55,7 @@ function serializeEntry(row: EntryRow) {
     complainantContact: row.complainant_contact,
     respondent: row.respondent,
     respondentAddress: row.respondent_address,
+    respondentContact: row.respondent_contact,
     nature: row.nature,
     narrative: row.narrative,
     occurredAt: row.occurred_at,
@@ -79,6 +82,9 @@ const entrySchema = z.object({
   complainantContact: z.string().max(80).optional(),
   respondent: z.string().min(2, 'Who is it against?').max(160),
   respondentAddress: z.string().max(300).optional(),
+  // A number or an address the barangay has for them. Used for one thing only:
+  // reminding them of a hearing it has called. Never matched against an account.
+  respondentContact: z.string().max(80).optional(),
   nature: z.enum(NATURES),
   narrative: z.string().min(20, 'Write what happened, in a few sentences.').max(4000),
   // The barangay writes the book after the fact, so this is usually in the
@@ -111,13 +117,13 @@ blotterRouter.post('/', async (req, res) => {
     const inserted = await client.query<EntryRow>(
       `insert into blotter_entries
          (reference_no, barangay_id, complainant, complainant_contact, respondent,
-          respondent_address, nature, narrative, occurred_at, recorded_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          respondent_address, respondent_contact, nature, narrative, occurred_at, recorded_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        returning *`,
       [
         reference, barangay.id, body.complainant, body.complainantContact ?? null,
-        body.respondent, body.respondentAddress ?? null, body.nature, body.narrative,
-        body.occurredAt ?? null, req.user!.id,
+        body.respondent, body.respondentAddress ?? null, body.respondentContact ?? null,
+        body.nature, body.narrative, body.occurredAt ?? null, req.user!.id,
       ]
     )
     return inserted.rows[0]!
@@ -179,9 +185,11 @@ blotterRouter.get('/:id', async (req, res) => {
     id: string; sequence: number; hearing_at: string; venue: string; note: string | null
     served_at: string | null; served_note: string | null; outcome: string
     issued_at: string; issued_by_name: string | null
+    notified_at: string | null; notify_result: string | null
   }>(
     `select s.id, s.sequence, s.hearing_at, s.venue, s.note, s.served_at, s.served_note,
-            s.outcome, s.issued_at, u.full_name as issued_by_name
+            s.outcome, s.issued_at, s.notified_at, s.notify_result,
+            u.full_name as issued_by_name
        from blotter_summons s
        left join users u on u.id = s.issued_by
       where s.blotter_id = $1 and s.barangay_id = $2
@@ -197,6 +205,10 @@ blotterRouter.get('/:id', async (req, res) => {
       hearingAt: s.hearing_at,
       venue: s.venue,
       note: s.note,
+      // Whether a reminder went out, and what happened to it. Kept apart from
+      // servedAt below: a text message is not service.
+      notifiedAt: s.notified_at,
+      notifyResult: s.notify_result,
       servedAt: s.served_at,
       servedNote: s.served_note,
       outcome: s.outcome,
@@ -307,8 +319,12 @@ blotterRouter.post('/:id/summons', requireRole('barangay_admin'), async (req, re
   if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
 
   const issued = await transaction(async (client) => {
-    const current = await client.query<{ id: string; status: string }>(
-      `select id, status from blotter_entries where id = $1 and barangay_id = $2 for update`,
+    const current = await client.query<{
+      id: string; status: string; reference_no: string
+      complainant_contact: string | null; respondent_contact: string | null
+    }>(
+      `select id, status, reference_no, complainant_contact, respondent_contact
+         from blotter_entries where id = $1 and barangay_id = $2 for update`,
       [req.params.id, barangay.id]
     )
     const entry = current.rows[0]
@@ -344,7 +360,7 @@ blotterRouter.post('/:id/summons', requireRole('barangay_admin'), async (req, re
         where id = $1 and status = 'recorded'`,
       [entry.id]
     )
-    return { summons: inserted.rows[0]! }
+    return { summons: inserted.rows[0]!, entry }
   })
 
   if ('error' in issued && issued.error === 'notfound') {
@@ -360,10 +376,33 @@ blotterRouter.post('/:id/summons', requireRole('barangay_admin'), async (req, re
   }
 
   const summons = 'summons' in issued ? issued.summons : null
+  const entry = 'entry' in issued ? issued.entry : null
+
+  /**
+   * The reminder goes after the hearing is recorded, never inside the
+   * transaction: a mail server that is slow or down must not be able to stop a
+   * barangay calling a hearing. What happened to it is written back onto the
+   * summons so the console can say whether anybody was actually reached.
+   */
+  const outcome = await sendSummonsNotice({
+    barangayName: barangay.name,
+    referenceNo: entry!.reference_no,
+    hearingAt: summons!.hearing_at,
+    venue,
+    contacts: [entry!.complainant_contact, entry!.respondent_contact],
+  })
+  await query(
+    `update blotter_summons set notified_at = now(), notify_result = $2 where id = $1`,
+    [summons!.id, outcome]
+  ).catch(() => undefined)
+
   res.status(201).json({
     id: summons!.id,
     sequence: summons!.sequence,
     hearingAt: summons!.hearing_at,
+    // Said back plainly, because "nobody was told" is the thing the barangay
+    // has to know before it relies on the parties turning up.
+    notifyResult: outcome,
   })
 })
 

@@ -233,5 +233,56 @@ check('a name finds its entry', found.json.some((e) => e.referenceNo === entry.j
 const theirSearch = await j(`/barangay-staff/blotter?q=${encodeURIComponent(String(stamp))}`, { token: otherAdmin })
 check('but only inside the barangay doing the searching', theirSearch.json.length === 0, theirSearch.json.length)
 
+console.log('\n== telling the parties a hearing was called ==')
+
+// The one place the blotter's silence is relaxed. It is relaxed without the
+// thing that made silence necessary: the parties are still free text, so the
+// reminder goes to a contact the barangay typed and never to a matched account.
+const withContacts = await j('/barangay-staff/blotter', {
+  method: 'POST', token: admin, body: {
+    complainant: `Reachable Complainant ${stamp}`,
+    complainantContact: 'complainant@example.com',
+    respondent: `Reachable Respondent ${stamp}`,
+    respondentContact: '0917 555 0101',
+    nature: 'Other',
+    narrative: 'A dispute recorded so the reminder path has two contacts to reach.',
+  },
+})
+check('a respondent contact can be recorded', withContacts.status === 201, withContacts.status)
+check('and reads back', withContacts.json.respondentContact === '0917 555 0101',
+  withContacts.json.respondentContact)
+
+const called = await j(`/barangay-staff/blotter/${withContacts.json.id}/summons`, {
+  method: 'POST', token: admin,
+  body: { hearingAt: soon(72), venue: 'Barangay Hall' },
+})
+check('calling a hearing reports what became of the reminder',
+  called.status === 201 && typeof called.json.notifyResult === 'string', JSON.stringify(called.json))
+check('it reached the email contact', /emailed/.test(called.json.notifyResult), called.json.notifyResult)
+check('and said plainly what happened to the number rather than implying it went',
+  /texted|SMS is not configured/.test(called.json.notifyResult), called.json.notifyResult)
+
+const withNotice = await j(`/barangay-staff/blotter/${withContacts.json.id}`, { token: admin })
+const row = withNotice.json.summons[0]
+check('the summons records that a reminder went', Boolean(row.notifiedAt), row.notifiedAt)
+check('and what happened to it', Boolean(row.notifyResult))
+// A text message is not service. The law wants the barangay to serve it, and
+// conflating the two would let a barangay report service it never performed.
+check('but it is NOT recorded as served', row.servedAt === null, row.servedAt)
+
+const noContacts = await j('/barangay-staff/blotter', {
+  method: 'POST', token: admin, body: {
+    complainant: `Unreachable ${stamp}`, respondent: `Also Unreachable ${stamp}`,
+    nature: 'Other', narrative: 'Nobody left a number, which the barangay has to be told.',
+  },
+})
+const quiet = await j(`/barangay-staff/blotter/${noContacts.json.id}/summons`, {
+  method: 'POST', token: admin,
+  body: { hearingAt: soon(72), venue: 'Barangay Hall' },
+})
+check('with no contact on file the hearing is still called', quiet.status === 201, quiet.status)
+check('and the barangay is told nobody was reached',
+  /no contact/i.test(quiet.json.notifyResult), quiet.json.notifyResult)
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)

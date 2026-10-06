@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v21'
+const STORE_KEY = 'elgu-demo-state-v22'
 
 interface DemoIncident {
   id: string
@@ -170,6 +170,8 @@ interface DemoState {
   barangayFees: Record<string, Record<string, number>>
   /** barangay id -> the hall's details, for the same reason the offices are here. */
   barangayOffices: Record<string, DemoBarangayOffice>
+  /** The certificate catalogue: shared rows and each barangay's own. */
+  certificates: DemoCertificateType[]
   /**
    * The blotter. Held like everything else here, and read by nothing but the
    * barangay console — the demo mirrors that rule because a demo that leaked it
@@ -207,7 +209,7 @@ interface DemoHousehold {
 interface DemoBlotterEntry {
   id: string; referenceNo: string; barangayId: string
   complainant: string; complainantContact: string | null
-  respondent: string; respondentAddress: string | null
+  respondent: string; respondentAddress: string | null; respondentContact: string | null
   nature: string; narrative: string; occurredAt: string | null
   status: 'recorded' | 'mediation' | 'settled' | 'unsettled' | 'withdrawn' | 'referred'
   outcomeNote: string | null
@@ -215,6 +217,8 @@ interface DemoBlotterEntry {
   summons: Array<{
     id: string; sequence: number; hearingAt: string; venue: string; note: string | null
     servedAt: string | null; servedNote: string | null
+    /** That a reminder went to the typed contacts. Not service. */
+    notifiedAt: string | null; notifyResult: string | null
     outcome: 'pending' | 'appeared' | 'failed_to_appear' | 'rescheduled' | 'cancelled'
     issuedAt: string; issuedBy: string | null
   }>
@@ -234,6 +238,18 @@ interface DemoBarangayRequest {
  * the same reason the municipal office details are: a demo that showed an edit
  * saving and then not appearing anywhere would teach the wrong thing.
  */
+/**
+ * A row of the certificate catalogue, held in state rather than read from the
+ * imported constant — the same reason the municipal office contacts are, now
+ * that both tiers can add to it. `barangayId` null is the shared catalogue.
+ */
+interface DemoCertificateType {
+  id: string; name: string; description: string; fee: number
+  purposeHint: string; sortOrder: number; active: boolean
+  validityDays: number | null; barangayId: string | null
+  steps: unknown[]
+}
+
 interface DemoBarangayOffice {
   captain: string | null; secretary: string | null
   hallAddress: string | null; officeHours: string | null
@@ -404,8 +420,14 @@ function seed(): DemoState {
     complaintCounter: 0,
     barangayRequests: [],
     barangayFees: {},
-    // Seeded from the authored roster and editable from the console after that,
-    // exactly like the municipal office contacts.
+    // Seeded from the authored catalogue and editable from both consoles after
+    // that. Everything authored is shared; a barangay's own are added at runtime.
+    certificates: BARANGAY_CERTIFICATES.map((c, index) => ({
+      id: c.id, name: c.name, description: c.description, fee: c.fee,
+      purposeHint: c.purposeHint, sortOrder: index, active: true,
+      validityDays: c.validityDays ?? null, barangayId: null,
+      steps: c.steps ?? [],
+    })),
     barangayOffices: Object.fromEntries(
       BARANGAYS.map((b) => [b.id, {
         captain: b.captain, secretary: b.secretary,
@@ -521,7 +543,8 @@ function seed(): DemoState {
       id: uid(),
       referenceNo: `BLTR-${bltrYear}-${String(state.counters[`bltr-${bltrYear}`]).padStart(5, '0')}`,
       barangayId: BARANGAYS[0]!.id,
-      complainantContact: null, respondentAddress: null, occurredAt: null, outcomeNote: null,
+      complainantContact: null, respondentContact: null,
+      respondentAddress: null, occurredAt: null, outcomeNote: null,
       recordedBy: `${BARANGAYS[0]!.name} Barangay Clerk`,
       recordedAt: at, updatedAt: at, summons: [],
       ...seed,
@@ -531,6 +554,7 @@ function seed(): DemoState {
         id: uid(), sequence: 1,
         hearingAt: new Date(now + 86400000 * 3).toISOString(),
         venue: 'Barangay hall', note: 'Both parties to appear.',
+        notifiedAt: null, notifyResult: null,
         servedAt: new Date(now - 86400000 * 4).toISOString(), servedNote: 'Served personally.',
         outcome: 'pending',
         issuedAt: new Date(now - 86400000 * 5).toISOString(),
@@ -809,9 +833,67 @@ const notify = (userId: string, requestId: string | null, kind: string, title: s
  * the shared catalogue's where it did not. The same coalesce the server does in
  * SQL, so the resident's screen and the administrator's agree.
  */
+const certificates = (): DemoCertificateType[] =>
+  state.certificates ?? BARANGAY_CERTIFICATES.map((c, index) => ({
+    id: c.id, name: c.name, description: c.description, fee: c.fee,
+    purposeHint: c.purposeHint, sortOrder: index, active: true,
+    validityDays: c.validityDays ?? null, barangayId: null, steps: c.steps ?? [],
+  }))
+
+/** Shared rows plus this barangay's own — never another barangay's. */
+const certificatesFor = (barangayId: string) =>
+  certificates().filter((c) => c.barangayId === null || c.barangayId === barangayId)
+
+const certificateType = (typeId: string) => certificates().find((c) => c.id === typeId)
+
+const serializeCertificate = (c: DemoCertificateType) => ({
+  id: c.id, name: c.name, description: c.description, fee: c.fee,
+  purposeHint: c.purposeHint, sortOrder: c.sortOrder, active: c.active,
+  validityDays: c.validityDays, barangayId: c.barangayId,
+})
+
+/**
+ * The validation both tiers share, mirroring the server's one module — two
+ * copies here would drift exactly where the server refuses to let them.
+ */
+const readCertificateBody = (body: Record<string, unknown> | undefined, partial: boolean) => {
+  const name = body?.name === undefined ? undefined : String(body.name).trim()
+  const description = body?.description === undefined ? undefined : String(body.description).trim()
+  const fee = body?.fee === undefined ? undefined : Number(body.fee)
+  if (!partial || name !== undefined) {
+    if (!name || name.length < 3) throw new DemoError(400, 'Give it the name people will ask for at the counter.')
+  }
+  if (!partial || description !== undefined) {
+    if (!description || description.length < 10) throw new DemoError(400, 'Say what it is for.')
+  }
+  if (!partial || fee !== undefined) {
+    if (fee === undefined || !Number.isFinite(fee) || fee < 0) throw new DemoError(400, 'Give a fee in pesos, 0 or more.')
+  }
+  const validityDays = 'validityDays' in (body ?? {})
+    ? (body!.validityDays === null ? null : Number(body!.validityDays))
+    : undefined
+  return { name, description, fee, validityDays }
+}
+
+/** Slug plus a tail: two barangays will both add "Tricycle Permit". */
+const certificateId = (name: string) => {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
+  return `${slug || 'certificate'}-${Math.random().toString(16).slice(2, 8)}`
+}
+
+/** Shared with the municipal audit log, which is where the treasury reads it. */
+const auditCertificate = (
+  actor: DemoUser, action: string, target: string, before: unknown, after: unknown
+) => {
+  state.audit.unshift({
+    id: state.audit.length + 1, actorName: actor.fullName, action, target,
+    before: before ?? null, after: after ?? null, createdAt: new Date().toISOString(),
+  })
+}
+
 const barangayFee = (barangayId: string, typeId: string) =>
   state.barangayFees[barangayId]?.[typeId] ??
-  BARANGAY_CERTIFICATES.find((c) => c.id === typeId)?.fee ??
+  certificateType(typeId)?.fee ??
   0
 
 /**
@@ -1298,7 +1380,11 @@ async function route(
     if (parts[1] === 'certificates') {
       return {
         status: 200,
-        body: BARANGAY_CERTIFICATES.map((c) => ({ ...c, validityDays: c.validityDays ?? null })),
+        // The shared catalogue only: this endpoint is public and barangay-less,
+        // so a barangay's own documents have no business being listed.
+        body: certificates()
+          .filter((c) => c.barangayId === null && c.active)
+          .map((c) => ({ ...c, validityDays: c.validityDays ?? null })),
       }
     }
     return {
@@ -1326,10 +1412,12 @@ async function route(
           // The hall's details ride along here, because this is the screen that
           // has to answer "come and collect it".
           barangay: { id: own.id, name: own.name, ...barangayOffice(own.id) },
-          certificates: BARANGAY_CERTIFICATES.map((c) => ({
-            ...c, fee: barangayFee(own.id, c.id),
-            validityDays: c.validityDays ?? null,
-          })),
+          certificates: certificatesFor(own.id)
+            .filter((c) => c.active)
+            .map((c) => ({
+              ...c, fee: barangayFee(own.id, c.id),
+              validityDays: c.validityDays ?? null,
+            })),
         },
       }
     }
@@ -1344,7 +1432,8 @@ async function route(
     if (parts[1] === 'requests') {
       if (method === 'POST') {
         if (!user.barangayId) throw new DemoError(409, 'Set which barangay you live in first.')
-        const type = BARANGAY_CERTIFICATES.find((c) => c.id === body?.typeId)
+        const type = certificatesFor(user.barangayId)
+          .find((c) => c.id === body?.typeId && c.active)
         if (!type) throw new DemoError(404, 'That certificate is not issued here.')
         const purpose = String(body?.purpose ?? '').trim()
         if (purpose.length < 3) throw new DemoError(400, 'Say what it is for.')
@@ -1554,7 +1643,7 @@ async function route(
       // prepared and dated, and the paper is what an office reads.
       if (next === 'ready') {
         row.validUntil = lapseDay(
-          BARANGAY_CERTIFICATES.find((c) => c.id === row.typeId)?.validityDays ?? null
+          certificateType(row.typeId)?.validityDays ?? null
         )
       }
       const hours = barangayOffice(own.id).officeHours
@@ -1831,6 +1920,7 @@ async function route(
       const serialize = (b: DemoBlotterEntry) => ({
         id: b.id, referenceNo: b.referenceNo,
         complainant: b.complainant, complainantContact: b.complainantContact,
+        respondentContact: b.respondentContact,
         respondent: b.respondent, respondentAddress: b.respondentAddress,
         nature: b.nature, narrative: b.narrative, occurredAt: b.occurredAt,
         status: b.status, outcomeNote: b.outcomeNote,
@@ -1886,6 +1976,7 @@ async function route(
           barangayId: own.id,
           complainant: String(body.complainant).trim(),
           complainantContact: body.complainantContact ? String(body.complainantContact) : null,
+          respondentContact: body.respondentContact ? String(body.respondentContact) : null,
           respondent: String(body.respondent).trim(),
           respondentAddress: body.respondentAddress ? String(body.respondentAddress) : null,
           nature: String(body.nature ?? 'Other'),
@@ -1969,6 +2060,8 @@ async function route(
           note: body?.note ? String(body.note) : null,
           servedAt: null,
           servedNote: null,
+          notifiedAt: null as string | null,
+          notifyResult: null as string | null,
           outcome: 'pending' as const,
           issuedAt: new Date().toISOString(),
           issuedBy: user.fullName,
@@ -1976,8 +2069,24 @@ async function route(
         entry.summons.push(summons)
         if (entry.status === 'recorded') entry.status = 'mediation'
         entry.updatedAt = new Date().toISOString()
+        // The reminder goes to contacts the barangay typed, never to a matched
+        // account — the rule that keeps this book from becoming a lookup. There
+        // is no mail or SMS in the demo, so it says what *would* have happened
+        // rather than implying something went.
+        const reachable = [entry.complainantContact, entry.respondentContact]
+          .map((c) => c?.trim()).filter(Boolean)
+        summons.notifiedAt = new Date().toISOString()
+        summons.notifyResult = reachable.length === 0
+          ? 'no contact on file'
+          : `${reachable.length} contact${reachable.length > 1 ? 's' : ''} on file — not sent in the demo`
         persist()
-        return { status: 201, body: { id: summons.id, sequence: summons.sequence, hearingAt: summons.hearingAt } }
+        return {
+          status: 201,
+          body: {
+            id: summons.id, sequence: summons.sequence, hearingAt: summons.hearingAt,
+            notifyResult: summons.notifyResult,
+          },
+        }
       }
 
       if (parts[3] === 'summons' && parts[4] && method === 'PATCH') {
@@ -2003,9 +2112,10 @@ async function route(
       adminOnly()
       return {
         status: 200,
-        body: BARANGAY_CERTIFICATES.map((c) => ({
-          id: c.id, name: c.name, fee: barangayFee(own.id, c.id),
-        })),
+        // Shared plus this barangay's own, never another's.
+        body: certificatesFor(own.id)
+          .filter((c) => c.active)
+          .map((c) => ({ id: c.id, name: c.name, fee: barangayFee(own.id, c.id) })),
       }
     }
 
@@ -2015,12 +2125,86 @@ async function route(
       if (!Number.isFinite(fee) || fee < 0 || fee > 10000) {
         throw new DemoError(400, 'Give a fee in pesos, 0 or more.')
       }
-      if (!BARANGAY_CERTIFICATES.some((c) => c.id === parts[2])) {
+      // Scoped: another barangay's own document is not found rather than refused.
+      if (!certificatesFor(own.id).some((c) => c.id === parts[2])) {
         throw new DemoError(404, 'No such certificate.')
       }
+      const was = barangayFee(own.id, parts[2]!)
       state.barangayFees[own.id] = { ...(state.barangayFees[own.id] ?? {}), [parts[2]!]: fee }
+      // Audited, because this changes what a resident is charged and the
+      // treasury reconciles against it.
+      auditCertificate(user, 'barangay_fee.update', `${own.id}/${parts[2]}`,
+        { fee: was, barangay: own.name }, { fee, barangay: own.name })
       persist()
       return { status: 200, body: { ok: true, fee } }
+    }
+
+    // ---- this barangay's own certificates ----
+    //
+    // Shared rows are the municipality's; a barangay may price them and nothing
+    // else. Every statement filters on this barangay's own id, so a shared row —
+    // or another barangay's — is not found rather than refused.
+    if (parts[1] === 'certificates') {
+      adminOnly()
+
+      if (!parts[2] && method === 'POST') {
+        const input = readCertificateBody(body, false)
+        const row: DemoCertificateType = {
+          id: certificateId(input.name!), name: input.name!, description: input.description!,
+          fee: input.fee!, purposeHint: '', active: true,
+          sortOrder: Math.max(0, ...certificates().map((c) => c.sortOrder)) + 1,
+          validityDays: input.validityDays ?? null, barangayId: own.id, steps: [],
+        }
+        state.certificates.push(row)
+        auditCertificate(user, 'certificate.create', row.id, null, serializeCertificate(row))
+        persist()
+        return { status: 201, body: { ...serializeCertificate(row), own: true } }
+      }
+
+      const mineOnly = parts[2]
+        ? state.certificates.find((c) => c.id === parts[2] && c.barangayId === own.id)
+        : undefined
+
+      if (parts[2] && method === 'PATCH') {
+        if (!mineOnly) throw new DemoError(404, 'That is not one of your barangay\u2019s own certificates.')
+        const input = readCertificateBody(body, true)
+        const before = serializeCertificate(mineOnly)
+        if (input.name !== undefined) mineOnly.name = input.name
+        if (input.description !== undefined) mineOnly.description = input.description
+        if (input.fee !== undefined) mineOnly.fee = input.fee
+        if (input.validityDays !== undefined) mineOnly.validityDays = input.validityDays
+        auditCertificate(user, 'certificate.update', mineOnly.id, before, serializeCertificate(mineOnly))
+        persist()
+        return { status: 200, body: { ...serializeCertificate(mineOnly), own: true } }
+      }
+
+      if (parts[2] && method === 'DELETE') {
+        const restore = query.get('restore') === 'true'
+        if (!mineOnly || mineOnly.active === restore) {
+          throw new DemoError(404, 'Not found, or already in that state.')
+        }
+        mineOnly.active = restore
+        auditCertificate(
+          user, restore ? 'certificate.restore' : 'certificate.withdraw',
+          mineOnly.id, null, serializeCertificate(mineOnly)
+        )
+        persist()
+        return { status: 200, body: { ...serializeCertificate(mineOnly), own: true } }
+      }
+
+      return {
+        status: 200,
+        body: certificatesFor(own.id)
+          .slice()
+          .sort((a, b) =>
+            Number(a.barangayId !== null) - Number(b.barangayId !== null) ||
+            a.sortOrder - b.sortOrder)
+          .map((c) => ({
+            ...serializeCertificate(c),
+            fee: barangayFee(own.id, c.id),
+            own: c.barangayId !== null,
+          })),
+      }
     }
 
     if (parts[1] === 'officers') {
@@ -2743,6 +2927,20 @@ async function route(
     // The treasurer's book. Scoped the same way the server scopes it: the
     // treasury and admins, and nobody else — a demo that showed every office the
     // payment ledger would teach something the real system refuses.
+    // What changed about money, for the office that collects it. Same gate as
+    // the payment book, and a read of the audit trail rather than a second
+    // record of the same fact.
+    if (parts[1] === 'fee-changes' && method === 'GET') {
+      if (user.role !== 'admin' && !user.departments.includes('treasury')) {
+        throw new DemoError(403, 'Fee changes are the treasury\u2019s to reconcile.')
+      }
+      const MONEY = [
+        'certificate.create', 'certificate.update', 'certificate.withdraw',
+        'certificate.restore', 'barangay_fee.update',
+      ]
+      return { status: 200, body: state.audit.filter((a) => MONEY.includes(a.action)).slice(0, 50) }
+    }
+
     if (parts[1] === 'payments' && method === 'GET') {
       const staff = need('staff', 'admin')
       if (staff.role !== 'admin' && !staff.departments.includes('treasury')) {
@@ -3502,13 +3700,75 @@ async function route(
   // ---- admin: the municipality's own data ----
   // Same rules as server/src/routes/admin.ts: administrators only, the same
   // validation, and every change written to the audit trail with the old value.
-  if (parts[0] === 'admin' && ['hotlines', 'holidays', 'offices', 'audit'].includes(parts[1] ?? '')) {
+  if (parts[0] === 'admin' &&
+      ['hotlines', 'holidays', 'offices', 'audit', 'certificates'].includes(parts[1] ?? '')) {
     const actor = need('admin')
     const audit = (action: string, target: string, before?: unknown, after?: unknown) => {
       state.audit.unshift({
         id: state.audit.length + 1, actorName: actor.fullName, action, target,
         before: before ?? null, after: after ?? null, createdAt: new Date().toISOString(),
       })
+    }
+
+    // ---- the shared certificate catalogue ----
+    //
+    // The documents every barangay issues. A barangay's own are not here and
+    // are not the hall's to edit, which is the mirror of the rule on the other
+    // side: each statement filters on barangayId === null.
+    if (parts[1] === 'certificates') {
+      const sharedOnly = parts[2]
+        ? state.certificates.find((c) => c.id === parts[2] && c.barangayId === null)
+        : undefined
+
+      if (!parts[2] && method === 'POST') {
+        const input = readCertificateBody(body, false)
+        const row: DemoCertificateType = {
+          id: certificateId(input.name!), name: input.name!, description: input.description!,
+          fee: input.fee!, purposeHint: '', active: true,
+          sortOrder: Math.max(0, ...certificates().map((c) => c.sortOrder)) + 1,
+          validityDays: input.validityDays ?? null, barangayId: null, steps: [],
+        }
+        state.certificates.push(row)
+        audit('certificate.create', row.id, null, serializeCertificate(row))
+        persist()
+        return { status: 201, body: serializeCertificate(row) }
+      }
+
+      if (parts[2] && method === 'PATCH') {
+        if (!sharedOnly) throw new DemoError(404, 'No such certificate in the shared catalogue.')
+        const input = readCertificateBody(body, true)
+        const before = serializeCertificate(sharedOnly)
+        if (input.name !== undefined) sharedOnly.name = input.name
+        if (input.description !== undefined) sharedOnly.description = input.description
+        if (input.fee !== undefined) sharedOnly.fee = input.fee
+        if (input.validityDays !== undefined) sharedOnly.validityDays = input.validityDays
+        audit('certificate.update', sharedOnly.id, before, serializeCertificate(sharedOnly))
+        persist()
+        return { status: 200, body: serializeCertificate(sharedOnly) }
+      }
+
+      if (parts[2] && method === 'DELETE') {
+        const restore = query.get('restore') === 'true'
+        if (!sharedOnly || sharedOnly.active === restore) {
+          throw new DemoError(404, 'Not found, or already in that state.')
+        }
+        sharedOnly.active = restore
+        audit(
+          restore ? 'certificate.restore' : 'certificate.withdraw',
+          sharedOnly.id, null, serializeCertificate(sharedOnly)
+        )
+        persist()
+        return { status: 200, body: serializeCertificate(sharedOnly) }
+      }
+
+      return {
+        status: 200,
+        body: certificates()
+          .filter((c) => c.barangayId === null)
+          .slice()
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map(serializeCertificate),
+      }
     }
 
     if (parts[1] === 'hotlines') {

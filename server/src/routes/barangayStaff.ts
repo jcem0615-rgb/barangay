@@ -7,6 +7,11 @@ import { issueResetToken } from '../resetTokens.ts'
 import { resetEmail, sendMail } from '../mailer.ts'
 import { env } from '../env.ts'
 import { servedMunicipality } from '../identity.ts'
+import {
+  certificateCreateSchema, certificateEditSchema, createCertificateType,
+  serializeCertificateType, updateCertificateType, withdrawCertificateType,
+  type CertificateRow,
+} from '../certificates.ts'
 import { toCentavos, toPesos } from '../serialize.ts'
 import { deliverNotification, recordNotification } from '../notifications.ts'
 import { serializeBarangayRequest, serializeBarangayOffice, type BarangayOfficeRow } from './barangay.ts'
@@ -349,8 +354,8 @@ barangayStaffRouter.get('/fees', requireRole('barangay_admin'), async (req, res)
     `select t.id, t.name, coalesce(f.fee_centavos, t.fee_centavos) as fee_centavos
        from barangay_certificate_types t
        left join barangay_certificate_fees f on f.type_id = t.id and f.barangay_id = $1
-      where t.active = true
-      order by t.sort_order, t.name`,
+      where t.active = true and (t.barangay_id is null or t.barangay_id = $1)
+      order by t.barangay_id nulls first, t.sort_order, t.name`,
     [barangay.id]
   )
   res.json(rows.map((r) => ({ id: r.id, name: r.name, fee: toPesos(r.fee_centavos) })))
@@ -368,15 +373,42 @@ barangayStaffRouter.put('/fees/:typeId', requireRole('barangay_admin'), async (r
   const barangay = await ownBarangay(req.user!.id)
   if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
 
-  const type = await one(`select 1 from barangay_certificate_types where id = $1`, [req.params.typeId])
+  // Scoped like everything else here: another barangay's own document is not
+  // found rather than refused, so there is nowhere to name one.
+  const type = await one(
+    `select 1 from barangay_certificate_types
+      where id = $1 and (barangay_id is null or barangay_id = $2)`,
+    [req.params.typeId, barangay.id]
+  )
   if (!type) return res.status(404).json({ error: 'No such certificate.' })
 
-  await query(
-    `insert into barangay_certificate_fees (barangay_id, type_id, fee_centavos)
-     values ($1, $2, $3)
-     on conflict (barangay_id, type_id) do update set fee_centavos = excluded.fee_centavos`,
-    [barangay.id, req.params.typeId, toCentavos(parsed.data.fee)]
-  )
+  // Audited, because this is a change to what a resident is charged and the
+  // treasury reconciles against it. Written in the same transaction as the fee
+  // itself, like every other audited edit — a fee that moved with no record of
+  // who moved it is the thing the log exists to prevent.
+  await transaction(async (client) => {
+    const before = await client.query<{ fee_centavos: number }>(
+      `select coalesce(f.fee_centavos, t.fee_centavos) as fee_centavos
+         from barangay_certificate_types t
+         left join barangay_certificate_fees f on f.type_id = t.id and f.barangay_id = $2
+        where t.id = $1`,
+      [req.params.typeId, barangay.id]
+    )
+    await client.query(
+      `insert into barangay_certificate_fees (barangay_id, type_id, fee_centavos)
+       values ($1, $2, $3)
+       on conflict (barangay_id, type_id) do update set fee_centavos = excluded.fee_centavos`,
+      [barangay.id, req.params.typeId, toCentavos(parsed.data.fee)]
+    )
+    await recordAudit(client, {
+      actorId: req.user!.id,
+      actorName: req.user!.fullName,
+      action: 'barangay_fee.update',
+      target: `${barangay.id}/${req.params.typeId}`,
+      before: { fee: toPesos(before.rows[0]?.fee_centavos ?? 0), barangay: barangay.name },
+      after: { fee: parsed.data.fee, barangay: barangay.name },
+    })
+  })
   res.json({ ok: true, fee: parsed.data.fee })
 })
 
@@ -396,6 +428,88 @@ const INVITE_TTL_MINUTES = 7 * 24 * 60 // a week, like the municipal invitation
 const ISSUABLE = ['barangay_officer', 'barangay_kagawad'] as const
 
 const OFFICER_ROLES = ['barangay_admin', 'barangay_officer', 'barangay_kagawad']
+
+// ------------------------------------------- this barangay's own certificates
+//
+// A barangay may add documents it alone issues, and may not touch the shared
+// catalogue — what a Barangay Clearance *is* stays the municipality's, so that
+// it means the same thing on every street. The split is the row's barangay_id,
+// and every statement below filters on this account's own, so a shared row is
+// not found rather than refused.
+
+/** Everything this barangay issues: the shared catalogue, then its own. */
+barangayStaffRouter.get('/certificates', requireRole('barangay_admin'), async (req, res) => {
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const rows = await query<CertificateRow & { override_centavos: number | null }>(
+    `select t.*, f.fee_centavos as override_centavos
+       from barangay_certificate_types t
+       left join barangay_certificate_fees f on f.type_id = t.id and f.barangay_id = $1
+      where t.barangay_id is null or t.barangay_id = $1
+      order by t.barangay_id nulls first, t.sort_order, t.name`,
+    [barangay.id]
+  )
+  res.json(
+    rows.map((r) => ({
+      ...serializeCertificateType(r),
+      // What this barangay actually charges, which is its override where it set
+      // one — the same figure the resident is quoted.
+      fee: toPesos(r.override_centavos ?? r.fee_centavos),
+      /** Shared documents are read-only here; its own are not. */
+      own: r.barangay_id !== null,
+    }))
+  )
+})
+
+barangayStaffRouter.post('/certificates', requireRole('barangay_admin'), async (req, res) => {
+  const parsed = certificateCreateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const row = await transaction((client) =>
+    createCertificateType(client, parsed.data, barangay.id, {
+      id: req.user!.id, fullName: req.user!.fullName,
+    })
+  )
+  res.status(201).json({ ...serializeCertificateType(row), own: true })
+})
+
+barangayStaffRouter.patch('/certificates/:id', requireRole('barangay_admin'), async (req, res) => {
+  const parsed = certificateEditSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  if (Object.keys(parsed.data).length === 0) {
+    return res.status(400).json({ error: 'Nothing to change.' })
+  }
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const row = await transaction((client) =>
+    updateCertificateType(client, String(req.params.id), parsed.data, barangay.id, {
+      id: req.user!.id, fullName: req.user!.fullName,
+    })
+  )
+  // A shared certificate is not this barangay's to edit, so from here it does
+  // not exist — the same answer another barangay's row gives.
+  if (!row) return res.status(404).json({ error: 'That is not one of your barangay\u2019s own certificates.' })
+  res.json({ ...serializeCertificateType(row), own: true })
+})
+
+/** Withdrawn, never deleted — an issued certificate has to keep its name. */
+barangayStaffRouter.delete('/certificates/:id', requireRole('barangay_admin'), async (req, res) => {
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+  const restore = req.query.restore === 'true'
+
+  const row = await transaction((client) =>
+    withdrawCertificateType(client, String(req.params.id), restore, barangay.id, {
+      id: req.user!.id, fullName: req.user!.fullName,
+    })
+  )
+  if (!row) return res.status(404).json({ error: 'Not found, or already in that state.' })
+  res.json({ ...serializeCertificateType(row), own: true })
+})
 
 /** Who works here, and who sits on the council. */
 barangayStaffRouter.get('/officers', requireRole('barangay_admin'), async (req, res) => {

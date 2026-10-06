@@ -902,6 +902,50 @@ staffRouter.post('/complaints/:id/respond', async (req, res) => {
 const paymentsBookSchema = z.object({ from: z.iso.date(), to: z.iso.date() })
 
 /**
+ * What changed about money, for the office that collects it.
+ *
+ * The treasury reconciles against fees it did not set: the municipal
+ * administrator defines the shared certificate catalogue, and each barangay
+ * overrides what it charges. Both already write to `admin_audit` in the same
+ * transaction as the change — this is the treasury's read of that log, narrowed
+ * to the entries that alter what a resident is actually charged.
+ *
+ * A read of the existing trail rather than a new table or a notification: there
+ * is no staff inbox in this app, and inventing one for this would mean a second
+ * record of the same fact that could disagree with the first. The log already
+ * carries the old value, who changed it and when, which is exactly what somebody
+ * reconciling a figure needs.
+ *
+ * Same gate as the payment book, because it answers the same person.
+ */
+const MONEY_ACTIONS = [
+  'certificate.create', 'certificate.update', 'certificate.withdraw', 'certificate.restore',
+  'barangay_fee.update',
+]
+
+staffRouter.get('/fee-changes', async (req, res) => {
+  const user = req.user!
+  if (user.role !== 'admin' && !user.departments.includes('treasury')) {
+    return res.status(403).json({ error: 'Fee changes are the treasury\'s to reconcile.' })
+  }
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200)
+
+  const rows = await query<{
+    id: number; actorName: string; action: string; target: string
+    before: unknown; after: unknown; createdAt: string
+  }>(
+    `select id, actor_name as "actorName", action, target, before, after,
+            created_at as "createdAt"
+       from admin_audit
+      where action = any($1::text[])
+      order by created_at desc, id desc
+      limit $2`,
+    [MONEY_ACTIONS, limit]
+  )
+  res.json(rows)
+})
+
+/**
  * The treasurer's book, for reconciliation.
  *
  * Somebody working through a bank statement needs to find *this* row from

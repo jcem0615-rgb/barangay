@@ -9,6 +9,11 @@ import { env } from '../env.ts'
 import { isRealDate, looksDialable, recordAudit } from '../municipality.ts'
 import { clearHolidayCache } from '../schedule.ts'
 import { servedMunicipality } from '../identity.ts'
+import {
+  certificateCreateSchema, certificateEditSchema, createCertificateType,
+  serializeCertificateType, updateCertificateType, withdrawCertificateType,
+  type CertificateRow,
+} from '../certificates.ts'
 
 export const adminRouter = Router()
 adminRouter.use(authenticate, requireRole('admin'))
@@ -482,6 +487,70 @@ adminRouter.patch('/offices/:id', async (req, res) => {
   })
   if (!updated) return res.status(404).json({ error: 'Office not found.' })
   res.json(updated)
+})
+
+// --------------------------------------------- the shared certificate catalogue
+//
+// The documents every barangay issues. Theirs to *charge* for and the
+// municipality's to define, so that a Barangay Clearance means the same thing
+// whichever barangay a resident walks into. A barangay's own documents are not
+// here and are not the hall's to edit — see barangayStaff.ts.
+
+/** The shared catalogue, withdrawn rows included: this is the editing screen. */
+adminRouter.get('/certificates', async (_req, res) => {
+  const rows = await query<CertificateRow>(
+    `select * from barangay_certificate_types
+      where barangay_id is null order by sort_order, name`
+  )
+  res.json(rows.map(serializeCertificateType))
+})
+
+/**
+ * Adding one to the shared catalogue.
+ *
+ * It appears for every barangay at once, at the default fee, which each
+ * barangay then overrides. That blast radius is why this is the municipal
+ * administrator's and not a barangay's.
+ */
+adminRouter.post('/certificates', async (req, res) => {
+  const parsed = certificateCreateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+
+  const row = await transaction((client) =>
+    createCertificateType(client, parsed.data, null, {
+      id: req.user!.id, fullName: req.user!.fullName,
+    })
+  )
+  res.status(201).json(serializeCertificateType(row))
+})
+
+adminRouter.patch('/certificates/:id', async (req, res) => {
+  const parsed = certificateEditSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  if (Object.keys(parsed.data).length === 0) {
+    return res.status(400).json({ error: 'Nothing to change.' })
+  }
+  const row = await transaction((client) =>
+    updateCertificateType(client, String(req.params.id), parsed.data, null, {
+      id: req.user!.id, fullName: req.user!.fullName,
+    })
+  )
+  // A barangay's own document is not the hall's to edit, so it is not found
+  // here — the same shape the barangay side gives for a shared one.
+  if (!row) return res.status(404).json({ error: 'No such certificate in the shared catalogue.' })
+  res.json(serializeCertificateType(row))
+})
+
+/** Withdrawn, never deleted: issued certificates keep rendering their name. */
+adminRouter.delete('/certificates/:id', async (req, res) => {
+  const restore = req.query.restore === 'true'
+  const row = await transaction((client) =>
+    withdrawCertificateType(client, String(req.params.id), restore, null, {
+      id: req.user!.id, fullName: req.user!.fullName,
+    })
+  )
+  if (!row) return res.status(404).json({ error: 'Not found, or already in that state.' })
+  res.json(serializeCertificateType(row))
 })
 
 /** The trail, newest first. Read-only — nothing in the app writes here twice. */

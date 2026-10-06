@@ -7,7 +7,7 @@ import StaffRequestPanel from './StaffRequestPanel'
 import StaffAccounts from './StaffAccounts'
 import StaffVerifyId from './StaffVerifyId'
 import StaffReports from './StaffReports'
-import StaffTreasury from './StaffTreasury'
+import StaffTreasury, { FeeChanges } from './StaffTreasury'
 import StaffIncidents from './StaffIncidents'
 import StaffMunicipality from './StaffMunicipality'
 import StaffDay from './StaffDay'
@@ -177,7 +177,12 @@ export default function StaffConsole() {
         {view === 'verify' ? (
           <StaffVerifyId />
         ) : view === 'payments' ? (
-          <StaffTreasury />
+          <>
+            <StaffTreasury />
+            {/* Under the book, because it answers what the book raises: a
+                figure that does not reconcile is usually a fee that moved. */}
+            <FeeChanges />
+          </>
         ) : view === 'incidents' ? (
           <StaffIncidents />
         ) : view === 'reports' ? (

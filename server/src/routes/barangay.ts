@@ -61,8 +61,14 @@ barangayPublicRouter.get('/certificates', async (_req, res) => {
     id: string; name: string; description: string; fee_centavos: number
     purpose_hint: string; steps: unknown[]; validity_days: number | null
   }>(
+    // The shared catalogue only. This endpoint is public and barangay-less —
+    // the guide and the sign-up screen read it before anybody has an account —
+    // so a barangay's own documents, which only its residents can ask for, have
+    // no business being listed here.
     `select id, name, description, fee_centavos, purpose_hint, steps, validity_days
-       from barangay_certificate_types where active = true order by sort_order, name`
+       from barangay_certificate_types
+      where active = true and barangay_id is null
+      order by sort_order, name`
   )
   res.json(
     rows.map((r) => ({
@@ -101,7 +107,7 @@ barangayRouter.get('/me', async (req, res) => {
             coalesce(f.fee_centavos, t.fee_centavos) as fee_centavos
        from barangay_certificate_types t
        left join barangay_certificate_fees f on f.type_id = t.id and f.barangay_id = $1
-      where t.active = true
+      where t.active = true and (t.barangay_id is null or t.barangay_id = $1)
       order by t.sort_order, t.name`,
     [row.id]
   )
@@ -157,7 +163,8 @@ barangayRouter.post('/requests', async (req, res) => {
     `select t.id, t.name, coalesce(f.fee_centavos, t.fee_centavos) as fee_centavos
        from barangay_certificate_types t
        left join barangay_certificate_fees f on f.type_id = t.id and f.barangay_id = $2
-      where t.id = $1 and t.active = true`,
+      where t.id = $1 and t.active = true
+        and (t.barangay_id is null or t.barangay_id = $2)`,
     [parsed.data.typeId, resident.barangay_id]
   )
   if (!type) return res.status(404).json({ error: 'That certificate is not issued here.' })

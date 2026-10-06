@@ -34,6 +34,32 @@ export interface BarangayRequest {
  * that has not filled one in should read as "not stated" rather than as an empty
  * line pretending to be an address.
  */
+/** A row of the barangay certificate catalogue, either tier's. */
+export interface CertificateType {
+  id: string
+  name: string
+  description: string
+  fee: number
+  purposeHint: string
+  sortOrder: number
+  active: boolean
+  validityDays: number | null
+  /** Null for the shared catalogue; a barangay id for one barangay's own. */
+  barangayId: string | null
+  /** Barangay console only: whether this barangay may edit it. */
+  own?: boolean
+}
+
+export interface FeeChange {
+  id: number
+  actorName: string
+  action: string
+  target: string
+  before: { fee?: number; name?: string; barangay?: string } | null
+  after: { fee?: number; name?: string; barangay?: string } | null
+  createdAt: string
+}
+
 export interface BarangayOffice {
   id: string
   name: string
@@ -52,6 +78,7 @@ export interface BlotterEntry {
   complainantContact: string | null
   respondent: string
   respondentAddress: string | null
+  respondentContact: string | null
   nature: string
   narrative: string
   occurredAt: string | null
@@ -72,6 +99,12 @@ export interface BlotterSummons {
   note: string | null
   servedAt: string | null
   servedNote: string | null
+  /**
+   * That a reminder was sent to the contacts the barangay typed, and what came
+   * of it. Deliberately separate from `servedAt`: a text message is not service.
+   */
+  notifiedAt: string | null
+  notifyResult: string | null
   outcome: 'pending' | 'appeared' | 'failed_to_appear' | 'rescheduled' | 'cancelled'
   issuedAt: string
   issuedBy: string | null
@@ -801,6 +834,58 @@ export const api = {
       method: 'PATCH', body: JSON.stringify(patch),
     }),
 
+  /** Shared catalogue plus this barangay's own; `own` says which it may edit. */
+  // ---- the shared certificate catalogue, the municipality's ----
+
+  sharedCertificates: () => request<CertificateType[]>('/admin/certificates'),
+
+  addSharedCertificate: (body: {
+    name: string; description: string; fee: number
+    purposeHint?: string; validityDays?: number | null
+  }) => request<CertificateType>('/admin/certificates', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+
+  editSharedCertificate: (id: string, body: Partial<{
+    name: string; description: string; fee: number
+    purposeHint: string; validityDays: number | null
+  }>) => request<CertificateType>(`/admin/certificates/${id}`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  }),
+
+  withdrawSharedCertificate: (id: string, restore = false) =>
+    request<CertificateType>(
+      `/admin/certificates/${id}${restore ? '?restore=true' : ''}`,
+      { method: 'DELETE' }
+    ),
+
+  /** What changed about money, for the office that collects it. */
+  feeChanges: () => request<FeeChange[]>('/staff/fee-changes'),
+
+  barangayCertificateCatalogue: () =>
+    request<CertificateType[]>('/barangay-staff/certificates'),
+
+  addBarangayCertificate: (body: {
+    name: string; description: string; fee: number
+    purposeHint?: string; validityDays?: number | null
+  }) => request<CertificateType>('/barangay-staff/certificates', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+
+  editBarangayCertificate: (id: string, body: Partial<{
+    name: string; description: string; fee: number
+    purposeHint: string; validityDays: number | null
+  }>) => request<CertificateType>(`/barangay-staff/certificates/${id}`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  }),
+
+  /** Withdrawn, never deleted — an issued certificate keeps its name. */
+  withdrawBarangayCertificate: (id: string, restore = false) =>
+    request<CertificateType>(
+      `/barangay-staff/certificates/${id}${restore ? '?restore=true' : ''}`,
+      { method: 'DELETE' }
+    ),
+
   barangayOfficers: () =>
     request<Array<{ id: string; fullName: string; email: string; role: string; active: boolean }>>(
       '/barangay-staff/officers'
@@ -880,7 +965,7 @@ export const api = {
 
   recordBlotterEntry: (body: {
     complainant: string; complainantContact?: string
-    respondent: string; respondentAddress?: string
+    respondent: string; respondentAddress?: string; respondentContact?: string
     nature: string; narrative: string; occurredAt?: string
   }) => request<BlotterEntry>('/barangay-staff/blotter', { method: 'POST', body: JSON.stringify(body) }),
 

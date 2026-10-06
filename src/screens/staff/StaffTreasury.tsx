@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Loader2, Wallet } from 'lucide-react'
-import { api, ApiError } from '../../lib/api'
+import { AlertTriangle, Loader2, Wallet, Receipt } from 'lucide-react'
+import { api, ApiError, type FeeChange } from '../../lib/api'
 import { formatPeso } from '../../lib/money'
 
 /**
@@ -171,5 +171,87 @@ export default function StaffTreasury() {
         </p>
       )}
     </div>
+  )
+}
+
+
+/**
+ * What changed about money, for the office that collects it.
+ *
+ * The treasury reconciles against fees it did not set: the municipal
+ * administrator defines the shared certificate catalogue and each barangay
+ * overrides what it charges. Both already write the change, the old value and
+ * who made it to the audit trail in the same transaction, so this is a read of
+ * that rather than a second record of the same fact that could disagree with
+ * the first.
+ *
+ * It sits under the payment book because it answers the question the book
+ * raises: a figure that does not reconcile is usually a fee that moved.
+ */
+export function FeeChanges() {
+  const [rows, setRows] = useState<FeeChange[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.feeChanges()
+      .then(setRows)
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not load the fee trail.'))
+  }, [])
+
+  const WORDING: Record<string, string> = {
+    'certificate.create': 'added a certificate',
+    'certificate.update': 'changed a certificate',
+    'certificate.withdraw': 'withdrew a certificate',
+    'certificate.restore': 'restored a certificate',
+    'barangay_fee.update': 'changed what a barangay charges',
+  }
+
+  if (error) {
+    return <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-[13px] text-rose-700">{error}</p>
+  }
+
+  return (
+    <section className="mt-8">
+      <h2 className="mb-2 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide text-slate-500">
+        <Receipt size={13} /> Fee changes
+      </h2>
+      <p className="mb-3 max-w-2xl text-[12.5px] leading-snug text-slate-600">
+        What the hall and the barangays have changed about what residents are charged.
+        A fee is frozen onto a request when it is filed, so a change here never rewrites
+        what somebody was already quoted &mdash; which is usually the explanation when a
+        figure in the book above does not match the catalogue.
+      </p>
+
+      {rows.length === 0 ? (
+        <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-[13px] text-slate-500">
+          Nothing has changed yet.
+        </p>
+      ) : (
+        <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          {rows.map((row) => (
+            <div key={row.id} className="px-4 py-3 text-[13px]">
+              <p className="text-navy-950">
+                <span className="font-semibold">{row.actorName}</span>{' '}
+                {WORDING[row.action] ?? row.action}
+                {row.after?.name && <> &mdash; {row.after.name}</>}
+                {row.after?.barangay && <> &mdash; Barangay {row.after.barangay}</>}
+              </p>
+              {/* The old figure beside the new one, because reconciling means
+                  knowing what it used to be. */}
+              {row.before?.fee !== undefined && row.after?.fee !== undefined &&
+                row.before.fee !== row.after.fee && (
+                <p className="mt-0.5 tabular-nums text-slate-600">
+                  {formatPeso(row.before.fee)} &rarr;{' '}
+                  <span className="font-semibold text-navy-950">{formatPeso(row.after.fee)}</span>
+                </p>
+              )}
+              <p className="mt-0.5 text-[12px] text-slate-500">
+                {new Date(row.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }

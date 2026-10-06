@@ -138,12 +138,32 @@ list, stamps `users.barangay_id`, and writes the barangay's *own* name onto the 
 the municipality rule, one tier down: the register decides what a place is called, not the
 browser. A resident who registered before this is asked once in the barangay hub.
 
-**What a barangay issues is shared; what it charges is not.** `BARANGAY_CERTIFICATES` is one
-catalogue for every barangay, because a clearance is the same document in all of them and
-letting six offices each invent their own would make a resident's certificate depend on
-which street they live on. Fees genuinely vary, so a barangay administrator overrides them
-in `barangay_certificate_fees` and nothing else. The fee is **frozen onto the request** when
-it is filed, so changing one never rewrites what somebody was already quoted.
+**What a barangay issues is shared; what it charges is not** — and since the catalogue
+became editable, the row's `barangay_id` is what says which is which. Null is the **shared**
+catalogue: the documents every barangay issues, the municipal administrator's to add, edit
+and withdraw, because a clearance is the same document in all of them and letting six
+offices each invent their own would make a resident's certificate depend on which street
+they live on. A barangay id is that barangay's **own** document — one only it issues, its
+to manage, invisible to every other barangay and to residents elsewhere. Neither side can
+reach the other's rows, and that is a `where` clause rather than a check somebody has to
+remember: a shared row is *not found* from inside a barangay console, which is the same
+answer another barangay's row gives.
+
+Fees stay the barangay's on both: it overrides what it charges in
+`barangay_certificate_fees` and nothing else about a shared document. The fee is **frozen
+onto the request** when it is filed, so changing one never rewrites what somebody was
+already quoted.
+
+**Withdrawn, never deleted.** `barangay_requests.type_id` references the row, and a
+certificate somebody was issued last year has to keep rendering its name, so removing one
+sets `active = false`: residents stop being offered it and the history keeps working. The
+screens say "withdraw" rather than "delete" because that is what happens.
+
+**A certificate added in-app has no route.** `steps` is authored in `mockData.ts` and an
+administrator filling in a form cannot reasonably write a bilingual step chain, so a new
+one ships with none and the guide simply shows no chain. `server/test/document-steps.mjs`
+checks the invariant against the *authored* set for that reason — it is an authoring rule,
+not a fact about whatever is in the database.
 
 **Reference numbers come from one counter for the municipality**, not one per barangay.
 Per-barangay numbering reads nicer from inside a barangay, but it makes `BRGY-2026-00001`
@@ -255,12 +275,21 @@ of something who has been found to have done nothing — so:
   the resident app. It is not in the Data Privacy export either, which is deliberate: the
   export is what the app holds *about you*, and half of a blotter entry is somebody else's
   name and somebody else's account of what they say you did.
-- **Nothing notifies anybody.** Everywhere else a change is written with a notification in
-  the same transaction; here that would mean telling somebody by push that they have been
-  named in a live quarrel, and it is not how a summons is served. The law wants personal
-  service by the barangay, so the console says so where a hearing is read rather than only
-  where it is issued — "did they get told?" is a question somebody has while looking at a
-  hearing that is coming up.
+- **Nothing notifies anybody, with one exception: a summons.** Everywhere else a change is
+  written with a notification in the same transaction; here that would mean telling somebody
+  by push that they have been named in a live quarrel. A hearing is the one case where the
+  silence was wrong — the whole point is that two people have to know a date — so issuing
+  one sends a reminder to the contacts **the barangay typed in** (`complainant_contact`,
+  `respondent_contact`). It goes through the SMS and mail transports directly and *never*
+  through the notifications table, which is keyed on a user id and would have forced a
+  lookup to attach a row to: the parties stay free text and unmatched to accounts, which is
+  the rule that actually mattered. The message carries who is asking, when, where and the
+  reference, and nothing else — no narrative, no nature of the complaint, and never the
+  other party's name, because a lock screen is not private. **It is not service**:
+  `served_at` stays the record of that, the two are shown apart in the console, and the
+  reminder line says "this is not service" in those words. What became of it is stored in
+  `notify_result` and shown, because a reminder that silently went nowhere is worse than
+  none — the barangay stops checking.
 - **Municipal staff get 403, administrator included.** This is the barangay's book.
 - **Scoping is the same structural rule as the rest of that console**: every statement
   filters on the barangay from the signed-in account's own row, so another barangay's entry
@@ -843,6 +872,24 @@ One draft per resident per service, so tapping a service resumes what you had ra
 leaving a pile of near-identical copies. Submitting deletes the draft inside the same
 transaction as the insert, so a lost response cannot leave a resident with both a filed
 request and the draft of it.
+
+## What the treasury sees change
+
+The treasury reconciles against fees it did not set: the municipal administrator defines the
+shared certificate catalogue and each barangay overrides what it charges. Both already write
+the change, the old value and who made it to `admin_audit` **in the same transaction as the
+change**, so `GET /staff/fee-changes` is a *read of that trail* rather than a second record
+of the same fact that could disagree with the first.
+
+It is a read and not a notification because there is no staff inbox in this app —
+`/notifications` is resident-only — and inventing one for this would have been a second
+delivery mechanism to keep correct. The panel sits under the payment book because it answers
+the question the book raises: a figure that does not reconcile is usually a fee that moved,
+and the old figure is right there beside the new one.
+
+Same gate as the payment book — the treasury department or an admin, everybody else 403 —
+because it answers the same person. No barangay account can read it: a barangay sees its own
+fees in its own console, and the municipality-wide trail is the hall's and the treasury's.
 
 ## Office reports
 
@@ -1465,6 +1512,14 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   The periods the law sets (15 days to mediate, 15 more for the Pangkat) are not enforced or
   counted either; a deployment that wants them should treat them like the expected-ready
   dates, over the same working-day calendar.
+- **A certificate added in the app carries no step-by-step route**, and nothing in either
+  console lets somebody write one — `steps` needs a bilingual chain per step and that is an
+  authoring job, not a form. The resident simply sees no guide for it. A deployment that
+  adds documents regularly wants a step editor, which is a real screen rather than a field.
+- **Municipal services have no add/edit/delete.** The 17 services, with their form fields,
+  requirements and routes, are still authored in `mockData.ts` and seeded. Only the barangay
+  certificate catalogue is editable in-app. Service CRUD is a much larger surface — a form
+  builder, really — and worth designing deliberately rather than bolting onto this.
 - **The barangay ID is not here.** It is its own feature with its own rules, and bolting it
   on as a field of the certificate, the blotter or the register would get it wrong.
 - **A notice reaches a resident who opens the app, and a phone only when it is urgent.**

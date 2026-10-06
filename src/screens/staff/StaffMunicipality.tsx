@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Building2, CalendarDays, Loader2, Phone, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, Building2, CalendarDays, Loader2, Phone, Plus, Trash2, FileText } from 'lucide-react'
+import CertificateCatalogue, { type CatalogueDraft } from '../../components/CertificateCatalogue'
 import {
   api, ApiError,
-  type AuditRow, type Holiday, type Hotline, type OfficeContact,
+  type AuditRow, type CertificateType, type Holiday, type Hotline, type OfficeContact,
 } from '../../lib/api'
 
 /**
@@ -21,7 +22,7 @@ import {
  * who mistypes the fire hotline needs the old number back, not a note that
  * somebody changed something.
  */
-type Tab = 'hotlines' | 'holidays' | 'offices' | 'audit'
+type Tab = 'hotlines' | 'holidays' | 'offices' | 'certificates' | 'audit'
 
 export default function StaffMunicipality() {
   const [tab, setTab] = useState<Tab>('hotlines')
@@ -33,6 +34,7 @@ export default function StaffMunicipality() {
           ['hotlines', 'Emergency hotlines', Phone],
           ['holidays', 'Holiday calendar', CalendarDays],
           ['offices', 'Office details', Building2],
+          ['certificates', 'Barangay certificates', FileText],
           ['audit', 'What changed', AlertTriangle],
         ] as const).map(([key, label, Icon]) => (
           <button
@@ -50,6 +52,7 @@ export default function StaffMunicipality() {
       {tab === 'hotlines' && <Hotlines />}
       {tab === 'holidays' && <Holidays />}
       {tab === 'offices' && <Offices />}
+      {tab === 'certificates' && <SharedCertificates />}
       {tab === 'audit' && <Audit />}
     </div>
   )
@@ -578,3 +581,72 @@ const Input = ({ value, onChange, placeholder }: { value: string; onChange: (v: 
     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] outline-none placeholder:text-slate-400 focus:border-navy-600"
   />
 )
+
+
+/**
+ * The shared barangay certificate catalogue.
+ *
+ * It lives on the Municipality tab rather than anywhere barangay-shaped because
+ * that is what it is: a fact about what this municipality's barangays issue,
+ * alongside its hotlines, its holidays and its offices. Adding one here puts it
+ * on every barangay's list at once, which is exactly why it is not a barangay's
+ * to add — and why the panel says so before the button.
+ */
+function SharedCertificates() {
+  const [rows, setRows] = useState<CertificateType[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      setRows(await api.sharedCertificates())
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not load the catalogue.')
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  const run = async (work: () => Promise<unknown>) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await work()
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'That did not work.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toBody = (draft: CatalogueDraft) => ({
+    name: draft.name.trim(),
+    description: draft.description.trim(),
+    fee: Number(draft.fee),
+    validityDays: draft.validityDays.trim() === '' ? null : Number(draft.validityDays),
+  })
+
+  return (
+    <CertificateCatalogue
+      rows={rows}
+      canEdit={() => true}
+      busy={busy}
+      error={error}
+      note={
+        <>
+          The documents <strong>every barangay</strong> issues. Adding one here puts it on
+          all of their lists at once at the fee you set, which each barangay then
+          overrides for itself &mdash; that blast radius is why this is the hall&rsquo;s
+          and not a barangay&rsquo;s. A document only one barangay issues belongs in that
+          barangay&rsquo;s own console instead. Withdrawing removes it from residents&rsquo;
+          lists without deleting it, so certificates already issued keep their name, and
+          the treasury sees every change you make here.
+        </>
+      }
+      onAdd={(draft) => run(() => api.addSharedCertificate(toBody(draft)))}
+      onEdit={(id, draft) => run(() => api.editSharedCertificate(id, toBody(draft)))}
+      onWithdraw={(id, restore) => run(() => api.withdrawSharedCertificate(id, restore))}
+    />
+  )
+}
