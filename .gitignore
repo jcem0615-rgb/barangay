@@ -30,3 +30,6 @@ server/node_modules
 
 # Resident-uploaded attachments (storage backend, not source)
 server/uploads
+
+# Fonts fetched by proposal/fetch_fonts.sh — not redistributed here.
+proposal/fonts/
