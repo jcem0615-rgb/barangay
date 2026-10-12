@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v22'
+const STORE_KEY = 'elgu-demo-state-v23'
 
 interface DemoIncident {
   id: string
@@ -57,6 +57,40 @@ interface DemoPayment {
   createdAt: string
   settledAt: string | null
   note: string | null
+  /** Issued in the same step that settles the payment, as on the real server. */
+  receipt: DemoReceipt | null
+}
+
+/**
+ * A receipt, frozen at issue.
+ *
+ * The municipality's details are copied onto the row rather than read back from
+ * `state.municipality`, for the same reason the server stores the rendered PDF:
+ * a receipt re-made from the current row would carry the current treasurer's
+ * name over last month's payment.
+ */
+interface DemoReceipt {
+  receiptNo: string
+  verificationCode: string
+  issuedAt: string
+  issuedTo: string
+  issuedToAddress: string | null
+  particulars: string
+  issuer: DemoMunicipality
+}
+
+/** What the municipality prints on an official receipt. */
+interface DemoMunicipality {
+  address: string | null
+  phone: string | null
+  email: string | null
+  website: string | null
+  tin: string | null
+  treasurerName: string | null
+  treasurerTitle: string
+  receiptPrefix: string
+  receiptFormLabel: string | null
+  receiptFooter: string | null
 }
 
 interface DemoUser {
@@ -165,6 +199,17 @@ interface DemoState {
   feedback: DemoFeedback[]
   complaints: DemoComplaint[]
   complaintCounter: number
+  /** What goes on an official receipt, and the seal printed on it. */
+  municipality: DemoMunicipality
+  /**
+   * The uploaded seal, as a data URL downscaled before it is stored. The real
+   * store takes 2 MB; localStorage does not, so the demo shrinks it rather than
+   * accepting an upload that would silently fail to persist.
+   */
+  seal: string | null
+  sealUpdatedAt: string | null
+  /** One series for the municipality, like every other counter here. */
+  receiptCounter: number
   barangayRequests: DemoBarangayRequest[]
   /** barangay id -> certificate id -> fee in pesos. Only what a barangay changed. */
   barangayFees: Record<string, Record<string, number>>
@@ -418,6 +463,19 @@ function seed(): DemoState {
     feedback: [],
     complaints: [],
     complaintCounter: 0,
+    // Seeded from the authored municipality, exactly as the real seed does, and
+    // editable from the Municipality tab after that.
+    municipality: {
+      address: MUNICIPALITY.address, phone: MUNICIPALITY.phone, email: MUNICIPALITY.email,
+      website: MUNICIPALITY.website, tin: MUNICIPALITY.tin,
+      treasurerName: MUNICIPALITY.treasurerName, treasurerTitle: MUNICIPALITY.treasurerTitle,
+      receiptPrefix: MUNICIPALITY.receiptPrefix,
+      receiptFormLabel: MUNICIPALITY.receiptFormLabel || null,
+      receiptFooter: MUNICIPALITY.receiptFooter || null,
+    },
+    seal: null,
+    sealUpdatedAt: null,
+    receiptCounter: 0,
     barangayRequests: [],
     barangayFees: {},
     // Seeded from the authored catalogue and editable from both consoles after
@@ -1293,6 +1351,72 @@ function makePdf(lines: string[]): Blob {
   for (const off of offsets) pdf += `${String(off).padStart(10, '0')} 00000 n \n`
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`
   return new Blob([pdf], { type: 'application/pdf' })
+}
+
+/**
+ * Issues the receipt for a settled payment.
+ *
+ * Done in the same step that settles the payment, as on the real server, so
+ * there is no demo state where money landed and nothing says so.
+ */
+function issueDemoReceipt(target: DemoRequest, resident: DemoUser): DemoReceipt {
+  state.receiptCounter += 1
+  const year = new Date().getFullYear()
+  const prefix = state.municipality.receiptPrefix || 'OR'
+  return {
+    receiptNo: `${prefix}-${year}-${String(state.receiptCounter).padStart(6, '0')}`,
+    verificationCode: Array.from({ length: 4 }, () =>
+      Array.from({ length: 4 }, () =>
+        '0123456789ABCDEFGHJKMNPQRSTVWXYZ'[Math.floor(Math.random() * 32)]
+      ).join('')
+    ).join('-'),
+    issuedAt: new Date().toISOString(),
+    issuedTo: resident.fullName,
+    issuedToAddress: resident.profile.address ?? null,
+    particulars: `${target.serviceName} (${target.referenceNo})`,
+    // Copied, not referenced: a later edit must not rewrite a receipt somebody
+    // is already holding.
+    issuer: { ...state.municipality },
+  }
+}
+
+function receiptFor(payment: DemoPayment): Blob {
+  const r = payment.receipt!
+  const money = (payment.amountCentavos / 100).toLocaleString('en-PH', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  })
+  return makePdf([
+    'Republic of the Philippines',
+    `Province of ${MUNICIPALITY.province}`,
+    MUNICIPALITY.name.toUpperCase(),
+    r.issuer.address ?? '',
+    [r.issuer.phone, r.issuer.email].filter(Boolean).join('  ·  '),
+    r.issuer.tin ? `TIN ${r.issuer.tin}` : '',
+    '',
+    'ELECTRONIC OFFICIAL RECEIPT',
+    r.issuer.receiptFormLabel ?? '',
+    `Receipt No. ${r.receiptNo}`,
+    new Date(r.issuedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }),
+    '',
+    `Received from: ${r.issuedTo}`,
+    r.issuedToAddress ? `Address: ${r.issuedToAddress}` : '',
+    `In payment of: ${r.particulars}`,
+    '',
+    `AMOUNT PAID: PHP ${money}`,
+    `Paid through: ${payment.method ?? 'Online payment'}`,
+    `Payment reference: ${payment.reference}`,
+    '',
+    r.issuer.treasurerName ?? '',
+    r.issuer.treasurerTitle,
+    '',
+    `VERIFICATION CODE: ${r.verificationCode}`,
+    r.issuer.receiptFooter ?? '',
+    '',
+    // The demo draws no seal: this PDF is assembled by hand in the browser and
+    // cannot embed an image. The real renderer prints it, and the console still
+    // shows which seal is on file.
+    'Demo receipt — generated in your browser, not issued by an LGU.',
+  ].filter((line, i, all) => line !== '' || all[i - 1] !== ''))
 }
 
 function documentFor(r: DemoRequest): Blob {
@@ -2422,6 +2546,7 @@ async function route(
         createdAt: new Date().toISOString(),
         settledAt: null,
         note: null,
+        receipt: null,
       }
       if (!open) {
         payment.providerRef = `mock_${payment.reference}`
@@ -2453,6 +2578,7 @@ async function route(
           method: payment.method,
           requestId: payment.requestId,
           note: payment.note,
+          receiptNo: payment.receipt?.receiptNo ?? null,
         },
       }
     }
@@ -2470,6 +2596,7 @@ async function route(
       payment.status = 'settled'
       payment.settledAt = new Date().toISOString()
       payment.method = typeof body.method === 'string' ? body.method : 'gcash'
+      payment.receipt = issueDemoReceipt(target, user)
       target.paid = true
       target.paymentMethod = payment.method ?? undefined
       // The office's clock starts here, as on the real server.
@@ -2485,7 +2612,9 @@ async function route(
       state.notifications.unshift({
         id: uid(), userId: user.id, requestId: target.id, kind: 'request_paid',
         title: 'Payment received',
-        body: `We have received ${(payment.amountCentavos / 100).toFixed(2)} for ${target.referenceNo}.`,
+        body:
+          `We have received ${(payment.amountCentavos / 100).toFixed(2)} for ${target.referenceNo}. ` +
+          `Your official receipt ${payment.receipt.receiptNo} is in the app.`,
         readAt: null, createdAt: new Date().toISOString(),
       })
       persist()
@@ -2714,7 +2843,31 @@ async function route(
     const target = state.requests.find((r) => r.id === parts[1] && r.residentId === user.id)
     if (!target) throw new DemoError(404, 'Request not found.')
 
-    if (!parts[2] && method === 'GET') return { status: 200, body: { ...serialize(target), events: target.events } }
+    const receiptPayment = () =>
+      state.payments.find((p) => p.requestId === target.id && p.receipt)
+
+    if (!parts[2] && method === 'GET') {
+      const paid = receiptPayment()
+      return {
+        status: 200,
+        body: {
+          ...serialize(target), events: target.events,
+          receiptNo: paid?.receipt?.receiptNo ?? null,
+          receiptIssuedAt: paid?.receipt?.issuedAt ?? null,
+          receiptCode: paid?.receipt?.verificationCode ?? null,
+        },
+      }
+    }
+
+    if (parts[2] === 'receipt' && method === 'GET') {
+      const paid = receiptPayment()
+      if (!paid) throw new DemoError(404, 'No receipt has been issued for this request.')
+      return {
+        status: 200,
+        blob: receiptFor(paid),
+        fileName: `official-receipt-${paid.receipt!.receiptNo}.pdf`,
+      }
+    }
 
     // Paying moved to /payments, where the server prices the intent and only a
     // signed callback settles it. Gone rather than redirected, as on the server.
@@ -2963,6 +3116,7 @@ async function route(
             method: p.method, amount: p.amountCentavos / 100, settledAt: p.settledAt,
             requestRef: requestFor(p.requestId)?.referenceNo ?? '—',
             serviceName: requestFor(p.requestId)?.serviceName ?? '—',
+            receiptNo: p.receipt?.receiptNo ?? null,
           })),
           // Not limited to the period, as on the server: a payment stuck since
           // last week is exactly what this list exists to surface.
@@ -2974,6 +3128,20 @@ async function route(
               note: p.note, requestRef: requestFor(p.requestId)?.referenceNo ?? '—',
             })),
         },
+      }
+    }
+
+    if (parts[1] === 'payments' && parts[2] && parts[3] === 'receipt' && method === 'GET') {
+      const staff = need('staff', 'admin')
+      if (staff.role !== 'admin' && !staff.departments.includes('treasury')) {
+        throw new DemoError(403, "The payment book is the treasury's.")
+      }
+      const paid = state.payments.find((p) => p.reference === parts[2] && p.receipt)
+      if (!paid) throw new DemoError(404, 'No receipt was issued for that payment.')
+      return {
+        status: 200,
+        blob: receiptFor(paid),
+        fileName: `official-receipt-${paid.receipt!.receiptNo}.pdf`,
       }
     }
 
@@ -3701,13 +3869,93 @@ async function route(
   // Same rules as server/src/routes/admin.ts: administrators only, the same
   // validation, and every change written to the audit trail with the old value.
   if (parts[0] === 'admin' &&
-      ['hotlines', 'holidays', 'offices', 'audit', 'certificates'].includes(parts[1] ?? '')) {
+      ['hotlines', 'holidays', 'offices', 'audit', 'certificates', 'municipality'].includes(parts[1] ?? '')) {
     const actor = need('admin')
     const audit = (action: string, target: string, before?: unknown, after?: unknown) => {
       state.audit.unshift({
         id: state.audit.length + 1, actorName: actor.fullName, action, target,
         before: before ?? null, after: after ?? null, createdAt: new Date().toISOString(),
       })
+    }
+
+    // ---- what an official receipt says ----
+    //
+    // The municipality's own name and province are not here: those belong to
+    // the register, and the schema stripping an unknown key is what makes the
+    // refusal happen rather than a check somebody has to remember.
+    if (parts[1] === 'municipality') {
+      const shown = () => ({
+        code: MUNICIPALITY.code, name: MUNICIPALITY.name, province: MUNICIPALITY.province,
+        ...state.municipality,
+        hasSeal: state.seal !== null,
+        sealUpdatedAt: state.sealUpdatedAt,
+      })
+
+      if (!parts[2] && method === 'GET') return { status: 200, body: shown() }
+
+      if (!parts[2] && method === 'PATCH') {
+        const allowed = [
+          'address', 'phone', 'email', 'website', 'tin', 'treasurerName',
+          'treasurerTitle', 'receiptPrefix', 'receiptFormLabel', 'receiptFooter',
+        ] as const
+        const patch: Partial<DemoMunicipality> = {}
+        for (const key of allowed) {
+          if (body && key in body) {
+            const value = body[key]
+            patch[key] = (typeof value === 'string' ? value.trim() : value) || null
+          }
+        }
+        if (Object.keys(patch).length === 0) throw new DemoError(400, 'Nothing to change.')
+        if (patch.receiptPrefix !== undefined) {
+          if (!patch.receiptPrefix || !/^[A-Z][A-Z0-9-]{0,11}$/.test(patch.receiptPrefix)) {
+            throw new DemoError(400, 'Use capital letters, digits and hyphens, starting with a letter.')
+          }
+        }
+        if (patch.treasurerTitle === null) patch.treasurerTitle = 'Municipal Treasurer'
+        const before = shown()
+        state.municipality = { ...state.municipality, ...patch } as DemoMunicipality
+        audit('municipality.update', MUNICIPALITY.code, before, shown())
+        persist()
+        return { status: 200, body: shown() }
+      }
+
+      if (parts[2] === 'seal' && method === 'PUT') {
+        if (!file) throw new DemoError(400, 'Choose an image to upload.')
+        if (file.size > 2 * 1024 * 1024) {
+          throw new DemoError(413, 'That file is too large. The limit is 2 MB.')
+        }
+        // The declared type is the caller's claim; the bytes are the fact.
+        const kind = sniff(new Uint8Array(await file.slice(0, 12).arrayBuffer()))
+        if (!kind || (kind.mime !== 'image/png' && kind.mime !== 'image/jpeg')) {
+          throw new DemoError(415, 'A seal has to be a PNG or JPEG image — those are the two a receipt can be printed with.')
+        }
+        const before = shown()
+        // Shrunk before it is stored: the real store takes 2 MB and
+        // localStorage does not, so the demo downscales rather than accepting
+        // an upload that would silently fail to persist.
+        state.seal = await shrinkToDataUrl(file, 240)
+        state.sealUpdatedAt = new Date().toISOString()
+        audit('municipality.seal.update', MUNICIPALITY.code, before, shown())
+        persist()
+        return { status: 200, body: shown() }
+      }
+
+      if (parts[2] === 'seal' && method === 'GET') {
+        if (!state.seal) throw new DemoError(404, 'No seal has been uploaded.')
+        return { status: 200, blob: dataUrlToBlob(state.seal, 'image/png') }
+      }
+
+      if (parts[2] === 'seal' && method === 'DELETE') {
+        if (!state.seal) throw new DemoError(404, 'No seal has been uploaded.')
+        const before = shown()
+        state.seal = null
+        state.sealUpdatedAt = null
+        audit('municipality.seal.remove', MUNICIPALITY.code, before, shown())
+        persist()
+        return { status: 200, body: shown() }
+      }
+
+      throw new DemoError(404, 'Not found.')
     }
 
     // ---- the shared certificate catalogue ----
@@ -3968,6 +4216,36 @@ function asDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error)
     reader.readAsDataURL(file)
   })
+}
+
+/**
+ * An image as a small PNG data URL.
+ *
+ * Only the demo needs this: the real server stores the bytes it was given, but
+ * localStorage would refuse a 2 MB seal, and a seal that looks uploaded and
+ * then vanishes on reload is worse than one that was refused. Falls back to the
+ * original bytes where canvas cannot decode the file.
+ */
+async function shrinkToDataUrl(file: File, edge: number): Promise<string> {
+  const original = await asDataUrl(file)
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => reject(new Error('undecodable'))
+      img.src = original
+    })
+    const scale = Math.min(1, edge / Math.max(image.width, image.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(image.width * scale))
+    canvas.height = Math.max(1, Math.round(image.height * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return original
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/png')
+  } catch {
+    return original
+  }
 }
 
 function dataUrlToBlob(dataUrl: string, type: string): Blob {

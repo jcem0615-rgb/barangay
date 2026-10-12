@@ -1427,6 +1427,86 @@ Programme names, ID labels and issuing offices are catalogue data, so they stay 
 in both languages, exactly like "Cedula" and "Building Permit"; the chrome around them
 ("Programs & assistance", "Valid until") is translated.
 
+## The electronic official receipt
+
+Every other thing this app issues leaves the resident holding something — a
+released document, a queue number, a reference. Money, which is the one
+transaction they are most likely to be asked to prove, left them with a line in
+a list. The eOR is the receipt for it.
+
+**It is written in the same transaction that settles the payment.** A settled
+payment always has a receipt; there is no half state where money arrived and
+nothing says so. That is the rule every notification in this app already
+follows, and it matters more here because this is the thing somebody produces at
+a counter. `receipts.payment_id` is unique, so a gateway retrying its callback
+— which is ordinary behaviour, not an attack — settles once and receipts once.
+
+**The seal is fetched before the transaction opens.** Reading it off the object
+store is file I/O, and holding a transaction open across it would turn a slow
+disk into a lock on the `payments` table. Nothing about the issuer depends on
+who wins the settle race, so `loadIssuer()` runs first and `issueReceipt()` does
+only CPU and two statements.
+
+**The rendered PDF is stored, not re-rendered.** A receipt is a record of what
+was said at the time. Re-rendering one from the municipality's current row would
+reprint last year's receipt over this year's treasurer's name and this year's
+seal, which is the one thing a receipt must never do — the same reasoning as the
+fee frozen onto a barangay request and the validity period frozen onto a
+certificate. `receipts.issuer` keeps the details as printed, for the
+verification screen and for anybody asking later what the receipt actually said.
+
+**One series for the municipality**, from `receipt_counters`, like every other
+number here: a receipt number is read down a phone and typed into a search box,
+so it has to identify one payment. A counter rather than `count(*)`, for the
+reason `request_counters` exists — concurrent settlements all read the same
+count and all but one collide on the unique index.
+
+**It carries a verification code, and the same endpoint checks it as checks a
+document.** A clerk holding a printout should not have to know which of the two
+kinds of paper they are looking at before they can check it, so `/api/verify/:code`
+resolves both and says which it found. Public on purpose: whoever is holding the
+receipt already has everything on it. The resident sees the code in the app too,
+so they can read it out at a counter without opening a PDF on a phone.
+
+**What the municipality prints on it is the administrator's to correct.** The
+address, telephone, email, website, TIN, the treasurer's name and title, the
+series prefix, the accountable form label and a footer note all live on the
+single-row `municipality` table and are edited in the **Municipality → Official
+receipt** tab. The municipality's own *name* and *province* are not editable
+there: what a place is called belongs to the register, which is the same rule
+the barangay's own name follows one tier down. The schema strips an unknown key,
+so a request trying to rename the municipality has nothing left to change and is
+refused as empty rather than quietly doing something different.
+
+**The seal is uploaded, because no seed can guess it.** PNG and JPEG only, and
+that is narrower than the ID-portrait rule on purpose: this image is drawn into
+a PDF and the PDF writer embeds nothing else, so a HEIC seal would be accepted,
+previewed, and then silently missing from every receipt. Type comes from the
+leading bytes, it is virus-scanned in memory before it reaches disk, and it is
+capped at 2 MB. Removing it keeps every receipt already printed with it, which
+is the whole point of storing the rendered PDF.
+
+**Every write is audited in the same transaction as the change**, with the row
+as it was — `admin_audit`, the same table and the same reasoning as the
+hotlines. An administrator can point a receipt's TIN anywhere. These actions
+also appear in the treasury's **fee changes** panel, which is not a stretch of
+that panel's meaning: a TIN or a treasurer that moved without the treasury
+noticing is something they find out from whoever audits them.
+
+**It is not an accountable form, and the console says so.** A Philippine LGU's
+Official Receipt is an accountable form, and issuing one electronically is
+something the municipality has to be authorised to do — BIR accreditation where
+it applies, COA concurrence for the form itself. Nothing in this app grants that
+authority. `receipt_form_label` is null by default and prints nothing: a form
+number this app invented would be worse than a receipt that cites none.
+
+**Only municipal payments produce one.** The barangay tier settles its fees at
+the hall and this app never sees that money (see *Known simplifications*), and a
+receipt for a payment the server did not confirm would be the app asserting
+something it cannot know — which is the precise thing the payment design exists
+to refuse. A service with no fee has no receipt either; an official receipt for
+nothing is not a document.
+
 ## Known simplifications (intentional, flag if scope grows)
 
 - **PhilSys sync** is visual only. A production build would call a real PhilSys
@@ -1536,6 +1616,24 @@ in both languages, exactly like "Cedula" and "Building Permit"; the chrome aroun
   the first-time jobseeker certificate's year (RA 11261); **that the same law makes it a
   one-time availment is not enforced here**, so nothing stops a resident requesting a
   second.
+- **The eOR is this app's receipt, not an accredited accountable form.** It is
+  real, numbered from one series, verifiable and frozen at issue — but whether it
+  stands as the municipality's Official Receipt depends on authority the
+  municipality holds and this app cannot grant: BIR accreditation where it
+  applies, and COA concurrence for the form. `receipt_form_label` stays blank
+  until the LGU fills in the form number it was actually issued, and the console
+  says so where somebody would otherwise type one in.
+- **A receipt is issued only for a payment the gateway confirmed**, which today
+  means only municipal fees paid in-app. Nothing issues one for cash over a
+  counter or for a barangay fee settled at the hall — doing so would mean the app
+  recording a payment it never saw. An LGU that wants counter receipts needs a
+  staff-side "money received at the window" route, and that is an accountability
+  surface worth designing deliberately rather than bolting on.
+- **The seeded receipt details are placeholders**, exactly like the hotlines: the
+  address is approximate, the telephone number and email are invented, **the TIN
+  is not a real one**, and the treasurer named has never held the office. They are
+  seeded so a fresh database produces a receipt that looks like one, and they are
+  corrected in the Municipality tab before anybody sees a receipt.
 - **Nothing warns a resident that a certificate is about to lapse.** It reads as lapsed on
   the day, which is honest, but a notification a week out is the thing that would actually
   save the trip — and it is a scheduled job, which this app does not have anywhere yet.

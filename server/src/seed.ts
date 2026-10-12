@@ -187,12 +187,36 @@ async function main() {
     // The code is left alone once set: changing it would orphan every account
     // already stamped with the old one, which is a migration somebody has to
     // decide on, not something a re-seed should do quietly.
+    //
+    // The receipt details are filled into *blanks only* on a re-seed. The
+    // Municipality tab is where they are corrected, and a seed that overwrote a
+    // treasurer's name or a corrected TIN every time somebody ran it would make
+    // the editing screen a lie. Null means nobody has set it yet.
     await client.query(
-      `insert into municipality (only_row, code, name, province)
-       values (true, $1, $2, $3)
+      `insert into municipality
+         (only_row, code, name, province, address, phone, email, website, tin,
+          treasurer_name, treasurer_title, receipt_prefix, receipt_form_label,
+          receipt_footer)
+       values (true, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        on conflict (only_row) do update set
-         name = excluded.name, province = excluded.province`,
-      [TOWN.code, TOWN.name, TOWN.province]
+         name = excluded.name,
+         province = excluded.province,
+         address = coalesce(municipality.address, excluded.address),
+         phone = coalesce(municipality.phone, excluded.phone),
+         email = coalesce(municipality.email, excluded.email),
+         website = coalesce(municipality.website, excluded.website),
+         tin = coalesce(municipality.tin, excluded.tin),
+         treasurer_name = coalesce(municipality.treasurer_name, excluded.treasurer_name),
+         receipt_form_label = coalesce(municipality.receipt_form_label, excluded.receipt_form_label),
+         receipt_footer = coalesce(municipality.receipt_footer, excluded.receipt_footer)`,
+      [
+        TOWN.code, TOWN.name, TOWN.province,
+        blankToNull(TOWN.address), blankToNull(TOWN.phone), blankToNull(TOWN.email),
+        blankToNull(TOWN.website), blankToNull(TOWN.tin), blankToNull(TOWN.treasurerName),
+        TOWN.treasurerTitle || 'Municipal Treasurer',
+        TOWN.receiptPrefix || 'OR',
+        blankToNull(TOWN.receiptFormLabel), blankToNull(TOWN.receiptFooter),
+      ]
     )
 
     // Accounts made before residency scoping existed. This deployment has only
@@ -340,3 +364,9 @@ main().catch((err) => {
   console.error(err)
   process.exit(1)
 })
+
+/** An unset environment variable is a blank string; the column wants a null. */
+function blankToNull(value: string | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}

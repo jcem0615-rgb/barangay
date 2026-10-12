@@ -8,6 +8,7 @@ import { deliverNotification, recordNotification } from '../notifications.ts'
 import {
   MockProvider, PaymentError, newReference, paymentProvider, signPayload,
 } from '../payments.ts'
+import { issueReceipt, loadIssuer } from '../receipts.ts'
 import { toPesos } from '../serialize.ts'
 
 /**
@@ -104,9 +105,13 @@ paymentsRouter.get('/intents/:reference', async (req, res) => {
   const payment = await one<{
     reference: string; status: string; amount_centavos: number
     provider_ref: string | null; method: string | null; request_id: string; note: string | null
+    receipt_no: string | null
   }>(
-    `select reference, status, amount_centavos, provider_ref, method, request_id, note
-       from payments where reference = $1 and resident_id = $2`,
+    `select p.reference, p.status, p.amount_centavos, p.provider_ref, p.method,
+            p.request_id, p.note, rc.receipt_no
+       from payments p
+       left join receipts rc on rc.payment_id = p.id
+      where p.reference = $1 and p.resident_id = $2`,
     [req.params.reference, req.user!.id]
   )
   if (!payment) return res.status(404).json({ error: 'Payment not found.' })
@@ -118,6 +123,9 @@ paymentsRouter.get('/intents/:reference', async (req, res) => {
     method: payment.method,
     requestId: payment.request_id,
     note: payment.note,
+    // The screen the resident is standing on when the money lands is the right
+    // place to hand them the receipt, rather than making them go and find it.
+    receiptNo: payment.receipt_no,
   })
 })
 
@@ -208,9 +216,21 @@ paymentWebhookRouter.post(
 
     const payment = await one<{
       id: string; request_id: string; resident_id: string; amount_centavos: number; status: string
+      reference_no: string; service_name: string; resident_name: string; resident_address: string | null
     }>(
-      `select id, request_id, resident_id, amount_centavos, status
-         from payments where reference = $1`,
+      // Joined rather than fetched again inside the transaction: everything the
+      // receipt prints about the payer and what they paid for is already here,
+      // and a receipt written in the settling transaction cannot afford to go
+      // looking for it halfway through.
+      `select p.id, p.request_id, p.resident_id, p.amount_centavos, p.status,
+              r.reference_no, s.name as service_name,
+              u.full_name as resident_name, rp.address as resident_address
+         from payments p
+         join requests r on r.id = p.request_id
+         join services s on s.id = r.service_id
+         join users u on u.id = p.resident_id
+         left join resident_profiles rp on rp.user_id = p.resident_id
+        where p.reference = $1`,
       [verified.reference]
     )
     if (!payment) {
@@ -244,6 +264,11 @@ paymentWebhookRouter.post(
       // gateway to retry would bury the mismatch under duplicates.
       return res.json({ received: true })
     }
+
+    // Read before the transaction: fetching the seal is file I/O, and holding
+    // a transaction open across it would turn a slow disk into a lock on the
+    // payments table. None of it depends on who wins the settle race.
+    const issuer = verified.outcome === 'settled' ? await loadIssuer() : null
 
     const settled = await transaction(async (client) => {
       const event = await client.query(
@@ -297,12 +322,43 @@ paymentWebhookRouter.post(
         ]
       )
 
+      // The receipt, in the same transaction as the settlement. A settled
+      // payment always has one — there is no half state where money arrived and
+      // nothing says so, which is the rule every notification here follows and
+      // matters more for the thing a resident may have to produce at a counter.
+      const receipt = issuer
+        ? await issueReceipt(client, {
+            paymentId: payment.id,
+            requestId: payment.request_id,
+            issuedTo: payment.resident_name,
+            issuedToAddress: payment.resident_address,
+            particulars: `${payment.service_name} (${payment.reference_no})`,
+            amountCentavos: payment.amount_centavos,
+            paymentMethod: verified.method,
+            provider: provider.name,
+            providerRef: verified.providerRef,
+            paymentReference: verified.reference,
+            issuer,
+          })
+        : null
+      if (receipt) {
+        await client.query(
+          `insert into request_events (request_id, actor_id, event_type, from_step, to_step, note)
+           values ($1, $2, 'receipt', $3, $3, $4)`,
+          [payment.request_id, payment.resident_id, STEP_RELEASE,
+           `Official receipt ${receipt.receiptNo} issued`]
+        )
+      }
+
       const notification = {
         userId: payment.resident_id,
         requestId: payment.request_id,
         kind: 'request_paid' as const,
         title: 'Payment received',
-        body: `We have received ${toPesos(payment.amount_centavos)} for ${row.reference_no}.`,
+        body: receipt
+          ? `We have received ${toPesos(payment.amount_centavos)} for ${row.reference_no}. ` +
+            `Your official receipt ${receipt.receiptNo} is in the app.`
+          : `We have received ${toPesos(payment.amount_centavos)} for ${row.reference_no}.`,
       }
       await recordNotification(client, notification)
       return notification

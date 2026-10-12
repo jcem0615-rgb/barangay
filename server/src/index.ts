@@ -43,7 +43,14 @@ app.use(
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
         scriptSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:'],
+        // `blob:` is not covered by 'self' and has to be named. Every image
+        // this app holds behind a bearer token is fetched as a blob and handed
+        // to the DOM as an object URL, because <img src> cannot carry the
+        // token: the resident's ID portrait, the face a clerk sees when they
+        // check an ID, incident evidence in the console, and the municipal seal
+        // on the receipt screen. Without this they are all silently blocked in
+        // production and render as broken images with only a console warning.
+        imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],

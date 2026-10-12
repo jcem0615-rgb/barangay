@@ -24,10 +24,36 @@ import type {
  * resident reads. Changing the code on a live deployment strands every account
  * already registered under the old one, so it is not something to edit casually.
  */
+/**
+ * The municipality this development copy serves.
+ *
+ * `code`, `name` and `province` are the register's. Everything below them is
+ * what the municipality prints on an official receipt, and **every one of those
+ * values is a placeholder** on exactly the same footing as the emergency
+ * hotlines: the address is approximate, the telephone number and email are
+ * invented, the TIN is not a real one, and the treasurer named has never held
+ * the office. They are seeded so a fresh database produces a receipt that looks
+ * like a receipt; they are corrected in the Municipality tab, and a real
+ * deployment sets them from the environment and never edits this file.
+ */
 export const MUNICIPALITY = {
   code: 'malasiqui-pangasinan',
   name: 'Malasiqui',
   province: 'Pangasinan',
+  address: 'Municipal Hall, Poblacion, Malasiqui, Pangasinan 2421',
+  phone: '(075) 632-0000',
+  email: 'treasury@malasiqui.gov.ph',
+  website: 'malasiqui.gov.ph',
+  // Not a real TIN. Replace with the municipality's own before launch.
+  tin: '000-000-000-00000',
+  treasurerName: 'Aurelio B. Mendoza',
+  treasurerTitle: 'Municipal Treasurer',
+  receiptPrefix: 'OR',
+  // Deliberately empty. A receipt citing an accountable form number this app
+  // invented would be worse than one citing none, so nothing is printed until
+  // the municipality fills in the form it was actually issued.
+  receiptFormLabel: '',
+  receiptFooter: 'Keep this receipt. Present it when claiming your document at the counter.',
 } as const
 
 /**

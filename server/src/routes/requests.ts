@@ -288,7 +288,23 @@ requestsRouter.get('/:id', async (req, res) => {
        from request_events where request_id = $1 order by created_at`,
     [row.id]
   )
-  res.json({ ...(await serializeWithReady(row)), events })
+  // The receipt, if the payment settled. Carried on the detail rather than the
+  // list: it is one join, and the only screen that offers the download is this
+  // one.
+  const receipt = await one<{ receipt_no: string; issued_at: Date; verification_code: string }>(
+    `select receipt_no, issued_at, verification_code from receipts where request_id = $1`,
+    [row.id]
+  )
+  res.json({
+    ...(await serializeWithReady(row)),
+    events,
+    receiptNo: receipt?.receipt_no ?? null,
+    receiptIssuedAt: receipt?.issued_at.toISOString() ?? null,
+    // The code printed on their own receipt. No new exposure — it is on the
+    // paper they are already holding — and it saves a resident at a counter
+    // from having to open a PDF to read it out.
+    receiptCode: receipt?.verification_code ?? null,
+  })
 })
 
 /**
@@ -323,6 +339,30 @@ requestsRouter.get('/:id/document', async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `attachment; filename="${doc.file_name}"`)
   res.send(doc.content)
+})
+
+/**
+ * The official receipt for this request's payment.
+ *
+ * Scoped through the request's own resident_id, like the released document
+ * above: another resident's receipt is not found rather than refused, because
+ * the ownership is part of the query rather than a check somebody has to
+ * remember to write.
+ */
+requestsRouter.get('/:id/receipt', async (req, res) => {
+  const receipt = await one<{ file_name: string; content: Buffer }>(
+    `select rc.file_name, rc.content
+       from receipts rc
+       join requests r on r.id = rc.request_id
+      where rc.request_id = $1 and r.resident_id = $2`,
+    [req.params.id, req.user!.id]
+  )
+  if (!receipt) {
+    return res.status(404).json({ error: 'No receipt has been issued for this request.' })
+  }
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="${receipt.file_name}"`)
+  res.send(receipt.content)
 })
 
 // Held in memory so the bytes can be type-checked before anything is written to

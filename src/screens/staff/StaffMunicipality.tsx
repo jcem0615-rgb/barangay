@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Building2, CalendarDays, Loader2, Phone, Plus, Trash2, FileText } from 'lucide-react'
+import {
+  AlertTriangle, Building2, CalendarDays, Loader2, Phone, Plus, ReceiptText, Trash2,
+  FileText, Upload,
+} from 'lucide-react'
 import CertificateCatalogue, { type CatalogueDraft } from '../../components/CertificateCatalogue'
 import {
   api, ApiError,
-  type AuditRow, type CertificateType, type Holiday, type Hotline, type OfficeContact,
+  type AuditRow, type CertificateType, type Holiday, type Hotline,
+  type MunicipalityDetails, type OfficeContact,
 } from '../../lib/api'
 
 /**
@@ -22,7 +26,7 @@ import {
  * who mistypes the fire hotline needs the old number back, not a note that
  * somebody changed something.
  */
-type Tab = 'hotlines' | 'holidays' | 'offices' | 'certificates' | 'audit'
+type Tab = 'hotlines' | 'holidays' | 'offices' | 'receipt' | 'certificates' | 'audit'
 
 export default function StaffMunicipality() {
   const [tab, setTab] = useState<Tab>('hotlines')
@@ -34,6 +38,7 @@ export default function StaffMunicipality() {
           ['hotlines', 'Emergency hotlines', Phone],
           ['holidays', 'Holiday calendar', CalendarDays],
           ['offices', 'Office details', Building2],
+          ['receipt', 'Official receipt', ReceiptText],
           ['certificates', 'Barangay certificates', FileText],
           ['audit', 'What changed', AlertTriangle],
         ] as const).map(([key, label, Icon]) => (
@@ -52,6 +57,7 @@ export default function StaffMunicipality() {
       {tab === 'hotlines' && <Hotlines />}
       {tab === 'holidays' && <Holidays />}
       {tab === 'offices' && <Offices />}
+      {tab === 'receipt' && <Receipt />}
       {tab === 'certificates' && <SharedCertificates />}
       {tab === 'audit' && <Audit />}
     </div>
@@ -431,12 +437,20 @@ const ACTIONS: Record<string, string> = {
   'holiday.update': 'Corrected a non-working day',
   'holiday.delete': 'Removed a non-working day',
   'office.update': 'Updated office details',
+  'municipality.update': 'Changed what the official receipt says',
+  'municipality.seal.update': 'Uploaded a new municipal seal',
+  'municipality.seal.remove': 'Removed the municipal seal',
 }
 
 const describe = (row: AuditRow) => `${ACTIONS[row.action] ?? row.action} — ${row.target}`
 
 /** The fields worth reading back, in the order someone checking would want them. */
-const READABLE = ['label', 'agency', 'phone', 'name', 'officeName', 'address', 'hours', 'email', 'isLocal', 'isNational'] as const
+const READABLE = [
+  'label', 'agency', 'phone', 'name', 'officeName', 'address', 'hours', 'email',
+  'isLocal', 'isNational',
+  'website', 'tin', 'treasurerName', 'treasurerTitle', 'receiptPrefix',
+  'receiptFormLabel', 'receiptFooter', 'hasSeal',
+] as const
 
 const show = (value: unknown) =>
   value === null || value === undefined || value === '' ? '—' : String(value)
@@ -582,6 +596,186 @@ const Input = ({ value, onChange, placeholder }: { value: string; onChange: (v: 
   />
 )
 
+
+/* ----------------------------------------------------------------- receipt */
+
+/**
+ * What an official receipt says, and the seal printed on it.
+ *
+ * Every field here is on a document a resident keeps and may be asked to
+ * produce years later, which is why it is editable at all: a seeded TIN, a
+ * seeded address and a treasurer who left office two elections ago are exactly
+ * the sort of thing nobody can correct by reseeding a database.
+ *
+ * What is *not* editable is the municipality's own name and province. Those
+ * belong to the register — the same rule a barangay's name follows one tier
+ * down — so they are shown and locked rather than left out, because an
+ * administrator looking for them should find out why rather than wonder.
+ */
+function Receipt() {
+  const [row, setRow] = useState<MunicipalityDetails | null>(null)
+  const [edit, setEdit] = useState<MunicipalityDetails | null>(null)
+  const [seal, setSeal] = useState<string | null>(null)
+  const { loading, error, setError, run, reload } = useLoader(
+    useCallback(async () => {
+      const next = await api.municipalityDetails()
+      setRow(next)
+      setEdit(next)
+    }, [])
+  )
+
+  // The seal is fetched as a blob and handed to the DOM as an object URL,
+  // because <img src> cannot carry the bearer token — the same reason the ID
+  // portrait is loaded this way.
+  useEffect(() => {
+    if (!row?.hasSeal) { setSeal(null); return }
+    let url: string | null = null
+    let live = true
+    void api.municipalSeal()
+      .then((blob) => {
+        // Null where the row says there is a seal and the stored file has gone.
+        if (!live || !blob) return
+        url = URL.createObjectURL(blob)
+        setSeal(url)
+      })
+      .catch(() => setSeal(null))
+    return () => {
+      live = false
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [row?.hasSeal, row?.sealUpdatedAt])
+
+  const dirty = !!row && !!edit && FIELDS.some(([key]) => (edit[key] ?? '') !== (row[key] ?? ''))
+
+  return (
+    <Panel
+      title="Official receipt"
+      blurb="What every electronic official receipt this municipality issues will say, and the seal printed on it. A receipt already issued keeps the details it was printed with — changing these affects the next one, never one somebody is already holding."
+      error={error}
+      loading={loading}
+    >
+      {edit && row && (
+        <div className="space-y-4">
+          {/* The seal */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="font-display text-[14px] font-bold text-navy-950">Municipal seal</p>
+            <p className="mt-0.5 max-w-2xl text-[12.5px] leading-snug text-slate-600">
+              Printed at the head of every receipt and faintly behind it. PNG or JPEG only —
+              those are the two a receipt can actually be printed with, so anything else is
+              refused rather than accepted and silently left off. A transparent PNG looks best.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-4">
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50">
+                {seal ? (
+                  <img src={seal} alt="The municipality's seal" className="max-h-20 max-w-20 object-contain" />
+                ) : (
+                  <span className="px-2 text-center text-[11px] text-slate-500">No seal</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <label className="tap-target inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-navy-800 px-4 py-2 text-[13px] font-semibold text-white active:bg-navy-900">
+                  <Upload size={14} /> {row.hasSeal ? 'Replace seal' : 'Upload seal'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      if (file) void run(async () => { await api.uploadMunicipalSeal(file); await reload() })
+                    }}
+                  />
+                </label>
+                {row.hasSeal && (
+                  <button
+                    onClick={() => void run(async () => { await api.removeMunicipalSeal(); await reload() })}
+                    className="tap-target inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-medium text-slate-600"
+                  >
+                    <Trash2 size={14} /> Remove
+                  </button>
+                )}
+              </div>
+            </div>
+            {row.sealUpdatedAt && (
+              <p className="mt-3 text-[12px] text-slate-500">
+                Uploaded {new Date(row.sealUpdatedAt).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}.
+                Receipts issued before now keep the seal they were printed with.
+              </p>
+            )}
+          </div>
+
+          {/* The municipality, as it is printed */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="font-display text-[14px] font-bold text-navy-950">Printed on the receipt</p>
+            <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[12.5px] text-slate-600">
+              <span className="font-semibold text-navy-950">{row.name}, {row.province}</span>
+              {' '}comes from this deployment's register and is not editable here — what a place
+              is called is not a thing an administrator retypes.
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {FIELDS.map(([key, label, placeholder, hint]) => (
+                <Field key={key} label={label}>
+                  <Input
+                    value={edit[key] ?? ''}
+                    onChange={(v) => setEdit({ ...edit, [key]: v || null })}
+                    placeholder={placeholder}
+                  />
+                  {hint && <span className="text-[11.5px] leading-snug text-slate-500">{hint}</span>}
+                </Field>
+              ))}
+            </div>
+            {dirty && (
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => void run(async () => {
+                    await api.updateMunicipality(
+                      Object.fromEntries(FIELDS.map(([key]) => [key, edit[key]])) as never
+                    )
+                    await reload()
+                  })}
+                  className="rounded-xl bg-navy-800 px-4 py-2 text-[13px] font-semibold text-white active:bg-navy-900"
+                >
+                  Save changes
+                </button>
+                <button
+                  onClick={() => { setEdit(row); setError(null) }}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-medium text-slate-600"
+                >
+                  Discard
+                </button>
+              </div>
+            )}
+          </div>
+
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] leading-snug text-amber-900">
+            <strong className="font-semibold">An official receipt is an accountable form.</strong>{' '}
+            This app issues a receipt for a payment its own payment provider confirmed. Whether
+            that stands as this municipality's Official Receipt depends on the authority the
+            municipality holds to issue one electronically — BIR accreditation where it applies,
+            and COA concurrence for the form itself. Leave the accountable form number blank
+            until you have been issued one; a number nobody authorised is worse than none.
+          </p>
+        </div>
+      )}
+    </Panel>
+  )
+}
+
+/** The editable fields, in the order somebody filling this in would want them. */
+const FIELDS = [
+  ['address', 'Municipal hall address', 'Municipal Hall, Poblacion, Malasiqui, Pangasinan 2421', null],
+  ['phone', 'Telephone', '(075) 632-0000', 'Ring it before saving. A number that rings nowhere is worse than none.'],
+  ['email', 'Email', 'treasury@malasiqui.gov.ph', null],
+  ['website', 'Website', 'malasiqui.gov.ph', null],
+  ['tin', 'TIN', '000-000-000-00000', 'The municipality\'s own, as the BIR issued it.'],
+  ['treasurerName', 'Treasurer', 'Aurelio B. Mendoza', 'The name the receipt is issued over. It changes with the office.'],
+  ['treasurerTitle', 'Title', 'Municipal Treasurer', null],
+  ['receiptPrefix', 'Receipt series prefix', 'OR', 'Capitals, digits and hyphens. Numbering continues; changing this never renumbers a receipt already issued.'],
+  ['receiptFormLabel', 'Accountable form number', 'Accountable Form No. 51', 'Leave blank unless the municipality has been issued one. Nothing is printed when it is blank.'],
+  ['receiptFooter', 'Footer note', 'Keep this receipt. Present it when claiming your document at the counter.', null],
+] as const satisfies ReadonlyArray<
+  readonly [keyof MunicipalityDetails, string, string, string | null]
+>
 
 /**
  * The shared barangay certificate catalogue.

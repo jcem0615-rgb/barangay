@@ -42,6 +42,21 @@ export const PORTRAIT_DESCRIPTION = 'JPEG, PNG, or HEIC'
 export const MAX_PORTRAIT_BYTES = 4 * 1024 * 1024
 
 /**
+ * The municipality's seal, for the official receipt.
+ *
+ * PNG and JPEG only, and narrower than the portrait rule on purpose: this image
+ * is drawn into a PDF, and the PDF writer embeds nothing else. HEIC is a
+ * perfectly good photograph and a seal that cannot be printed — accepting one
+ * would mean an administrator uploading a seal, seeing it in the console, and
+ * finding out it is missing only when a resident opens a receipt.
+ */
+export const SEAL_TYPES = new Set(['image/png', 'image/jpeg'])
+export const SEAL_DESCRIPTION = 'PNG or JPEG'
+
+/** A seal is a small mark. 2 MB is already generous for one. */
+export const MAX_SEAL_BYTES = 2 * 1024 * 1024
+
+/**
  * Evidence on an incident report: a photograph, or a video.
  *
  * Video is a different animal from every other upload here. A requirement photo

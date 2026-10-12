@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
+import multer from 'multer'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { authenticate, hashPassword, requireRole } from '../auth.ts'
@@ -9,6 +10,10 @@ import { env } from '../env.ts'
 import { isRealDate, looksDialable, recordAudit } from '../municipality.ts'
 import { clearHolidayCache } from '../schedule.ts'
 import { servedMunicipality } from '../identity.ts'
+import { MUNICIPALITY_SELECT, type MunicipalityRow } from '../receipts.ts'
+import { getFile, putFile, removeFile } from '../storage.ts'
+import { detectType, MAX_SEAL_BYTES, SEAL_DESCRIPTION, SEAL_TYPES } from '../uploads.ts'
+import { scanBuffer } from '../antivirus.ts'
 import {
   certificateCreateSchema, certificateEditSchema, createCertificateType,
   serializeCertificateType, updateCertificateType, withdrawCertificateType,
@@ -551,6 +556,237 @@ adminRouter.delete('/certificates/:id', async (req, res) => {
   )
   if (!row) return res.status(404).json({ error: 'Not found, or already in that state.' })
   res.json(serializeCertificateType(row))
+})
+
+// ---------------------------------------------------------------------------
+// What the municipality prints on an official receipt
+//
+// The register decides what a place is called, so `name`, `province` and `code`
+// are not here — the same rule the barangay's own name follows one tier down.
+// What *is* here is everything the municipality knows and no seed can keep
+// correct: where the hall is, how to reach it, its TIN, who signs as treasurer,
+// the series its receipts are numbered in, and the accountable form it is
+// authorised to cite.
+//
+// Every write is audited in the same transaction as the change, with the row as
+// it was. An administrator can point a receipt's TIN or treasurer anywhere, and
+// a record with the old value in it is the only defence against a mistake
+// nobody notices — exactly the reasoning behind the hotlines.
+// ---------------------------------------------------------------------------
+
+const serializeMunicipality = (row: MunicipalityRow & { seal_updated_at: Date | null; code: string }) => ({
+  code: row.code,
+  name: row.name,
+  province: row.province,
+  address: row.address,
+  phone: row.phone,
+  email: row.email,
+  website: row.website,
+  tin: row.tin,
+  treasurerName: row.treasurer_name,
+  treasurerTitle: row.treasurer_title,
+  receiptPrefix: row.receipt_prefix,
+  receiptFormLabel: row.receipt_form_label,
+  receiptFooter: row.receipt_footer,
+  hasSeal: row.seal_key !== null,
+  sealUpdatedAt: row.seal_updated_at?.toISOString() ?? null,
+})
+
+/**
+ * Only the fields an administrator may correct.
+ *
+ * `name`, `province` and `code` are deliberately absent: an unknown key is
+ * stripped by the schema, so a request trying to rename the municipality
+ * changes nothing and is refused as empty rather than quietly doing something
+ * different. That is the same shape the office-details patch has.
+ */
+const municipalityBody = z.object({
+  address: z.string().trim().max(200).nullable(),
+  phone: z.union([phone, z.null()]),
+  email: z.union([z.email().max(160), z.null()]),
+  website: z.string().trim().max(200).nullable(),
+  tin: z.string().trim().max(40).nullable(),
+  treasurerName: z.string().trim().max(120).nullable(),
+  treasurerTitle: z.string().trim().min(2).max(120),
+  // Printed in front of every receipt number, so it has to survive being read
+  // down a phone: capitals, digits and hyphens only.
+  receiptPrefix: z.string().trim().min(1).max(12).regex(
+    /^[A-Z][A-Z0-9-]*$/,
+    'Use capital letters, digits and hyphens, starting with a letter.'
+  ),
+  // The accountable form the municipality was actually issued. Null prints
+  // nothing: a form number this app invented would be worse than none.
+  receiptFormLabel: z.string().trim().max(120).nullable(),
+  receiptFooter: z.string().trim().max(400).nullable(),
+})
+
+const MUNICIPALITY_COLUMNS = {
+  address: 'address', phone: 'phone', email: 'email', website: 'website', tin: 'tin',
+  treasurerName: 'treasurer_name', treasurerTitle: 'treasurer_title',
+  receiptPrefix: 'receipt_prefix', receiptFormLabel: 'receipt_form_label',
+  receiptFooter: 'receipt_footer',
+} as const
+
+adminRouter.get('/municipality', async (_req, res) => {
+  const row = await one<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+    `select ${MUNICIPALITY_SELECT} from municipality limit 1`
+  )
+  if (!row) return res.status(404).json({ error: 'This deployment has no municipality row yet.' })
+  res.json(serializeMunicipality(row))
+})
+
+adminRouter.patch('/municipality', async (req, res) => {
+  const parsed = municipalityBody.partial().safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the details.' })
+  }
+  const patch = parsed.data
+  const keys = Object.keys(patch) as Array<keyof typeof MUNICIPALITY_COLUMNS>
+  if (keys.length === 0) return res.status(400).json({ error: 'Nothing to change.' })
+  const actor = req.user!
+
+  const updated = await transaction(async (client) => {
+    const existing = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+      `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
+    )
+    if (existing.rowCount === 0) return null
+    const assignments = keys.map((key, i) => `${MUNICIPALITY_COLUMNS[key]} = $${i + 1}`)
+    const { rows } = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+      `update municipality set ${assignments.join(', ')} returning ${MUNICIPALITY_SELECT}`,
+      keys.map((key) => patch[key] ?? null)
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'municipality.update', target: existing.rows[0]!.code,
+      before: serializeMunicipality(existing.rows[0]!),
+      after: serializeMunicipality(rows[0]!),
+    })
+    return rows[0]!
+  })
+  if (!updated) return res.status(404).json({ error: 'This deployment has no municipality row yet.' })
+  res.json(serializeMunicipality(updated))
+})
+
+// ---------------------------------------------------------------------------
+// The seal
+//
+// Uploaded rather than shipped, because a seal belongs to the municipality and
+// no seed can guess it. Stored in the same object store as a resident's ID
+// portrait — a seal is a small picture, and the store already exists.
+//
+// PNG and JPEG only, decided by the leading bytes rather than the filename.
+// Narrower than the portrait rule on purpose: this image is drawn into a PDF,
+// and a seal that cannot be drawn is worse than none at all because nothing
+// would say so until a receipt came out blank.
+// ---------------------------------------------------------------------------
+
+const sealUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_SEAL_BYTES, files: 1 },
+})
+
+adminRouter.put('/municipality/seal', sealUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choose an image to upload.' })
+
+  const detected = detectType(req.file.buffer)
+  if (!detected || !SEAL_TYPES.has(detected.contentType)) {
+    return res.status(415).json({
+      error: `A seal has to be a ${SEAL_DESCRIPTION} image — those are the two a receipt can be printed with.`,
+    })
+  }
+
+  // Scanned in memory, so nothing infected reaches disk. Fails closed where the
+  // scanner is configured and unreachable, exactly as attachments do.
+  const scan = await scanBuffer(req.file.buffer)
+  if (scan.status === 'infected') {
+    console.warn(`rejected municipal seal from ${req.user!.id}: ${scan.signature}`)
+    return res.status(422).json({ error: 'That file was rejected by our virus scan.' })
+  }
+  if (scan.status === 'unavailable') {
+    console.error(`virus scan unavailable: ${scan.reason}`)
+    return res.status(503).json({ error: "We can't check files for viruses right now. Please try again shortly." })
+  }
+
+  const actor = req.user!
+  const stored = await putFile(req.file.buffer)
+
+  const outcome = await transaction(async (client) => {
+    const existing = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+      `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
+    )
+    if (existing.rowCount === 0) return null
+    const { rows } = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+      `update municipality set seal_key = $1, seal_type = $2, seal_updated_at = now()
+       returning ${MUNICIPALITY_SELECT}`,
+      [stored.storageKey, detected.contentType]
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'municipality.seal.update', target: existing.rows[0]!.code,
+      before: serializeMunicipality(existing.rows[0]!),
+      after: serializeMunicipality(rows[0]!),
+    })
+    return { previous: existing.rows[0]!.seal_key, row: rows[0]! }
+  })
+  if (!outcome) {
+    await removeFile(stored.storageKey)
+    return res.status(404).json({ error: 'This deployment has no municipality row yet.' })
+  }
+
+  // Only once the new one is recorded, so a failed write cannot leave the
+  // municipality with no seal at all.
+  if (outcome.previous) await removeFile(outcome.previous)
+  res.json(serializeMunicipality(outcome.row))
+})
+
+/** The preview in the console. Admin-only, like everything else on this router. */
+adminRouter.get('/municipality/seal', async (_req, res) => {
+  const row = await one<{ seal_key: string | null; seal_type: string | null }>(
+    `select seal_key, seal_type from municipality limit 1`
+  )
+  if (!row?.seal_key) return res.status(404).json({ error: 'No seal has been uploaded.' })
+
+  let content: Buffer
+  try {
+    content = await getFile(row.seal_key)
+  } catch {
+    return res.status(410).json({ error: 'That image is no longer available.' })
+  }
+  // Inline because the console renders it. Safe only because the type came from
+  // the magic bytes and SVG is not among the accepted ones.
+  res.setHeader('Content-Type', row.seal_type ?? 'image/png')
+  res.setHeader('Content-Disposition', 'inline')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Cache-Control', 'private, no-store')
+  res.send(content)
+})
+
+adminRouter.delete('/municipality/seal', async (req, res) => {
+  const actor = req.user!
+  const outcome = await transaction(async (client) => {
+    const existing = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+      `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
+    )
+    if (existing.rowCount === 0 || !existing.rows[0]!.seal_key) return null
+    const { rows } = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+      `update municipality set seal_key = null, seal_type = null, seal_updated_at = null
+       returning ${MUNICIPALITY_SELECT}`
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'municipality.seal.remove', target: existing.rows[0]!.code,
+      before: serializeMunicipality(existing.rows[0]!),
+      after: serializeMunicipality(rows[0]!),
+    })
+    return { previous: existing.rows[0]!.seal_key, row: rows[0]! }
+  })
+  if (!outcome) return res.status(404).json({ error: 'No seal has been uploaded.' })
+
+  // Receipts already issued keep theirs: the image was drawn into the PDF when
+  // it was rendered, which is the whole reason a receipt is stored rather than
+  // re-rendered on demand.
+  await removeFile(outcome.previous!)
+  res.json(serializeMunicipality(outcome.row))
 })
 
 /** The trail, newest first. Read-only — nothing in the app writes here twice. */

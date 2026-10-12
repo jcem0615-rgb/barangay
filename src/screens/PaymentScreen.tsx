@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CheckCircle2, ChevronRight, Loader2, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Download, Loader2, ShieldCheck } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import { useAppData } from '../lib/appData'
 import { useNav } from '../lib/nav'
+import { saveBlob } from '../lib/download'
 import { api, ApiError, IS_DEMO } from '../lib/api'
 import { formatPeso } from '../lib/money'
 import { useT } from '../lib/i18n'
@@ -25,6 +26,10 @@ export default function PaymentScreen({ id }: { id: string }) {
   const [step, setStep] = useState<'select' | 'confirm' | 'processing' | 'done'>('select')
   const [error, setError] = useState<string | null>(null)
   const [reference, setReference] = useState<string | null>(null)
+  // Handed over on the screen the resident is standing on when the money lands,
+  // rather than making them go and find it.
+  const [receiptNo, setReceiptNo] = useState<string | null>(null)
+  const [gettingReceipt, setGettingReceipt] = useState(false)
   const { t } = useT()
 
   // Polling, rather than trusting our own return from the provider. The
@@ -41,6 +46,7 @@ export default function PaymentScreen({ id }: { id: string }) {
         if (!live) return
         if (state.status === 'settled') {
           settled.current = true
+          setReceiptNo(state.receiptNo)
           await refresh()
           if (live) setStep('done')
         } else if (state.status === 'failed' || state.status === 'mismatched') {
@@ -92,9 +98,34 @@ export default function PaymentScreen({ id }: { id: string }) {
         <p className="mt-2 max-w-xs text-[calc(14.5px_*_var(--text-scale))] leading-relaxed text-slate-500">
           {t('pay.successBlurb', { amount: formatPeso(app.fee), method: selected ?? '' })}
         </p>
+        {receiptNo && (
+          <>
+            <p className="mt-4 max-w-xs text-[calc(13.5px_*_var(--text-scale))] leading-relaxed text-slate-500">
+              {t('pay.receiptReady', { no: receiptNo })}
+            </p>
+            <button
+              disabled={gettingReceipt}
+              onClick={async () => {
+                setGettingReceipt(true)
+                try {
+                  const { blob, fileName } = await api.receipt(app.id)
+                  saveBlob(blob, fileName)
+                } catch {
+                  // The receipt is also on the request itself; a failed download
+                  // here is not worth derailing a successful payment screen.
+                } finally {
+                  setGettingReceipt(false)
+                }
+              }}
+              className="tap-target mt-4 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl border border-navy-800 py-3 text-[calc(14.5px_*_var(--text-scale))] font-semibold text-navy-800 active:bg-navy-50 disabled:opacity-70"
+            >
+              <Download size={16} /> {gettingReceipt ? t('detail.preparing') : t('pay.getReceipt')}
+            </button>
+          </>
+        )}
         <button
           onClick={() => replace({ name: 'application-detail', id: app.id })}
-          className="mt-7 w-full max-w-xs rounded-xl bg-navy-800 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-white active:bg-navy-900"
+          className={`w-full max-w-xs rounded-xl bg-navy-800 py-3.5 text-[calc(15px_*_var(--text-scale))] font-semibold text-white active:bg-navy-900 ${receiptNo ? 'mt-3' : 'mt-7'}`}
         >
           {t('pay.backToRequest')}
         </button>

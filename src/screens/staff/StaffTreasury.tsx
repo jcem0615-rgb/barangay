@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Loader2, Wallet, Receipt } from 'lucide-react'
+import { AlertTriangle, Loader2, Wallet, Receipt, ReceiptText } from 'lucide-react'
 import { api, ApiError, type FeeChange } from '../../lib/api'
+import { saveBlob } from '../../lib/download'
 import { formatPeso } from '../../lib/money'
 
 /**
@@ -25,6 +26,21 @@ export default function StaffTreasury() {
   const [book, setBook] = useState<Awaited<ReturnType<typeof api.paymentsBook>> | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reprinting, setReprinting] = useState<string | null>(null)
+
+  /** A copy of the receipt already issued, not a new one. */
+  const reprint = useCallback(async (reference: string) => {
+    setReprinting(reference)
+    setError(null)
+    try {
+      const { blob, fileName } = await api.staffReceipt(reference)
+      saveBlob(blob, fileName)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not open that receipt.')
+    } finally {
+      setReprinting(null)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setBusy(true)
@@ -96,6 +112,7 @@ export default function StaffTreasury() {
                     <th className="px-4 py-2.5 font-semibold">Service</th>
                     <th className="px-4 py-2.5 font-semibold">Method</th>
                     <th className="px-4 py-2.5 font-semibold">Gateway reference</th>
+                    <th className="px-4 py-2.5 font-semibold">Official receipt</th>
                     <th className="px-4 py-2.5 text-right font-semibold">Amount</th>
                   </tr>
                 </thead>
@@ -111,6 +128,25 @@ export default function StaffTreasury() {
                       {/* What somebody working down a bank statement has. */}
                       <td className="px-4 py-2.5 font-mono text-[12px] text-slate-600">
                         {row.providerRef ?? row.reference}
+                      </td>
+                      {/*
+                        The receipt the resident is holding. Reprinting hands
+                        them the same one rather than a second, differently
+                        numbered receipt — the stored PDF is what is served.
+                      */}
+                      <td className="px-4 py-2.5">
+                        {row.receiptNo ? (
+                          <button
+                            onClick={() => void reprint(row.reference)}
+                            disabled={reprinting === row.reference}
+                            className="inline-flex items-center gap-1.5 font-mono text-[12px] font-semibold text-navy-800 underline-offset-2 hover:underline disabled:opacity-60"
+                          >
+                            <ReceiptText size={13} />
+                            {reprinting === row.reference ? 'Preparing…' : row.receiptNo}
+                          </button>
+                        ) : (
+                          <span className="text-[12px] text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-right font-semibold text-navy-950">{formatPeso(row.amount)}</td>
                     </tr>

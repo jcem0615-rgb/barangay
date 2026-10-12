@@ -1,4 +1,4 @@
-import { CalendarClock, CloudOff, Download, FileEdit, Wallet2 } from 'lucide-react'
+import { CalendarClock, CloudOff, Download, FileEdit, ReceiptText, Wallet2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import StatusPill from '../components/StatusPill'
 import ReadyDate from '../components/ReadyDate'
@@ -27,6 +27,11 @@ export default function ApplicationDetail({ id }: { id: string }) {
   const { findCategory, findService } = useCatalogue()
   const { t } = useT()
   const [downloading, setDownloading] = useState(false)
+  const [receiptDownloading, setReceiptDownloading] = useState(false)
+  // Fetched rather than taken off the list: a receipt number is one left join
+  // on one screen, and the list does not need it. Same shape as the rating
+  // below, which is already fetched here for the same reason.
+  const [receipt, setReceipt] = useState<{ no: string; code: string | null } | null>(null)
   // A rating already given must show as given, or the app asks the same
   // question every time the screen is opened.
   const [rating, setRating] = useState<{ rating: number; comment: string | null } | null>(null)
@@ -40,6 +45,17 @@ export default function ApplicationDetail({ id }: { id: string }) {
     }
   }, [id])
   useEffect(() => { void loadRating() }, [loadRating])
+  useEffect(() => {
+    let live = true
+    void api.myRequest(id)
+      .then((full) => {
+        if (live && full.receiptNo) setReceipt({ no: full.receiptNo, code: full.receiptCode })
+      })
+      // A receipt that will not load is not worth an error banner on a screen
+      // whose job is the request itself; the button simply does not appear.
+      .catch(() => undefined)
+    return () => { live = false }
+  }, [id])
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const { push, replace } = useNav()
   const app = applications.find((a) => a.id === id)
@@ -163,6 +179,59 @@ export default function ApplicationDetail({ id }: { id: string }) {
             existing={rating}
             onRated={() => void loadRating()}
           />
+        )}
+
+        {/*
+          The receipt appears as soon as the payment settles, which is well
+          before the document exists — paying carries a request to the release
+          step without closing it. Making a resident wait for the office to
+          finish before they can prove they paid would be the wrong way round.
+        */}
+        {receipt && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-50 text-navy-800">
+                <ReceiptText size={17} />
+              </span>
+              <div className="min-w-0">
+                <p className="font-display text-[calc(14.5px_*_var(--text-scale))] font-semibold text-navy-950">
+                  {t('detail.receiptIssued', { no: receipt.no })}
+                </p>
+                <p className="mt-0.5 text-[calc(13px_*_var(--text-scale))] text-slate-500">
+                  {t('detail.receiptHint')}
+                </p>
+                {/*
+                  The code printed on the receipt, shown here so a resident at a
+                  counter can read it out without opening the PDF on a phone.
+                */}
+                {receipt.code && (
+                  <p className="mt-2 font-mono text-[calc(12.5px_*_var(--text-scale))] tracking-wide text-navy-800">
+                    {receipt.code}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              disabled={receiptDownloading}
+              onClick={async () => {
+                setReceiptDownloading(true)
+                setDownloadError(null)
+                try {
+                  const { blob, fileName } = await api.receipt(app.id)
+                  saveBlob(blob, fileName)
+                } catch (err) {
+                  setDownloadError(
+                    err instanceof ApiError ? err.message : t('detail.receiptError')
+                  )
+                } finally {
+                  setReceiptDownloading(false)
+                }
+              }}
+              className="tap-target mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-navy-800 py-3 text-[calc(14.5px_*_var(--text-scale))] font-semibold text-navy-800 transition active:bg-navy-50 disabled:opacity-70"
+            >
+              <Download size={16} /> {receiptDownloading ? t('detail.preparing') : t('detail.receipt')}
+            </button>
+          </div>
         )}
 
         {app.status === 'completed' && (

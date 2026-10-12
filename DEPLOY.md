@@ -49,6 +49,21 @@ Everything is environment variables. Only the first two are required.
 | `PAYMENT_SECRET` | **to take money** | The secret the gateway signs callbacks with. The server refuses to start in production without it |
 | `PUBLIC_URL` | **yes, if mailing** | Address residents reach; reset and notification links use it |
 | `SMS_TRANSPORT` | optional | `http` plus `SMS_URL`/`SMS_API_KEY` to text residents |
+| `MUNICIPALITY_ADDRESS` | for receipts | The hall's address as it should read on an official receipt |
+| `MUNICIPALITY_PHONE` | for receipts | Printed on the receipt. Ring it before you set it |
+| `MUNICIPALITY_EMAIL` | for receipts | Printed on the receipt |
+| `MUNICIPALITY_WEBSITE` | for receipts | Printed on the receipt |
+| `MUNICIPALITY_TIN` | for receipts | The municipality's own TIN. **The seeded one is invented** |
+| `MUNICIPALITY_TREASURER` | for receipts | The name a receipt is issued over. Changes with the office |
+| `MUNICIPALITY_TREASURER_TITLE` | no | Defaults to `Municipal Treasurer` |
+| `RECEIPT_PREFIX` | no | Series prefix, default `OR`. Capitals, digits and hyphens |
+| `RECEIPT_FORM_LABEL` | no | The accountable form the LGU was issued, e.g. `Accountable Form No. 51`. **Leave unset unless you have one** |
+| `RECEIPT_FOOTER` | no | The municipality's own note at the foot of the receipt |
+
+All of the receipt variables are seeded **into blanks only**. The Municipality tab is
+where they are corrected, and a reseed that overwrote a treasurer's name every time
+somebody ran it would make the editing screen a lie. Set them here for a fresh
+deployment; change them in the app afterwards.
 
 ### TRUST_PROXY is not optional guesswork
 
@@ -107,6 +122,17 @@ usually `1` behind a single load balancer or ingress.
       from a secret store
 - [ ] A test payment has been taken end to end, and the treasury's **Payments** tab shows
       it with the gateway's own reference beside it
+- [ ] **The official receipt is this municipality's.** Open **Municipality → Official
+      receipt** and set the hall's address, telephone, email, **the real TIN** (the seeded
+      one is invented) and the treasurer's name, then upload the municipal seal as a PNG
+      or JPEG. A test payment's receipt has been downloaded and read end to end by
+      somebody from the treasury
+- [ ] **Somebody with the authority to say so has decided whether this receipt is an
+      Official Receipt.** It is numbered, verifiable and frozen at issue, but an LGU's OR
+      is an accountable form: issuing one electronically needs BIR accreditation where it
+      applies and COA concurrence for the form. Leave the accountable form number blank
+      until the municipality has been issued one — a number nobody authorised is worse
+      than none — and tell the treasury in writing what the app does and does not claim
 - [ ] Every municipal hotline, **the electric cooperative included**, has been **rung** and answered by the office it names —
       the seed ships invented numbers under a real town's name, and 911 and 143 are the
       only two that are correct as published
@@ -263,6 +289,8 @@ over. In particular:
       apply anywhere else
 - [ ] `DATABASE_URL` points at this town's database and nothing else's, and a restore
       procedure exists that cannot cross them
+- [ ] The receipt details and the seal are this town's — none of the seeded ones apply
+      anywhere else, and the TIN least of all
 
 ## Scaling
 
@@ -303,6 +331,14 @@ Deploying does not make these real, and residents will notice:
   and nothing in the app verifies one. The municipal side renders a signed-at-release PDF
   with a verification code; the barangay side does not.
 - **Nothing is paid online at the barangay.** The fee is quoted in the app and settled at
-  the barangay hall on collection.
+  the barangay hall on collection, so no electronic receipt is issued for it — the app
+  never saw that money, and a receipt for a payment it cannot confirm would be an
+  assertion rather than a record.
+- **The electronic official receipt is real but is not an accredited accountable form.**
+  It is issued in the settling transaction, numbered from one municipal series, carries a
+  verification code anybody can check, and is frozen against later edits. Whether it
+  stands as this municipality's Official Receipt is a question of authority the app
+  cannot grant — see the pre-launch checklist. Nothing issues a receipt for cash taken
+  over a counter.
 - **Sessions** are 12-hour JWTs with no refresh or revocation list. Signing out
   clears the token client-side; it stays valid until it expires.

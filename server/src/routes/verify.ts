@@ -29,14 +29,42 @@ verifyRouter.get('/:code', async (req, res) => {
   )
 
   if (!row) {
+    // A receipt carries a code for the same reason a document does, so the same
+    // endpoint answers for both: a clerk holding a printout should not have to
+    // know which of the two kinds of paper they are looking at before they can
+    // check it.
+    const receipt = await one<{
+      receipt_no: string; issued_to: string; particulars: string
+      amount_centavos: number; issued_at: Date; issuer: { municipality?: string }
+    }>(
+      `select receipt_no, issued_to, particulars, amount_centavos, issued_at, issuer
+         from receipts where verification_code = $1`,
+      [code]
+    )
+    if (receipt) {
+      return res.json({
+        valid: true,
+        kind: 'receipt',
+        referenceNo: receipt.receipt_no,
+        documentType: 'Official Receipt',
+        issuedBy: receipt.issuer?.municipality ?? 'the municipality',
+        issuedTo: receipt.issued_to,
+        issuedAt: receipt.issued_at.toISOString(),
+        particulars: receipt.particulars,
+        // Pesos, like everywhere else that crosses the wire.
+        amount: receipt.amount_centavos / 100,
+        status: 'settled',
+      })
+    }
     return res.status(404).json({
       valid: false,
-      error: 'No document matches that code. It may have been mistyped.',
+      error: 'No document or receipt matches that code. It may have been mistyped.',
     })
   }
 
   res.json({
     valid: true,
+    kind: 'document',
     referenceNo: row.reference_no,
     documentType: row.service_name,
     issuedBy: row.office_name,

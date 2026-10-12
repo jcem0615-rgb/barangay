@@ -921,6 +921,11 @@ const paymentsBookSchema = z.object({ from: z.iso.date(), to: z.iso.date() })
 const MONEY_ACTIONS = [
   'certificate.create', 'certificate.update', 'certificate.withdraw', 'certificate.restore',
   'barangay_fee.update',
+  // Not a fee, but squarely the treasury's: these change what an official
+  // receipt says — the TIN on it, the treasurer it is issued over, the series
+  // it is numbered in, the seal printed on it. A treasurer who cannot see that
+  // the TIN moved finds out from whoever audits them.
+  'municipality.update', 'municipality.seal.update', 'municipality.seal.remove',
 ]
 
 staffRouter.get('/fee-changes', async (req, res) => {
@@ -972,12 +977,14 @@ staffRouter.get('/payments', async (req, res) => {
   const settled = await query<{
     reference: string; provider: string; provider_ref: string | null; method: string | null
     amount_centavos: number; settled_at: string; reference_no: string; service_name: string
+    receipt_no: string | null
   }>(
     `select p.reference, p.provider, p.provider_ref, p.method, p.amount_centavos,
-            p.settled_at, r.reference_no, s.name as service_name
+            p.settled_at, r.reference_no, s.name as service_name, rc.receipt_no
        from payments p
        join requests r on r.id = p.request_id
        join services s on s.id = r.service_id
+       left join receipts rc on rc.payment_id = p.id
       where p.status = 'settled'
         and p.settled_at >= $1::date and p.settled_at < ($2::date + interval '1 day')
       order by p.settled_at desc`,
@@ -1014,6 +1021,9 @@ staffRouter.get('/payments', async (req, res) => {
       settledAt: row.settled_at,
       requestRef: row.reference_no,
       serviceName: row.service_name,
+      // Null only for payments that settled before receipts existed; the
+      // console says so rather than showing a blank.
+      receiptNo: row.receipt_no,
     })),
     unsettled: unsettled.map((row) => ({
       reference: row.reference,
@@ -1026,6 +1036,33 @@ staffRouter.get('/payments', async (req, res) => {
       requestRef: row.reference_no,
     })),
   })
+})
+
+/**
+ * A copy of the receipt, for the office that collects the money.
+ *
+ * Same gate as the book it is read from. A resident at a counter saying they
+ * never got theirs is the ordinary case this exists for, and the treasury
+ * reprinting the stored PDF hands them the same receipt rather than a second,
+ * differently-numbered one.
+ */
+staffRouter.get('/payments/:reference/receipt', async (req, res) => {
+  const user = req.user!
+  if (user.role !== 'admin' && !user.departments.includes('treasury')) {
+    return res.status(403).json({ error: 'The payment book is the treasury\'s.' })
+  }
+  const receipt = await one<{ file_name: string; content: Buffer }>(
+    `select rc.file_name, rc.content
+       from receipts rc
+       join payments p on p.id = rc.payment_id
+      where p.reference = $1`,
+    [req.params.reference]
+  )
+  if (!receipt) return res.status(404).json({ error: 'No receipt was issued for that payment.' })
+
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="${receipt.file_name}"`)
+  res.send(receipt.content)
 })
 
 // ---------------------------------------------------------------- incidents

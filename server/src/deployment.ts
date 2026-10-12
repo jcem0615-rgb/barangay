@@ -25,6 +25,21 @@ export interface ConfiguredMunicipality {
   code: string
   name: string
   province: string
+  /**
+   * What goes on an official receipt. Seeded only into blanks, because the
+   * Municipality tab is where these are corrected and a re-seed must not undo
+   * somebody's correction.
+   */
+  address: string
+  phone: string
+  email: string
+  website: string
+  tin: string
+  treasurerName: string
+  treasurerTitle: string
+  receiptPrefix: string
+  receiptFormLabel: string
+  receiptFooter: string
   /** Whether this came from the environment or from the sample data. */
   source: 'environment' | 'sample'
 }
@@ -38,14 +53,37 @@ export interface ConfiguredMunicipality {
  * why `boot` below refuses to start rather than letting it happen quietly.
  */
 export function configuredMunicipality(): ConfiguredMunicipality {
+  // The receipt details fall back to the sample individually rather than as a
+  // block: a deployment that sets its own address and telephone number but has
+  // not yet been told its TIN should get the one it set and a blank for the
+  // rest, not the sample town's.
+  const receipt = {
+    address: trimmed('MUNICIPALITY_ADDRESS') ?? '',
+    phone: trimmed('MUNICIPALITY_PHONE') ?? '',
+    email: trimmed('MUNICIPALITY_EMAIL') ?? '',
+    website: trimmed('MUNICIPALITY_WEBSITE') ?? '',
+    tin: trimmed('MUNICIPALITY_TIN') ?? '',
+    treasurerName: trimmed('MUNICIPALITY_TREASURER') ?? '',
+    treasurerTitle: trimmed('MUNICIPALITY_TREASURER_TITLE') ?? 'Municipal Treasurer',
+    receiptPrefix: trimmed('RECEIPT_PREFIX') ?? 'OR',
+    receiptFormLabel: trimmed('RECEIPT_FORM_LABEL') ?? '',
+    receiptFooter: trimmed('RECEIPT_FOOTER') ?? '',
+  }
+
   const code = trimmed('MUNICIPALITY_CODE')
-  if (!code) return { ...MUNICIPALITY, source: 'sample' }
+  if (!code) return { ...MUNICIPALITY, ...stripBlanks(receipt), source: 'sample' }
   return {
     code,
     name: trimmed('MUNICIPALITY_NAME') ?? code,
     province: trimmed('MUNICIPALITY_PROVINCE') ?? '',
+    ...receipt,
     source: 'environment',
   }
+}
+
+/** Blank means "not configured", so the sample value underneath stands. */
+function stripBlanks<T extends Record<string, string>>(values: T): Partial<T> {
+  return Object.fromEntries(Object.entries(values).filter(([, v]) => v !== '')) as Partial<T>
 }
 
 const rosterSchema = z.array(z.object({

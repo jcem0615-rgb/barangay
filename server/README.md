@@ -378,6 +378,7 @@ npm run test:barangay-office  # the hall's details, who may correct them, and wh
 npm run test:kagawad      # the council's view: figures not people, and the escalation line
 npm run test:certificates  # the catalogue: who owns which half, and the fee trail treasury reads
 npm run test:deployment   # one deployment per municipality: config, roster, and the boot refusal
+npm run test:receipts     # the eOR: issued with the settlement, one series, frozen at issue
 ```
 
 Run them one at a time, or clear `login_attempts` between them. Every suite signs

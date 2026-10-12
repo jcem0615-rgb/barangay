@@ -258,6 +258,31 @@ export interface IdCheck {
   checkedAt: string
 }
 
+/**
+ * What the municipality prints on an official receipt.
+ *
+ * `code`, `name` and `province` are read-only here: what a place is called
+ * belongs to the register, which is the same rule a barangay's own name follows
+ * one tier down. Everything else is the administrator's to correct.
+ */
+export interface MunicipalityDetails {
+  code: string
+  name: string
+  province: string
+  address: string | null
+  phone: string | null
+  email: string | null
+  website: string | null
+  tin: string | null
+  treasurerName: string | null
+  treasurerTitle: string
+  receiptPrefix: string
+  receiptFormLabel: string | null
+  receiptFooter: string | null
+  hasSeal: boolean
+  sealUpdatedAt: string | null
+}
+
 export interface ReportRow {
   departmentId: string
   departmentName: string
@@ -647,7 +672,15 @@ export const api = {
 
   myRequests: () => request<Application[]>('/requests'),
 
-  myRequest: (id: string) => request<Application & { events: RequestEvent[] }>(`/requests/${id}`),
+  myRequest: (id: string) =>
+    request<Application & {
+      events: RequestEvent[]
+      /** Set once a payment for this request has settled. */
+      receiptNo: string | null
+      receiptIssuedAt: string | null
+      /** The code printed on it, for reading out at a counter. */
+      receiptCode: string | null
+    }>(`/requests/${id}`),
 
   submitRequest: (
     serviceId: string,
@@ -661,6 +694,9 @@ export const api = {
     }),
 
   document: (id: string) => downloadPdf(`/requests/${id}/document`),
+
+  /** The official receipt for this request's payment, for the resident who paid. */
+  receipt: (id: string) => downloadPdf(`/requests/${id}/receipt`),
 
   notifications: () =>
     request<{ notifications: Notification[]; unread: number }>('/notifications'),
@@ -692,6 +728,10 @@ export const api = {
     downloadPdf(`/requests/${id}/attachments/${attachmentId}`),
 
   staffAttachments: (id: string) => request<Attachment[]>(`/staff/requests/${id}/attachments`),
+
+  /** A reprint of an issued receipt, for the treasury counter. */
+  staffReceipt: (reference: string) =>
+    downloadPdf(`/staff/payments/${encodeURIComponent(reference)}/receipt`),
 
   /** The resident's programme record, read through a request of theirs. */
   staffPrograms: (id: string) =>
@@ -751,6 +791,8 @@ export const api = {
       method: string | null
       requestId: string
       note: string | null
+      /** The official receipt, the moment the money lands. */
+      receiptNo: string | null
     }>(`/payments/intents/${encodeURIComponent(reference)}`),
 
   /**
@@ -1158,6 +1200,8 @@ export const api = {
       settled: Array<{
         reference: string; provider: string; providerRef: string | null; method: string | null
         amount: number; settledAt: string; requestRef: string; serviceName: string
+        /** Null only for payments settled before receipts existed. */
+        receiptNo: string | null
       }>
       unsettled: Array<{
         reference: string; provider: string; providerRef: string | null; status: string
@@ -1207,6 +1251,24 @@ export const api = {
 
   updateOffice: (id: string, body: Partial<Omit<OfficeContact, 'id' | 'name' | 'officeName'>>) =>
     request<OfficeContact>(`/admin/offices/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  /** What the municipality prints on a receipt, and its seal. */
+  municipalityDetails: () => request<MunicipalityDetails>('/admin/municipality'),
+
+  updateMunicipality: (body: Partial<Omit<MunicipalityDetails, 'code' | 'name' | 'province' | 'hasSeal' | 'sealUpdatedAt'>>) =>
+    request<MunicipalityDetails>('/admin/municipality', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  /** The seal as a blob, because <img src> cannot carry the bearer token. */
+  municipalSeal: () => fetchBlob('/admin/municipality/seal'),
+
+  uploadMunicipalSeal: (file: File) =>
+    uploadFile<MunicipalityDetails>('/admin/municipality/seal', file, undefined, 'PUT'),
+
+  removeMunicipalSeal: () =>
+    request<MunicipalityDetails>('/admin/municipality/seal', { method: 'DELETE' }),
 
   auditTrail: (limit = 50) => request<AuditRow[]>(`/admin/audit?limit=${limit}`),
 
