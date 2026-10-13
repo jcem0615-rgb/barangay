@@ -225,20 +225,48 @@ barangayRouter.get('/requests', async (req, res) => {
     id: string; reference_no: string; type_id: string; type_name: string
     purpose: string; fee_centavos: number; status: string
     requested_at: string; updated_at: string; note: string | null; barangay_name: string
-    valid_until: string | null
+    valid_until: string | null; has_certificate: boolean
   }>(
     `select r.id, r.reference_no, r.type_id, t.name as type_name, r.purpose,
             r.fee_centavos, r.status, r.requested_at, r.updated_at, r.note,
-            r.valid_until, b.name as barangay_name
+            r.valid_until, b.name as barangay_name,
+            d.request_id is not null as has_certificate,
+            d.verification_code as certificate_code
        from barangay_requests r
        join barangay_certificate_types t on t.id = r.type_id
        join barangays b on b.id = r.barangay_id
+       left join barangay_documents d on d.request_id = r.id
       where r.resident_id = $1
       order by r.requested_at desc
       limit 50`,
     [req.user!.id]
   )
   res.json(rows.map(serializeBarangayRequest))
+})
+
+/**
+ * The released certificate, for the resident it was issued to.
+ *
+ * Ownership is part of the query rather than a check afterwards, so another
+ * resident's certificate is simply not found — the same shape the municipal
+ * document download has.
+ */
+barangayRouter.get('/requests/:id/certificate', async (req, res) => {
+  const doc = await one<{ file_name: string; content: Buffer }>(
+    `select d.file_name, d.content
+       from barangay_documents d
+       join barangay_requests r on r.id = d.request_id
+      where d.request_id = $1 and r.resident_id = $2`,
+    [req.params.id, req.user!.id]
+  )
+  if (!doc) {
+    return res.status(404).json({
+      error: 'No certificate yet. The barangay issues it when the certificate is released.',
+    })
+  }
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="${doc.file_name}"`)
+  res.send(doc.content)
 })
 
 /** The day the office is on, for comparing a date against today. */
@@ -252,6 +280,8 @@ export function serializeBarangayRequest(row: {
   requested_at: string; updated_at: string; note: string | null
   barangay_name?: string; resident_name?: string
   valid_until?: string | Date | null
+  has_certificate?: boolean
+  certificate_code?: string | null
 }) {
   // A date column comes back as a Date from pg; take the calendar day off it
   // rather than an ISO timestamp, which would shift it in another time zone.
@@ -278,6 +308,13 @@ export function serializeBarangayRequest(row: {
     // register: a stored flag is wrong the day after it is written, and the
     // whole point of saying this is to say it on the day it becomes true.
     expired: validUntil !== null && validUntil < officeDay(),
+    // Whether there is a PDF to download. Only ever true once the barangay has
+    // released it — the certificate is written in that transaction.
+    hasCertificate: row.has_certificate ?? false,
+    // The code printed on their own certificate. No new exposure — it is on the
+    // paper they are holding — and it saves somebody at a counter from having
+    // to open a PDF on a phone to read it out.
+    certificateCode: row.certificate_code ?? null,
   }
 }
 

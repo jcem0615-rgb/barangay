@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  BadgeCheck, BookText, Building, Home, Landmark, Megaphone, CheckCircle2, Inbox, Loader2, LogOut,
-  PhilippinePeso, RefreshCw, UserPlus, Users,
+  BadgeCheck, BookText, Building, FileDown, Home, Landmark, Megaphone, CheckCircle2, Inbox,
+  Loader2, LogOut, PhilippinePeso, RefreshCw, UserPlus, Users,
 } from 'lucide-react'
 import { api, ApiError, type BarangayRequest, type CertificateType } from '../../lib/api'
 import BarangayBlotter from './BarangayBlotter'
@@ -10,6 +10,7 @@ import BarangayAnnouncements from './BarangayAnnouncements'
 import BarangayOffice from './BarangayOffice'
 import CertificateCatalogue, { type CatalogueDraft } from '../../components/CertificateCatalogue'
 import { useAuth } from '../../lib/auth'
+import { saveBlob } from '../../lib/download'
 import { formatPeso } from '../../lib/money'
 
 /**
@@ -317,6 +318,33 @@ function RequestPanel({ request, onChanged }: { request: BarangayRequest | null;
         <p className="mt-4 rounded-xl bg-slate-50 px-3.5 py-3 text-[12.5px] leading-snug text-slate-600">
           {request.note}
         </p>
+      )}
+
+      {/*
+        A copy of what was handed over, for the resident who lost theirs. It
+        reprints the stored PDF rather than making a second, differently coded
+        certificate — the same reasoning as the treasury reprinting a receipt.
+      */}
+      {request.hasCertificate && (
+        <button
+          onClick={async () => {
+            setBusy('certificate')
+            setError(null)
+            try {
+              const { blob, fileName } = await api.barangayStaffCertificate(request.id)
+              saveBlob(blob, fileName)
+            } catch (err) {
+              setError(err instanceof ApiError ? err.message : 'Could not open that certificate.')
+            } finally {
+              setBusy(null)
+            }
+          }}
+          disabled={busy !== null}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-navy-800 px-4 py-2.5 text-[13px] font-semibold text-navy-800 transition hover:bg-navy-50 disabled:opacity-60"
+        >
+          <FileDown size={14} />
+          {busy === 'certificate' ? 'Preparing…' : 'Print the certificate'}
+        </button>
       )}
 
       {moves.length === 0 ? (

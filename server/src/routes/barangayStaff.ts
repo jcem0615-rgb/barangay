@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
+import multer from 'multer'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { authenticate, hashPassword, requireRole } from '../auth.ts'
@@ -16,6 +17,12 @@ import { toCentavos, toPesos } from '../serialize.ts'
 import { deliverNotification, recordNotification } from '../notifications.ts'
 import { serializeBarangayRequest, serializeBarangayOffice, type BarangayOfficeRow } from './barangay.ts'
 import { looksDialable, recordAudit } from '../municipality.ts'
+import {
+  issueBarangayCertificate, loadBarangaySeal,
+} from '../barangayDocuments.ts'
+import { getFile, putFile, removeFile } from '../storage.ts'
+import { detectType, MAX_SEAL_BYTES, SEAL_DESCRIPTION, SEAL_TYPES } from '../uploads.ts'
+import { scanBuffer } from '../antivirus.ts'
 import { blotterRouter } from './blotter.ts'
 import { householdsRouter } from './households.ts'
 import { announcementsStaffRouter } from './announcements.ts'
@@ -38,8 +45,13 @@ async function ownBarangay(userId: string) {
   return one<{
     id: string; name: string; captain: string | null; secretary: string | null
     office_hours: string | null; phone: string | null
+    hall_address: string | null; email: string | null
   }>(
-    `select b.id, b.name, b.captain, b.secretary, b.office_hours, b.phone
+    // The hall's address and email ride along because a released certificate
+    // prints them, and this is already the one query that establishes which
+    // barangay the signed-in account belongs to.
+    `select b.id, b.name, b.captain, b.secretary, b.office_hours, b.phone,
+            b.hall_address, b.email
        from users u join barangays b on b.id = u.barangay_id
       where u.id = $1`,
     [userId]
@@ -80,15 +92,171 @@ barangayStaffRouter.get('/me', async (req, res) => {
  * resident is being shown — and only the administrator changes it.
  */
 barangayStaffRouter.get('/office', async (req, res) => {
-  const row = await one<BarangayOfficeRow & { id: string; name: string }>(
+  const row = await one<BarangayOfficeRow & {
+    id: string; name: string; seal_key: string | null; seal_updated_at: Date | null
+  }>(
     `select b.id, b.name, b.captain, b.secretary,
-            b.hall_address, b.office_hours, b.phone, b.email
+            b.hall_address, b.office_hours, b.phone, b.email,
+            b.seal_key, b.seal_updated_at
        from users u join barangays b on b.id = u.barangay_id
       where u.id = $1`,
     [req.user!.id]
   )
   if (!row) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
-  res.json({ id: row.id, name: row.name, ...serializeBarangayOffice(row) })
+  res.json({
+    id: row.id, name: row.name, ...serializeBarangayOffice(row),
+    hasSeal: row.seal_key !== null,
+    sealUpdatedAt: row.seal_updated_at?.toISOString() ?? null,
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The barangay's seal, and the certificates it has issued
+//
+// A certificate without the barangay's own seal reads as unofficial, and no
+// seed can guess what it looks like. Same store and the same narrow type set as
+// the municipal seal: PNG and JPEG only, because those are the two the PDF
+// writer embeds, and a seal that cannot be drawn would be accepted, previewed,
+// and then silently missing from every certificate.
+//
+// The administrator uploads it, both roles see it, and the API refuses the
+// officer's write regardless — the line the rest of this console already draws.
+// ---------------------------------------------------------------------------
+
+const sealUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_SEAL_BYTES, files: 1 },
+})
+
+barangayStaffRouter.put(
+  '/office/seal',
+  requireRole('barangay_admin'),
+  sealUpload.single('file'),
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Choose an image to upload.' })
+
+    const detected = detectType(req.file.buffer)
+    if (!detected || !SEAL_TYPES.has(detected.contentType)) {
+      return res.status(415).json({
+        error: `A seal has to be a ${SEAL_DESCRIPTION} image — those are the two a certificate can be printed with.`,
+      })
+    }
+
+    const scan = await scanBuffer(req.file.buffer)
+    if (scan.status === 'infected') {
+      console.warn(`rejected barangay seal from ${req.user!.id}: ${scan.signature}`)
+      return res.status(422).json({ error: 'That file was rejected by our virus scan.' })
+    }
+    if (scan.status === 'unavailable') {
+      console.error(`virus scan unavailable: ${scan.reason}`)
+      return res.status(503).json({ error: "We can't check files for viruses right now. Please try again shortly." })
+    }
+
+    const barangay = await ownBarangay(req.user!.id)
+    if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+    const stored = await putFile(req.file.buffer)
+    const previous = await transaction(async (client) => {
+      const existing = await client.query<{ seal_key: string | null }>(
+        `select seal_key from barangays where id = $1 for update`, [barangay.id]
+      )
+      await client.query(
+        `update barangays set seal_key = $2, seal_type = $3, seal_updated_at = now()
+          where id = $1`,
+        [barangay.id, stored.storageKey, detected.contentType]
+      )
+      await recordAudit(client, {
+        actorId: req.user!.id, actorName: req.user!.fullName,
+        action: 'barangay_seal.update', target: barangay.id,
+        before: { hasSeal: existing.rows[0]?.seal_key !== null },
+        after: { hasSeal: true },
+      })
+      return existing.rows[0]?.seal_key ?? null
+    })
+
+    // Only once the new one is recorded, so a failed write cannot leave the
+    // barangay with no seal at all.
+    if (previous) await removeFile(previous)
+    res.json({ hasSeal: true })
+  }
+)
+
+/** The preview in the console. Both roles, like the rest of the hall's details. */
+barangayStaffRouter.get('/office/seal', async (req, res) => {
+  const row = await one<{ seal_key: string | null; seal_type: string | null }>(
+    `select b.seal_key, b.seal_type
+       from users u join barangays b on b.id = u.barangay_id
+      where u.id = $1`,
+    [req.user!.id]
+  )
+  if (!row?.seal_key) return res.status(404).json({ error: 'No seal has been uploaded.' })
+
+  let content: Buffer
+  try {
+    content = await getFile(row.seal_key)
+  } catch {
+    return res.status(410).json({ error: 'That image is no longer available.' })
+  }
+  res.setHeader('Content-Type', row.seal_type ?? 'image/png')
+  res.setHeader('Content-Disposition', 'inline')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Cache-Control', 'private, no-store')
+  res.send(content)
+})
+
+barangayStaffRouter.delete('/office/seal', requireRole('barangay_admin'), async (req, res) => {
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const removed = await transaction(async (client) => {
+    const existing = await client.query<{ seal_key: string | null }>(
+      `select seal_key from barangays where id = $1 for update`, [barangay.id]
+    )
+    const key = existing.rows[0]?.seal_key ?? null
+    if (!key) return null
+    await client.query(
+      `update barangays set seal_key = null, seal_type = null, seal_updated_at = null
+        where id = $1`,
+      [barangay.id]
+    )
+    await recordAudit(client, {
+      actorId: req.user!.id, actorName: req.user!.fullName,
+      action: 'barangay_seal.remove', target: barangay.id,
+      before: { hasSeal: true }, after: { hasSeal: false },
+    })
+    return key
+  })
+  if (!removed) return res.status(404).json({ error: 'No seal has been uploaded.' })
+
+  // Certificates already issued keep theirs: the seal was drawn into the PDF
+  // when it was rendered, which is why a released certificate is stored rather
+  // than re-rendered on demand.
+  await removeFile(removed)
+  res.status(204).end()
+})
+
+/**
+ * A copy of a certificate this barangay issued.
+ *
+ * Scoped through `barangay_documents.barangay_id` in the same statement, so
+ * another barangay's certificate is not found rather than refused — there is
+ * nowhere to name one. Both roles, because reprinting for a resident who lost
+ * theirs is counter work rather than a decision.
+ */
+barangayStaffRouter.get('/requests/:id/certificate', async (req, res) => {
+  const barangay = await ownBarangay(req.user!.id)
+  if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+  const doc = await one<{ file_name: string; content: Buffer }>(
+    `select file_name, content from barangay_documents
+      where request_id = $1 and barangay_id = $2`,
+    [req.params.id, barangay.id]
+  )
+  if (!doc) return res.status(404).json({ error: 'No certificate has been released for this request.' })
+
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="${doc.file_name}"`)
+  res.send(doc.content)
 })
 
 /**
@@ -248,12 +416,31 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
   const barangay = await ownBarangay(req.user!.id)
   if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
 
+  // Read before the transaction: fetching the seal is file I/O, and holding a
+  // transaction open across it would make a slow disk into a lock on the
+  // barangay's queue. Neither depends on the release succeeding.
+  const sealSource = status === 'released'
+    ? await loadBarangaySeal(barangay.id)
+    : { seal: null, sealType: null }
+  const town = await servedMunicipality()
+
   const updated = await transaction(async (client) => {
     // Scoped to this barangay in the same statement that locks the row, so
     // another barangay's request is not found rather than refused.
-    const current = await client.query<{ id: string; status: string; reference_no: string; resident_id: string; type_id: string }>(
-      `select id, status, reference_no, resident_id, type_id
-         from barangay_requests where id = $1 and barangay_id = $2 for update`,
+    const current = await client.query<{
+      id: string; status: string; reference_no: string; resident_id: string; type_id: string
+      purpose: string; fee_centavos: number; valid_until: Date | string | null
+      type_name: string; resident_name: string; resident_address: string | null
+    }>(
+      `select r.id, r.status, r.reference_no, r.resident_id, r.type_id, r.purpose,
+              r.fee_centavos, r.valid_until, t.name as type_name,
+              u.full_name as resident_name, rp.address as resident_address
+         from barangay_requests r
+         join barangay_certificate_types t on t.id = r.type_id
+         join users u on u.id = r.resident_id
+         left join resident_profiles rp on rp.user_id = r.resident_id
+        where r.id = $1 and r.barangay_id = $2
+        for update of r`,
       [req.params.id, barangay.id]
     )
     const row = current.rows[0]
@@ -295,6 +482,52 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
       [row.id, status, note ?? null, req.user!.id, validity]
     )
 
+    /**
+     * The certificate itself, written in the same transaction as the release.
+     *
+     * `released` and not `ready`: `ready` means the paper has been prepared,
+     * `released` means the barangay has handed it over — and it takes its fee
+     * at the hall on collection, because nothing is paid online at this tier.
+     * A PDF at `ready` would hand somebody the certificate without their ever
+     * collecting or paying for it.
+     *
+     * The date it carries is the `valid_until` stamped at `ready`, not one
+     * worked out now. The paper was dated when it was prepared, and the copy
+     * has to say what the paper says.
+     */
+    let issued: { verificationCode: string; fileName: string } | null = null
+    if (status === 'released') {
+      const validUntil =
+        row.valid_until instanceof Date
+          ? row.valid_until.toLocaleDateString('en-CA')
+          : (row.valid_until ?? null)
+      issued = await issueBarangayCertificate(client, {
+        requestId: row.id,
+        barangayId: barangay.id,
+        issuedBy: req.user!.id,
+        data: {
+          referenceNo: row.reference_no,
+          certificateName: row.type_name,
+          purpose: row.purpose,
+          residentName: row.resident_name,
+          residentAddress: row.resident_address,
+          barangayName: barangay.name,
+          municipality: town.name,
+          province: town.province,
+          hallAddress: barangay.hall_address,
+          phone: barangay.phone,
+          email: barangay.email,
+          captain: barangay.captain,
+          secretary: barangay.secretary,
+          feePesos: row.fee_centavos / 100,
+          issuedAt: new Date(),
+          validUntil,
+          seal: sealSource.seal,
+          sealType: sealSource.sealType,
+        },
+      })
+    }
+
     const title =
       status === 'rejected'
         ? `${row.reference_no} — not issued`
@@ -309,9 +542,11 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
       status === 'ready'
         ? `Your certificate is ready at Barangay ${barangay.name}. Bring a valid ID.` +
           (barangay.office_hours ? ` Open ${barangay.office_hours}.` : '')
-        : note?.trim()
-          ? note.trim()
-          : `Your barangay certificate request is now ${status}.`
+        : status === 'released' && issued
+          ? `Your ${row.type_name} has been released. A copy you can show or print is in the app.`
+          : note?.trim()
+            ? note.trim()
+            : `Your barangay certificate request is now ${status}.`
 
     const notification = {
       userId: row.resident_id,

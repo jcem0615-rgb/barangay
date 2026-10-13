@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Building, CalendarClock, CheckCircle2, ChevronRight, Clock, Loader2 } from 'lucide-react'
+import { Building, CalendarClock, CheckCircle2, ChevronRight, Clock, Download, Loader2 } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import TierSwitch from '../components/TierSwitch'
 import AnnouncementBoard from '../components/AnnouncementBoard'
 import BarangayHallCard from '../components/BarangayHallCard'
 import { api, ApiError, type BarangayRequest } from '../lib/api'
+import { saveBlob } from '../lib/download'
 import { formatPeso } from '../lib/money'
 import { formatValidUntil } from '../lib/validity'
 import { useNav } from '../lib/nav'
@@ -123,6 +124,8 @@ function BarangayView({
 }) {
   const { t } = useT()
   const { push } = useNav()
+  const [downloading, setDownloading] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   return (
       <>
         {/* What the barangay is telling you, before what you can ask it for. */}
@@ -215,6 +218,55 @@ function BarangayView({
                     </span>
                   </p>
                 )}
+                {/*
+                  The certificate itself, once the barangay has released it.
+                  It only exists from `released` — the barangay takes its fee
+                  at the hall on collection, so a copy at `ready` would hand
+                  somebody the document without their ever going.
+                */}
+                {item.hasCertificate && (
+                  <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2.5">
+                    <p className="text-[calc(12.5px_*_var(--text-scale))] leading-snug text-emerald-900">
+                      {t('brgy.certificateHint')}
+                    </p>
+                    {/*
+                      The code printed on it, so somebody at a counter can read
+                      it out without opening a PDF on a phone.
+                    */}
+                    {item.certificateCode && (
+                      <p className="mt-1.5 font-mono text-[calc(12.5px_*_var(--text-scale))] tracking-wide text-emerald-800">
+                        {item.certificateCode}
+                      </p>
+                    )}
+                    <button
+                      disabled={downloading === item.id}
+                      onClick={async () => {
+                        setDownloading(item.id)
+                        setDownloadError(null)
+                        try {
+                          const { blob, fileName } = await api.barangayCertificate(item.id)
+                          saveBlob(blob, fileName)
+                        } catch (err) {
+                          setDownloadError(
+                            err instanceof ApiError ? err.message : t('brgy.certificateError')
+                          )
+                        } finally {
+                          setDownloading(null)
+                        }
+                      }}
+                      className="tap-target mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-white py-2.5 text-[calc(14px_*_var(--text-scale))] font-semibold text-emerald-700 transition active:bg-emerald-50 disabled:opacity-70"
+                    >
+                      <Download size={15} />
+                      {downloading === item.id ? t('detail.preparing') : t('brgy.certificate')}
+                    </button>
+                    {downloadError && downloading === null && (
+                      <p role="alert" className="mt-2 text-[calc(12.5px_*_var(--text-scale))] text-rose-700">
+                        {downloadError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {item.note && item.status === 'rejected' && (
                   <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-rose-800">
                     {item.note}

@@ -27,6 +27,10 @@ export interface BarangayRequest {
   validUntil?: string | null
   /** Derived on read by the server, never stored. */
   expired?: boolean
+  /** True once the barangay released it and the PDF was written. */
+  hasCertificate?: boolean
+  /** The code printed on it, for reading out at a counter. */
+  certificateCode?: string | null
 }
 
 /**
@@ -69,6 +73,9 @@ export interface BarangayOffice {
   officeHours: string | null
   phone: string | null
   email: string | null
+  /** Only on the barangay's own console read; the public list carries neither. */
+  hasSeal?: boolean
+  sealUpdatedAt?: string | null
 }
 
 export interface BlotterEntry {
@@ -843,6 +850,10 @@ export const api = {
 
   myCertificates: () => request<BarangayRequest[]>('/barangay/requests'),
 
+  /** The released certificate, for the resident it was issued to. */
+  barangayCertificate: (id: string) =>
+    downloadPdf(`/barangay/requests/${id}/certificate`),
+
   // ---- the barangay's own portal ----
 
   barangayStaffMe: () =>
@@ -871,10 +882,26 @@ export const api = {
   /** The hall's own details: both roles read, only the administrator writes. */
   barangayOffice: () => request<BarangayOffice>('/barangay-staff/office'),
 
-  updateBarangayOffice: (patch: Partial<Omit<BarangayOffice, 'id' | 'name'>>) =>
+  updateBarangayOffice: (patch: Partial<Omit<BarangayOffice, 'id' | 'name' | 'hasSeal' | 'sealUpdatedAt'>>) =>
     request<BarangayOffice>('/barangay-staff/office', {
       method: 'PATCH', body: JSON.stringify(patch),
     }),
+
+  /**
+   * The barangay's seal, printed on every certificate it releases.
+   * The administrator uploads and removes it; both roles can see it.
+   */
+  barangaySeal: () => fetchBlob('/barangay-staff/office/seal'),
+
+  uploadBarangaySeal: (file: File) =>
+    uploadFile<{ hasSeal: boolean }>('/barangay-staff/office/seal', file, undefined, 'PUT'),
+
+  removeBarangaySeal: () =>
+    request<void>('/barangay-staff/office/seal', { method: 'DELETE' }),
+
+  /** A copy of a certificate this barangay released, for the counter. */
+  barangayStaffCertificate: (id: string) =>
+    downloadPdf(`/barangay-staff/requests/${id}/certificate`),
 
   /** Shared catalogue plus this barangay's own; `own` says which it may edit. */
   // ---- the shared certificate catalogue, the municipality's ----

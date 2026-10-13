@@ -149,6 +149,14 @@ usually `1` behind a single load balancer or ingress.
       reconcile them. A resident who follows a wrong order makes exactly the wasted trip
       the guide exists to prevent, and the municipality's name on the screen is why they
       trusted it
+- [ ] **Each barangay has uploaded its own seal** (Barangay console → Hall), and somebody
+      has walked one certificate through to "released" and read the resulting PDF. It carries
+      the Punong Barangay and the Barangay Secretary from that barangay's own row — check
+      both names are the people currently holding those offices, because they are printed on
+      every certificate it releases and they change at every barangay election
+- [ ] **Each office has read the certificate's attestation wording and accepted it.** It is
+      generic across every certificate type; a barangay whose clearance form says something
+      specific will not find that text here
 - [ ] **Somebody has decided who in each barangay may open the blotter.** It names people
       accused of things and found guilty of nothing, and every account with a
       `barangay_officer` or `barangay_admin` role for that barangay can read the whole book.
@@ -326,10 +334,12 @@ Deploying does not make these real, and residents will notice:
   **Deploying with `PAYMENT_PROVIDER=mock` makes every permit free**, because the
   mock's own route settles a payment nobody made.
 - **PhilSys verification** and the ID **QR code** are visual only.
-- **A barangay certificate produces no document.** The request reaches "released" and the
-  resident is told to collect it; the barangay prints its own certificate as it always has,
-  and nothing in the app verifies one. The municipal side renders a signed-at-release PDF
-  with a verification code; the barangay side does not.
+- **A barangay certificate's wording is generic.** It now renders a real PDF at release,
+  with the barangay's seal, both signatories and a verification code anybody can check — but
+  the attestation text certifies that the barangay issued this certificate to this person
+  for this purpose, which is true of every type rather than the specific wording a real
+  clearance or indigency form carries. The municipal renderer has the same limitation. If
+  your offices need the exact text, it has to be authored per certificate type.
 - **Nothing is paid online at the barangay.** The fee is quoted in the app and settled at
   the barangay hall on collection, so no electronic receipt is issued for it — the app
   never saw that money, and a receipt for a payment it cannot confirm would be an

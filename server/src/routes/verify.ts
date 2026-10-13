@@ -56,9 +56,51 @@ verifyRouter.get('/:code', async (req, res) => {
         status: 'settled',
       })
     }
+    // The third kind. A clerk holding a printout should not have to know which
+    // tier issued it before they can check it, so one endpoint answers for a
+    // municipal document, a receipt and a barangay certificate alike.
+    const certificate = await one<{
+      reference_no: string; type_name: string; barangay_name: string
+      resident_name: string; issued_at: Date; valid_until: Date | string | null
+      status: string
+    }>(
+      `select r.reference_no, t.name as type_name, b.name as barangay_name,
+              u.full_name as resident_name, d.issued_at, r.valid_until, r.status
+         from barangay_documents d
+         join barangay_requests r on r.id = d.request_id
+         join barangay_certificate_types t on t.id = r.type_id
+         join barangays b on b.id = d.barangay_id
+         join users u on u.id = r.resident_id
+        where d.verification_code = $1`,
+      [code]
+    )
+    if (certificate) {
+      const validUntil =
+        certificate.valid_until instanceof Date
+          ? certificate.valid_until.toLocaleDateString('en-CA')
+          : (certificate.valid_until ?? null)
+      return res.json({
+        valid: true,
+        kind: 'barangay_certificate',
+        referenceNo: certificate.reference_no,
+        documentType: certificate.type_name,
+        issuedBy: `Barangay ${certificate.barangay_name}`,
+        issuedTo: certificate.resident_name,
+        issuedAt: certificate.issued_at.toISOString(),
+        validUntil,
+        // Derived here rather than stored, like everywhere else this date is
+        // read: a certificate that lapsed yesterday has to say so today, and
+        // nothing is scheduled to make that true.
+        expired:
+          validUntil !== null &&
+          validUntil < new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }),
+        status: certificate.status,
+      })
+    }
+
     return res.status(404).json({
       valid: false,
-      error: 'No document or receipt matches that code. It may have been mistyped.',
+      error: 'No document, receipt or certificate matches that code. It may have been mistyped.',
     })
   }
 

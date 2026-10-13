@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v23'
+const STORE_KEY = 'elgu-demo-state-v24'
 
 interface DemoIncident {
   id: string
@@ -208,6 +208,8 @@ interface DemoState {
    */
   seal: string | null
   sealUpdatedAt: string | null
+  /** barangay id -> its own seal, as a downscaled data URL. */
+  barangaySeals: Record<string, { seal: string; updatedAt: string }>
   /** One series for the municipality, like every other counter here. */
   receiptCounter: number
   barangayRequests: DemoBarangayRequest[]
@@ -276,6 +278,12 @@ interface DemoBarangayRequest {
   requestedAt: string; updatedAt: string; note: string | null
   /** Stamped on the move to `ready`, like the server. A calendar day. */
   validUntil: string | null
+  /**
+   * The certificate, written on the move to `released` — not `ready`. The
+   * barangay takes its fee at the hall on collection, so a copy available at
+   * `ready` would hand somebody the document without their ever going.
+   */
+  certificate: { verificationCode: string; issuedAt: string } | null
 }
 
 /**
@@ -475,6 +483,7 @@ function seed(): DemoState {
     },
     seal: null,
     sealUpdatedAt: null,
+    barangaySeals: {},
     receiptCounter: 0,
     barangayRequests: [],
     barangayFees: {},
@@ -560,6 +569,12 @@ function seed(): DemoState {
       requestedAt: at,
       updatedAt: at,
       note: null,
+      // The released one carries its copy, so the demo shows the download
+      // without somebody having to walk a request through the whole queue.
+      certificate:
+        status === 'released'
+          ? { verificationCode: 'H7QB-2MXT-5KRE-91WD', issuedAt: at }
+          : null,
       // The released one was issued when it was requested, so it is already
       // partway through its validity — which is the case worth showing, since a
       // certificate that always looks fresh never demonstrates the lapse.
@@ -1052,7 +1067,44 @@ const serializeBarangayRequest = (r: DemoBarangayRequest) => ({
   // Derived on read, as on the server: a stored flag would be wrong the day
   // after it was written.
   expired: r.validUntil !== null && r.validUntil < officeDay(),
+  hasCertificate: r.certificate !== null,
+  certificateCode: r.certificate?.verificationCode ?? null,
 })
+
+/** The barangay certificate PDF, assembled by hand like the municipal one. */
+function barangayCertificateFor(r: DemoBarangayRequest): Blob {
+  const barangay = BARANGAYS.find((b) => b.id === r.barangayId)
+  const office = barangayOffice(r.barangayId)
+  return makePdf([
+    'Republic of the Philippines',
+    `Province of ${MUNICIPALITY.province}`,
+    `Municipality of ${MUNICIPALITY.name}`,
+    `BARANGAY ${(barangay?.name ?? '').toUpperCase()}`,
+    office.hallAddress ?? '',
+    '',
+    r.typeName.toUpperCase(),
+    `Reference No. ${r.referenceNo}`,
+    '',
+    'TO WHOM IT MAY CONCERN:',
+    `This is to certify that ${r.residentName}, a resident of Barangay ${barangay?.name ?? ''},`,
+    `has been issued this ${r.typeName} by the Barangay Government.`,
+    `Issued upon request for the purpose of: ${r.purpose}.`,
+    '',
+    `Issued on: ${r.certificate ? new Date(r.certificate.issuedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}`,
+    `Valid until: ${r.validUntil ?? 'This barangay states no validity period for this certificate.'}`,
+    `Fee: ${r.fee > 0 ? `PHP ${r.fee.toFixed(2)}, paid at the barangay hall` : 'No fee'}`,
+    '',
+    `Attested by: ${office.secretary ?? ''} — Barangay Secretary`,
+    `Issued by: ${office.captain ?? ''} — Punong Barangay`,
+    '',
+    `VERIFICATION CODE: ${r.certificate?.verificationCode ?? ''}`,
+    '',
+    // The demo assembles this PDF in the browser and cannot embed an image, so
+    // no seal is drawn. The real renderer prints it and the console still shows
+    // which seal is on file.
+    'Demo certificate — generated in your browser, not issued by a barangay.',
+  ].filter((line, i, all) => line !== '' || all[i - 1] !== ''))
+}
 
 /** Today where the office is, for comparing a stored calendar day against it. */
 const officeDay = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
@@ -1585,6 +1637,7 @@ async function route(
           note: null,
           // Nothing has been issued yet, so there is nothing to lapse.
           validUntil: null,
+          certificate: null,
         }
         state.barangayRequests.unshift(created)
         persist()
@@ -1596,6 +1649,20 @@ async function route(
           },
         }
       }
+      if (parts[2] && parts[3] === 'certificate' && method === 'GET') {
+        const mine = state.barangayRequests.find(
+          (r) => r.id === parts[2] && r.residentId === user.id && r.certificate
+        )
+        if (!mine) {
+          throw new DemoError(404, 'No certificate yet. The barangay issues it when the certificate is released.')
+        }
+        return {
+          status: 200,
+          blob: barangayCertificateFor(mine),
+          fileName: `${mine.typeName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${mine.referenceNo}.pdf`,
+        }
+      }
+
       return {
         status: 200,
         body: state.barangayRequests
@@ -1662,6 +1729,10 @@ async function route(
     const user = need('barangay_admin', 'barangay_officer')
     const own = BARANGAYS.find((b) => b.id === user.barangayId)
     if (!own) throw new DemoError(409, 'This account is not attached to a barangay.')
+    const sealState = () => ({
+      hasSeal: Boolean(state.barangaySeals[own.id]),
+      sealUpdatedAt: state.barangaySeals[own.id]?.updatedAt ?? null,
+    })
     const adminOnly = () => {
       if (user.role !== 'barangay_admin') {
         throw new DemoError(403, 'You do not have access to this area.')
@@ -1722,9 +1793,77 @@ async function route(
           before: current, after: next, createdAt: new Date().toISOString(),
         })
         persist()
-        return { status: 200, body: { id: own.id, name: own.name, ...next } }
+        return { status: 200, body: { id: own.id, name: own.name, ...next, ...sealState() } }
       }
-      return { status: 200, body: { id: own.id, name: own.name, ...barangayOffice(own.id) } }
+
+      // ---- the barangay's own seal ----
+      if (parts[2] === 'seal') {
+        if (method === 'PUT') {
+          adminOnly()
+          if (!file) throw new DemoError(400, 'Choose an image to upload.')
+          if (file.size > 2 * 1024 * 1024) {
+            throw new DemoError(413, 'That file is too large. The limit is 2 MB.')
+          }
+          // The declared type is the caller's claim; the bytes are the fact.
+          const kind = sniff(new Uint8Array(await file.slice(0, 12).arrayBuffer()))
+          if (!kind || (kind.mime !== 'image/png' && kind.mime !== 'image/jpeg')) {
+            throw new DemoError(415, 'A seal has to be a PNG or JPEG image — those are the two a certificate can be printed with.')
+          }
+          state.barangaySeals[own.id] = {
+            // Shrunk before it is stored: localStorage will not take 2 MB, and
+            // a seal that looks uploaded and vanishes on reload is worse than
+            // one that was refused.
+            seal: await shrinkToDataUrl(file, 240),
+            updatedAt: new Date().toISOString(),
+          }
+          state.audit.unshift({
+            id: state.audit.length + 1, actorName: user.fullName,
+            action: 'barangay_seal.update', target: own.id,
+            before: { hasSeal: false }, after: { hasSeal: true },
+            createdAt: new Date().toISOString(),
+          })
+          persist()
+          return { status: 200, body: { hasSeal: true } }
+        }
+        if (method === 'GET') {
+          const held = state.barangaySeals[own.id]
+          if (!held) throw new DemoError(404, 'No seal has been uploaded.')
+          return { status: 200, blob: dataUrlToBlob(held.seal, 'image/png') }
+        }
+        if (method === 'DELETE') {
+          adminOnly()
+          if (!state.barangaySeals[own.id]) throw new DemoError(404, 'No seal has been uploaded.')
+          delete state.barangaySeals[own.id]
+          state.audit.unshift({
+            id: state.audit.length + 1, actorName: user.fullName,
+            action: 'barangay_seal.remove', target: own.id,
+            before: { hasSeal: true }, after: { hasSeal: false },
+            createdAt: new Date().toISOString(),
+          })
+          persist()
+          return { status: 204 }
+        }
+        throw new DemoError(404, 'Not found.')
+      }
+
+      return {
+        status: 200,
+        body: { id: own.id, name: own.name, ...barangayOffice(own.id), ...sealState() },
+      }
+    }
+
+    // A reprint of what was handed over, scoped to this barangay in the same
+    // lookup — another barangay's certificate is not found rather than refused.
+    if (parts[1] === 'requests' && parts[2] && parts[3] === 'certificate' && method === 'GET') {
+      const held = state.barangayRequests.find(
+        (r) => r.id === parts[2] && r.barangayId === own.id && r.certificate
+      )
+      if (!held) throw new DemoError(404, 'No certificate has been released for this request.')
+      return {
+        status: 200,
+        blob: barangayCertificateFor(held),
+        fileName: `${held.typeName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${held.referenceNo}.pdf`,
+      }
     }
 
     if (parts[1] === 'requests' && !parts[2]) {
@@ -1763,6 +1902,18 @@ async function route(
       row.status = next as DemoBarangayRequest['status']
       if (note) row.note = note
       row.updatedAt = new Date().toISOString()
+      // Released is when the barangay has handed the paper over and taken the
+      // fee, which is why the copy exists from here and not from `ready`.
+      if (next === 'released' && !row.certificate) {
+        row.certificate = {
+          verificationCode: Array.from({ length: 4 }, () =>
+            Array.from({ length: 4 }, () =>
+              '0123456789ABCDEFGHJKMNPQRSTVWXYZ'[Math.floor(Math.random() * 32)]
+            ).join('')
+          ).join('-'),
+          issuedAt: new Date().toISOString(),
+        }
+      }
       // Stamped on `ready`, as on the server: that is when the paper is
       // prepared and dated, and the paper is what an office reads.
       if (next === 'ready') {
@@ -1783,7 +1934,9 @@ async function route(
         next === 'ready'
           ? `Your certificate is ready at Barangay ${own.name}. Bring a valid ID.` +
             (hours ? ` Open ${hours}.` : '')
-          : note || `Your barangay certificate request is now ${next}.`
+          : next === 'released'
+            ? `Your ${row.typeName} has been released. A copy you can show or print is in the app.`
+            : note || `Your barangay certificate request is now ${next}.`
       )
       persist()
       return { status: 200, body: { ok: true } }

@@ -1507,6 +1507,61 @@ something it cannot know — which is the precise thing the payment design exist
 to refuse. A service with no fee has no receipt either; an official receipt for
 nothing is not a document.
 
+## The barangay certificate, as a document
+
+The municipal tier has produced a verifiable PDF since the first release and the barangay
+tier produced nothing — which was backwards, because the barangay is the tier most
+residents deal with in a year. A clearance, a residency certificate, an indigency
+certificate: all of them went out as paper the app could not verify, could not reproduce if
+it was lost, and could not show a bank.
+
+**It is written in the same transaction that moves the request to `released`.** A released
+request always has its certificate; `barangay_documents.request_id` is unique, so nothing
+can mint two.
+
+**`released` and not `ready`, and the difference is the fee.** `ready` means the secretary
+has prepared and dated the paper; `released` means the barangay has handed it over — and
+the barangay takes its fee at the hall on collection, because nothing is paid online at
+this tier. A PDF available at `ready` would hand a resident the certificate without their
+ever collecting or paying for it, which removes the only payment point the barangay has.
+
+**The date it carries is the `valid_until` stamped at `ready`**, not one worked out at
+release. The paper was dated when it was prepared and the copy has to say what the paper
+says — the same reason that date is stamped at `ready` in the first place.
+
+**The seal is read before the transaction opens**, like the receipt's, because reading it
+is file I/O and holding a transaction across it would turn a slow disk into a lock on the
+barangay's queue. A seal that cannot be read is not a reason to fail a release: a
+certificate without it is still a certificate, and a release that failed over a missing
+image is a resident standing at a counter being told to come back.
+
+**The rendered PDF is stored, not re-rendered.** It names the captain and the secretary who
+were in office when it was issued, and re-rendering it after an election would quietly
+reissue it over somebody else's name. Same reasoning as the receipt and the frozen fee.
+
+**Two signatories, because a barangay certificate has two.** It goes out over the Punong
+Barangay's name and is attested by the Barangay Secretary, which is why both already sit on
+the `barangays` row. A missing name leaves the rule and the title, so the paper can still
+be signed by hand rather than printing a title over nothing.
+
+**The barangay uploads its own seal**, in its own Hall tab — PNG and JPEG only, by the
+leading bytes, virus-scanned in memory, 2 MB. Narrower than the ID-portrait rule for the
+same reason the municipal seal is: the PDF writer embeds nothing else, so a HEIC seal would
+be accepted, previewed, and then silently missing from every certificate. The administrator
+writes and both roles read, which is the line the rest of that console already draws.
+Removing it keeps every certificate already printed with it.
+
+**The same endpoint verifies all three kinds.** `/api/verify/:code` now answers for a
+municipal document, a receipt and a barangay certificate, and says which it found: a clerk
+holding a printout should not have to know which tier issued it before they can check it.
+The resident sees the code in the app, so they can read it out at a counter without opening
+a PDF on a phone.
+
+**Scoping is the same structural rule as the rest of that console.** A certificate is read
+through `barangay_documents.barangay_id` in the same statement, so another barangay's is
+*not found* rather than refused — and the whole `/barangay-staff` mount still answers 403
+to every municipal account, administrator included. A different tier is not a wider one.
+
 ## Known simplifications (intentional, flag if scope grows)
 
 - **PhilSys sync** is visual only. A production build would call a real PhilSys
@@ -1600,11 +1655,13 @@ nothing is not a document.
   belongs in the PSGC listing for the municipality, and the officials' names change every
   barangay election. Replace both before deploying, and treat the names as data somebody
   has to maintain rather than something seeded once.
-- **A barangay certificate has no document at the end.** The request reaches `released` and
-  the resident is told to collect it; the barangay prints its own certificate as it always
-  has. The municipal side renders a PDF with a verification code and the barangay side does
-  not, which is a deliberate stopping point rather than a finished feature — a barangay
-  certificate that can be verified the way a municipal one can is the obvious next piece.
+- **A barangay certificate's attestation wording is generic.** The PDF certifies that the
+  barangay issued this certificate to this person for this purpose, which is true of every
+  type — but a real clearance form carries type-specific text ("is known to me to be of good
+  moral character", "is listed among the indigent families of this barangay") and there is
+  nowhere to author it per type. The municipal renderer has exactly the same limitation
+  across its seventeen services. A deployment that needs the real wording needs it as
+  authored catalogue data, like `steps`.
 - **Nothing is paid online at the barangay.** The fee is quoted and shown, and settled at the
   barangay hall on collection. The payment machinery is all municipal; pointing it at a
   barangay means deciding who the money goes to, which is a treasury question rather than a
