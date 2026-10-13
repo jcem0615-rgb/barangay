@@ -121,7 +121,6 @@ export interface BarangayCertificateData {
   secretary: string | null
   /** Authored on the certificate type; null falls back to the plain sentence. */
   attestation: string | null
-  feePesos: number
   issuedAt: Date
   /** Stamped when the barangay marked it ready; null where the type states none. */
   validUntil: string | null
@@ -295,12 +294,6 @@ export function renderBarangayCertificate(data: BarangayCertificateData): Promis
         data.validUntil
           ? longDay(data.validUntil)
           : 'This barangay states no validity period for this certificate.',
-      ],
-      [
-        'Fee',
-        data.feePesos > 0
-          ? `PHP ${data.feePesos.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}, paid at the barangay hall`
-          : 'No fee',
       ],
     ]
     for (const [label, value] of rows) {

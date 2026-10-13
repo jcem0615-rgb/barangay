@@ -429,12 +429,12 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
     // another barangay's request is not found rather than refused.
     const current = await client.query<{
       id: string; status: string; reference_no: string; resident_id: string; type_id: string
-      purpose: string; fee_centavos: number; valid_until: Date | string | null
+      purpose: string; valid_until: Date | string | null
       type_name: string; attestation: string | null
       resident_name: string; resident_address: string | null
     }>(
       `select r.id, r.status, r.reference_no, r.resident_id, r.type_id, r.purpose,
-              r.fee_centavos, r.valid_until, t.name as type_name, t.attestation,
+              r.valid_until, t.name as type_name, t.attestation,
               u.full_name as resident_name, rp.address as resident_address
          from barangay_requests r
          join barangay_certificate_types t on t.id = r.type_id
@@ -524,7 +524,6 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
           email: barangay.email,
           captain: barangay.captain,
           secretary: barangay.secretary,
-          feePesos: row.fee_centavos / 100,
           issuedAt: new Date(),
           validUntil,
           seal: sealSource.seal,

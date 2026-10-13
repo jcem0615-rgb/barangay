@@ -1170,7 +1170,6 @@ function barangayCertificateFor(r: DemoBarangayRequest): Blob {
     '',
     `Issued on: ${r.certificate ? new Date(r.certificate.issuedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}`,
     `Valid until: ${r.validUntil ?? 'This barangay states no validity period for this certificate.'}`,
-    `Fee: ${r.fee > 0 ? `PHP ${r.fee.toFixed(2)}, paid at the barangay hall` : 'No fee'}`,
     '',
     `Attested by: ${office.secretary ?? ''} — Barangay Secretary`,
     `Issued by: ${office.captain ?? ''} — Punong Barangay`,
