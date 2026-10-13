@@ -154,9 +154,14 @@ usually `1` behind a single load balancer or ingress.
       the Punong Barangay and the Barangay Secretary from that barangay's own row — check
       both names are the people currently holding those offices, because they are printed on
       every certificate it releases and they change at every barangay election
-- [ ] **Each office has read the certificate's attestation wording and accepted it.** It is
-      generic across every certificate type; a barangay whose clearance form says something
-      specific will not find that text here
+- [ ] **Each barangay has read the attestation on every certificate it issues and accepted
+      the wording**, in the Certificates tab. The seeded text is placeholder wording, not any
+      barangay's own form, and it is what goes out over the Punong Barangay's name. The one
+      line with a real legal source is the first-time jobseeker certificate's reference to
+      RA 11261
+- [ ] **Somebody has told the barangay clerks that the app does not check what a certificate
+      attests.** A clearance saying "no pending case" is the office's statement; nothing
+      cross-references the blotter, and the release screen says so
 - [ ] **Somebody has decided who in each barangay may open the blotter.** It names people
       accused of things and found guilty of nothing, and every account with a
       `barangay_officer` or `barangay_admin` role for that barangay can read the whole book.
@@ -334,12 +339,12 @@ Deploying does not make these real, and residents will notice:
   **Deploying with `PAYMENT_PROVIDER=mock` makes every permit free**, because the
   mock's own route settles a payment nobody made.
 - **PhilSys verification** and the ID **QR code** are visual only.
-- **A barangay certificate's wording is generic.** It now renders a real PDF at release,
-  with the barangay's seal, both signatories and a verification code anybody can check — but
-  the attestation text certifies that the barangay issued this certificate to this person
-  for this purpose, which is true of every type rather than the specific wording a real
-  clearance or indigency form carries. The municipal renderer has the same limitation. If
-  your offices need the exact text, it has to be authored per certificate type.
+- **A barangay certificate's wording is authored, and nothing verifies it.** Each type
+  carries its own attestation text, and the app prints what it was given: a clearance saying
+  the holder has no pending case says so because the office releasing it says so, not
+  because anything looked at the blotter. The seeded wording is placeholder content like the
+  hotlines — reconcile each with the barangay's own form. The *municipal* document is still
+  generic across all seventeen services.
 - **Nothing is paid online at the barangay.** The fee is quoted in the app and settled at
   the barangay hall on collection, so no electronic receipt is issued for it — the app
   never saw that money, and a receipt for a payment it cannot confirm would be an

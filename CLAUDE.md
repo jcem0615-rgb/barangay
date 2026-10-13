@@ -1539,6 +1539,33 @@ image is a resident standing at a counter being told to come back.
 were in office when it was issued, and re-rendering it after an election would quietly
 reissue it over somebody else's name. Same reasoning as the receipt and the frozen fee.
 
+**What it says is authored per type.** `BarangayCertificateType.attestation` carries the
+text — the clearance's "no pending case", the indigency certificate's "no sufficient
+means", the jobseeker certificate's citation of RA 11261 — with `{name}`, `{residence}`,
+`{barangay}`, `{municipality}`, `{province}`, `{purpose}` and `{date}` filled by the
+renderer. Paragraphs are separated by a blank line. Null falls back to a plain sentence
+claiming only what the barangay actually did, which is what a certificate added in a
+console gets until somebody writes one — the same stopping point `steps` has, and for the
+same reason: this is authoring rather than a form field.
+
+**The placeholder list is closed and checked at the save, not at the print.** A name the
+renderer cannot fill would come out as literal braces in the middle of an official
+document, and the first person to see it would be a resident at a bank. Refusing the save
+is the only moment somebody is still looking at what they typed, and the refusal names the
+one that is wrong as well as the ones that are right.
+
+**English only, and that is the catalogue rule rather than an omission.** `steps` carries a
+required Filipino because a step is an instruction a resident has to follow; this is the
+text of the document itself, issued in English at a Philippine barangay counter exactly as
+"Cedula" and "Building Permit" are said in English. A certificate whose attestation and
+whose name were in different languages would be the odd one out.
+
+**Nothing verifies what it attests, and the console says so.** A clearance saying the
+holder has no pending case says so because the office releasing it says so — the blotter
+names its parties as free text precisely so that it is *not* a lookup, so there is nothing
+to cross-check against. The release step carries that line, because that is the moment
+somebody is making the statement.
+
 **Two signatories, because a barangay certificate has two.** It goes out over the Punong
 Barangay's name and is attested by the Barangay Secretary, which is why both already sit on
 the `barangays` row. A missing name leaves the rule and the title, so the paper can still
@@ -1655,13 +1682,21 @@ to every municipal account, administrator included. A different tier is not a wi
   belongs in the PSGC listing for the municipality, and the officials' names change every
   barangay election. Replace both before deploying, and treat the names as data somebody
   has to maintain rather than something seeded once.
-- **A barangay certificate's attestation wording is generic.** The PDF certifies that the
-  barangay issued this certificate to this person for this purpose, which is true of every
-  type — but a real clearance form carries type-specific text ("is known to me to be of good
-  moral character", "is listed among the indigent families of this barangay") and there is
-  nowhere to author it per type. The municipal renderer has exactly the same limitation
-  across its seventeen services. A deployment that needs the real wording needs it as
-  authored catalogue data, like `steps`.
+- **Nothing checks what a certificate attests.** The wording is authored per type and the
+  app prints it; a clearance saying the holder has no pending case says so because the
+  office releasing it says so. Nothing cross-checks the blotter, and nothing could — the
+  blotter names its parties as free text precisely so that it is not a lookup on the user
+  table. The console says this where the officer presses release, which is the only place
+  it would change what somebody does.
+- **The seeded attestations are placeholder wording**, on the same footing as the hotlines
+  and the document routes: a careful reading of how these are ordinarily worded, not any
+  barangay's own form. The one with a real legal source is the first-time jobseeker
+  certificate's reference to RA 11261. Reconcile each with the barangay's actual form
+  before launch — it goes out over the Punong Barangay's name.
+- **The municipal document is still generic.** Its released PDF says the request was filed
+  and processed, across all seventeen services; only the barangay side has type-specific
+  wording. Giving the municipal renderer the same treatment means the same field on
+  `services`, which is a bigger catalogue to author.
 - **Nothing is paid online at the barangay.** The fee is quoted and shown, and settled at the
   barangay hall on collection. The payment machinery is all municipal; pointing it at a
   barangay means deciding who the money goes to, which is a treasury question rather than a

@@ -144,6 +144,32 @@ export interface BarangayCertificateType {
   validityDays?: number
   /** How to get it, in order. */
   steps: ServiceStep[]
+  /**
+   * What the certificate says, as the barangay says it.
+   *
+   * Paragraphs separated by a blank line. The renderer fills `{name}`,
+   * `{residence}`, `{barangay}`, `{municipality}`, `{province}`, `{purpose}`
+   * and `{date}`, and refuses to save anything else — a placeholder the
+   * renderer cannot fill would print as literal braces on an official document.
+   *
+   * **English only, deliberately.** `steps` carries a required Filipino because
+   * a step is an instruction a resident has to follow; this is the text of the
+   * document itself, which is issued in English at a Philippine barangay
+   * counter exactly as "Cedula" and "Building Permit" are said in English. A
+   * certificate whose attestation and whose name were in different languages
+   * would be the odd one out.
+   *
+   * Omitted leaves the generic sentence, which is what a certificate added in a
+   * console gets until somebody writes one.
+   *
+   * **Every text below is placeholder content**, on the same footing as the
+   * hotlines and the document routes: a careful reading of how these are
+   * ordinarily worded, not any municipality's own form. The one with a real
+   * legal source is the first-time jobseeker certificate's reference to RA
+   * 11261. Reconcile them with each barangay's actual form before launch — the
+   * certificate goes out over the Punong Barangay's name.
+   */
+  attestation?: string
 }
 
 export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
@@ -155,6 +181,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     purposeHint: 'e.g. local employment, bank requirement',
     /** Six months is what most employers and banks here will accept; past that they ask for a fresh one. */
     validityDays: 180,
+    attestation:
+      'This is to certify that {name} is a bona fide resident of {residence}, Municipality of {municipality}, Province of {province}.\n\nThis further certifies that, based on the records of this barangay, the above-named person has no pending case or derogatory record filed before this office as of the date of issue.\n\nIssued this {date} upon the request of the above-named person for {purpose}.',
     steps: [
       {
         label: 'Be a resident of this barangay',
@@ -188,6 +216,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     purposeHint: 'e.g. school enrolment, PhilHealth',
     /** Says where you live, and that changes — so it is read as a recent statement rather than a permanent one. */
     validityDays: 180,
+    attestation:
+      'This is to certify that {name} is a bona fide resident of {residence}, Municipality of {municipality}, Province of {province}, and is known to this office as an actual resident of this barangay.\n\nIssued this {date} upon the request of the above-named person for {purpose}.',
     steps: [
       {
         label: 'Be a resident of this barangay',
@@ -222,6 +252,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     purposeHint: 'e.g. hospital bill, DSWD assistance',
     /** The shortest of these on purpose: it states a household's circumstances, which an office will want stated recently. */
     validityDays: 90,
+    attestation:
+      'This is to certify that {name} is a bona fide resident of {residence}, Municipality of {municipality}, Province of {province}.\n\nThis further certifies that the above-named person belongs to an indigent family of this barangay and has no sufficient means to meet the expense for which this certification is sought.\n\nIssued this {date} upon the request of the above-named person for {purpose}.',
     steps: [
       {
         label: 'Be a resident of this barangay',
@@ -255,6 +287,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     purposeHint: 'e.g. new sari-sari store, renewal',
     /** Tied to the permit year, because this is what the municipal business permit asks for. */
     validityDays: 365,
+    attestation:
+      'This is to certify that {name}, a resident of {residence}, has been granted clearance by this barangay to operate a business within the territorial jurisdiction of Barangay {barangay}, Municipality of {municipality}, Province of {province}.\n\nThis clearance is issued without prejudice to the requirements of the Municipal Government and is subject to compliance with all barangay ordinances.\n\nIssued this {date} for {purpose}.',
     steps: [
       {
         label: 'Be a resident, or have the business located in this barangay',
@@ -287,6 +321,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     purposeHint: 'e.g. scholarship application',
     /** Same reading as the clearance — a statement about now, not a record of character. */
     validityDays: 180,
+    attestation:
+      'This is to certify that {name} is a bona fide resident of {residence}, Municipality of {municipality}, Province of {province}.\n\nThis further certifies that, based on the records of this barangay and to the knowledge of this office, the above-named person is of good moral character and has not been involved in any act contrary to law, public order or good custom within this barangay.\n\nIssued this {date} upon the request of the above-named person for {purpose}.',
     steps: [
       {
         label: 'Be a resident of this barangay',
@@ -319,6 +355,8 @@ export const BARANGAY_CERTIFICATES: BarangayCertificateType[] = [
     purposeHint: 'e.g. first employment requirements',
     /** RA 11261 gives the certificate a year, and it may be availed of once. The year is in the law; the one-time rule is not enforced here. */
     validityDays: 365,
+    attestation:
+      'This is to certify that {name} is a bona fide resident of {residence}, Municipality of {municipality}, Province of {province}, for at least six (6) months prior to the date of issue.\n\nThis further certifies that the above-named person is a first-time jobseeker, and that this certification is issued pursuant to Republic Act No. 11261, the First Time Jobseekers Assistance Act of 2019, for the purpose of availing of the exemption from the fees and charges provided therein.\n\nUnder the same Act this certification is valid for one (1) year from the date of issue and may be availed of only once.\n\nIssued this {date} for {purpose}.',
     steps: [
       {
         label: 'Be a resident of this barangay for at least six months',

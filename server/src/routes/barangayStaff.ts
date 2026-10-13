@@ -430,10 +430,11 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
     const current = await client.query<{
       id: string; status: string; reference_no: string; resident_id: string; type_id: string
       purpose: string; fee_centavos: number; valid_until: Date | string | null
-      type_name: string; resident_name: string; resident_address: string | null
+      type_name: string; attestation: string | null
+      resident_name: string; resident_address: string | null
     }>(
       `select r.id, r.status, r.reference_no, r.resident_id, r.type_id, r.purpose,
-              r.fee_centavos, r.valid_until, t.name as type_name,
+              r.fee_centavos, r.valid_until, t.name as type_name, t.attestation,
               u.full_name as resident_name, rp.address as resident_address
          from barangay_requests r
          join barangay_certificate_types t on t.id = r.type_id
@@ -508,6 +509,10 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
         data: {
           referenceNo: row.reference_no,
           certificateName: row.type_name,
+          // What the barangay attests, read off the type at the moment of
+          // release and rendered into the stored PDF — so a later edit to the
+          // wording never rewrites a certificate somebody is already holding.
+          attestation: row.attestation,
           purpose: row.purpose,
           residentName: row.resident_name,
           residentAddress: row.resident_address,

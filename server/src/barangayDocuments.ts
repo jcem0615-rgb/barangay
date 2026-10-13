@@ -14,15 +14,67 @@ import { getFile } from './storage.ts'
  * went out as paper the app could not verify, could not reproduce if it was
  * lost, and could not show a bank.
  *
- * **What this is not.** The attestation wording below is generic across every
- * certificate type, exactly as the municipal renderer's is across all
- * seventeen services. A real barangay's clearance form carries type-specific
- * text — "is known to me to be of good moral character", "is listed among the
- * indigent families of this barangay" — and the app has nowhere to author it
- * per type. Getting that wrong under the barangay's own name is worse than
- * being plain, so this certifies what the barangay actually did and nothing
- * more. See CLAUDE.md.
+ * **What the certificate says is the barangay's statement, not the app's.** The
+ * attestation is authored per certificate type (`BarangayCertificateType.attestation`,
+ * stored on the row) and this renderer only fills in the names and the dates.
+ * Nothing here cross-checks the blotter before printing "no pending case", and
+ * nothing could: the blotter names its parties as free text precisely so that it
+ * is not a lookup on the user table. The officer who releases the certificate is
+ * the one making the statement, and the console says so where they press the
+ * button. A type with no attestation falls back to a plain sentence that claims
+ * only what the barangay actually did.
  */
+
+/**
+ * The names the attestation may use.
+ *
+ * Closed on purpose, and checked at the point of saving rather than at the
+ * point of printing: a placeholder this renderer cannot fill would come out as
+ * literal braces in the middle of an official document, and the first person to
+ * see it would be a resident at a bank.
+ */
+export const ATTESTATION_PLACEHOLDERS = [
+  'name', 'residence', 'barangay', 'municipality', 'province', 'purpose', 'date',
+] as const
+
+const PLACEHOLDER_PATTERN = /\{([a-zA-Z0-9_]*)\}/g
+
+/** The placeholders an authored attestation uses that this renderer does not know. */
+export function unknownPlaceholders(attestation: string): string[] {
+  const known = new Set<string>(ATTESTATION_PLACEHOLDERS)
+  const found = new Set<string>()
+  for (const match of attestation.matchAll(PLACEHOLDER_PATTERN)) {
+    const name = match[1] ?? ''
+    if (!known.has(name)) found.add(match[0])
+  }
+  return [...found]
+}
+
+/**
+ * Fills an authored attestation.
+ *
+ * `residence` rather than a bare address because the sentence has to read
+ * either way: a resident with no address on file still lives in a barangay, and
+ * "a resident of , Barangay Poblacion" is the kind of thing that gets noticed
+ * at a counter rather than here.
+ */
+function fillAttestation(template: string, data: BarangayCertificateData): string {
+  const residence = data.residentAddress
+    ? `${data.residentAddress}, Barangay ${data.barangayName}`
+    : `Barangay ${data.barangayName}`
+  const values: Record<string, string> = {
+    name: data.residentName,
+    residence,
+    barangay: data.barangayName,
+    municipality: data.municipality,
+    province: data.province,
+    purpose: data.purpose,
+    date: longDate(data.issuedAt),
+  }
+  return template.replace(PLACEHOLDER_PATTERN, (whole, key: string) =>
+    key in values ? values[key]! : whole
+  )
+}
 
 export interface BarangaySealSource {
   /** PNG or JPEG bytes, or null where the barangay has uploaded none. */
@@ -67,6 +119,8 @@ export interface BarangayCertificateData {
   email: string | null
   captain: string | null
   secretary: string | null
+  /** Authored on the certificate type; null falls back to the plain sentence. */
+  attestation: string | null
   feePesos: number
   issuedAt: Date
   /** Stamped when the barangay marked it ready; null where the type states none. */
@@ -211,21 +265,26 @@ export function renderBarangayCertificate(data: BarangayCertificateData): Promis
       .text('TO WHOM IT MAY CONCERN:', left, y, { width })
     doc.moveDown(0.8)
 
+    // What the barangay attests, as the barangay wrote it. A type with none
+    // falls back to a sentence that claims only what the barangay actually did
+    // — which is what a certificate added in a console gets until somebody
+    // authors its text.
     const where = data.residentAddress
       ? `${data.residentAddress}, Barangay ${data.barangayName}`
       : `Barangay ${data.barangayName}`
-    doc.text(
-      `This is to certify that ${data.residentName}, a resident of ${where}, ` +
+    const body = data.attestation?.trim()
+      ? fillAttestation(data.attestation.trim(), data)
+      : `This is to certify that ${data.residentName}, a resident of ${where}, ` +
         `Municipality of ${data.municipality}, Province of ${data.province}, ` +
         `has been issued this ${data.certificateName} by the Barangay Government of ` +
-        `${data.barangayName} on ${longDate(data.issuedAt)}.`,
-      { width, align: 'justify', lineGap: 3 }
-    )
-    doc.moveDown(0.7)
-    doc.text(
-      `Issued upon the request of the above-named person for the purpose of: ${data.purpose}.`,
-      { width, align: 'justify', lineGap: 3 }
-    )
+        `${data.barangayName} on ${longDate(data.issuedAt)}.\n\n` +
+        `Issued upon the request of the above-named person for the purpose of: ${data.purpose}.`
+
+    const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+    paragraphs.forEach((paragraph, i) => {
+      doc.text(paragraph, { width, align: 'justify', lineGap: 3 })
+      if (i < paragraphs.length - 1) doc.moveDown(0.7)
+    })
     doc.moveDown(1.3)
 
     // ---------------------------------------------------------------- details

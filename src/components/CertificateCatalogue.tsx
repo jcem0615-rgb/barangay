@@ -22,9 +22,23 @@ export interface CatalogueDraft {
   description: string
   fee: string
   validityDays: string
+  attestation: string
 }
 
-const EMPTY: CatalogueDraft = { name: '', description: '', fee: '0', validityDays: '' }
+const EMPTY: CatalogueDraft = {
+  name: '', description: '', fee: '0', validityDays: '', attestation: '',
+}
+
+/** What the renderer can fill in. Anything else is refused at the save. */
+const PLACEHOLDERS = [
+  ['{name}', "the resident's full name"],
+  ['{residence}', 'their address and barangay, or just the barangay'],
+  ['{barangay}', 'the barangay'],
+  ['{municipality}', 'the municipality'],
+  ['{province}', 'the province'],
+  ['{purpose}', 'what the resident said it is for'],
+  ['{date}', 'the date it was released'],
+] as const
 
 export default function CertificateCatalogue({
   rows, canEdit, busy, error, note, onAdd, onEdit, onWithdraw,
@@ -55,6 +69,7 @@ export default function CertificateCatalogue({
       description: row.description,
       fee: String(row.fee),
       validityDays: row.validityDays === null ? '' : String(row.validityDays),
+      attestation: row.attestation ?? '',
     })
   }
 
@@ -118,6 +133,46 @@ export default function CertificateCatalogue({
               />
             </Field>
           </div>
+          {/*
+            The text of the document itself, which is the half that was missing:
+            a letterhead with a generic sentence under it is not a clearance.
+          */}
+          {/*
+            Not a <Field>: that puts its help line after the children, and the
+            two things below the box have to read in order — what it is, then
+            what it can fill in, then the warning.
+          */}
+          <label className="block">
+            <span className="mb-1 block text-[12.5px] font-semibold text-navy-950">
+              What the certificate says
+            </span>
+            <textarea
+              value={draft.attestation}
+              onChange={(e) => setDraft((d) => ({ ...d, attestation: e.target.value }))}
+              rows={8}
+              placeholder={'This is to certify that {name} is a bona fide resident of {residence}…'}
+              className={`${INPUT} font-mono text-[12px] leading-relaxed`}
+            />
+            <span className="mt-1 block text-[11.5px] leading-snug text-slate-500">
+              The wording printed on the certificate itself. Leave it blank and it falls back
+              to a plain sentence saying only that this barangay issued it. Separate
+              paragraphs with a blank line.
+            </span>
+            <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              {PLACEHOLDERS.map(([token, meaning]) => (
+                <span key={token} className="text-[11px] text-slate-500">
+                  <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-navy-800">{token}</code>{' '}
+                  {meaning}
+                </span>
+              ))}
+            </span>
+            <span className="mt-2 block rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] leading-snug text-amber-900">
+              This is the barangay's own statement. Nothing here checks it — a clearance
+              saying the holder has no pending case says so because the office releasing it
+              says so, not because the app looked.
+            </span>
+          </label>
+
           <div className="flex items-center gap-3 pt-1">
             <button
               onClick={() => void submit()}

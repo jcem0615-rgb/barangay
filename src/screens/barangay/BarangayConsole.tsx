@@ -321,6 +321,21 @@ function RequestPanel({ request, onChanged }: { request: BarangayRequest | null;
       )}
 
       {/*
+        Releasing is the moment the barangay's own statement goes out over the
+        Punong Barangay's name. Nothing in the app checks it — the blotter names
+        its parties as free text precisely so that it is not a lookup — so the
+        person pressing the button is the one making the statement, and the
+        console says so rather than letting them find out afterwards.
+      */}
+      {request.status === 'ready' && (
+        <p className="mt-4 rounded-xl bg-amber-50 px-3.5 py-3 text-[12px] leading-snug text-amber-900">
+          <strong className="font-semibold">Releasing prints this barangay's attestation.</strong>{' '}
+          A clearance saying the holder has no pending case says so because this office says
+          so — check the blotter and your own records first. The app does not.
+        </p>
+      )}
+
+      {/*
         A copy of what was handed over, for the resident who lost theirs. It
         reprints the stored PDF rather than making a second, differently coded
         certificate — the same reasoning as the treasury reprinting a receipt.
@@ -476,6 +491,9 @@ function Fees() {
     description: draft.description.trim(),
     fee: Number(draft.fee),
     validityDays: draft.validityDays.trim() === '' ? null : Number(draft.validityDays),
+    // Blank clears it back to the plain sentence, which is a change rather than
+    // "leave it alone" — the same shape validityDays has one line up.
+    attestation: draft.attestation.trim() === '' ? null : draft.attestation,
   })
 
   const saveFee = async (id: string) => {

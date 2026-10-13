@@ -210,6 +210,85 @@ const sealedId = await walk(resident, 'released', 'Scholarship application')
 const sealedPdf = await bin(`/barangay/requests/${sealedId}/certificate`, resident)
 check('a certificate released now still renders', sealedPdf.status === 200 && sealedPdf.bytes.subarray(0, 5).toString() === '%PDF-')
 
+console.log('\n== what the certificate actually says ==')
+
+// The attestation is authored on the type and printed as written. Read the
+// seeded clearance back off the catalogue rather than asserting a literal here:
+// the text is deployment data, and a test that hard-codes it would fail the
+// first time an LGU edited its own wording.
+const shared = (await j('/barangay-staff/certificates', { token: admin })).json
+const clearance = shared.find((c) => c.id === typeId)
+check('the seeded clearance carries an attestation', typeof clearance?.attestation === 'string', clearance?.attestation?.slice(0, 40))
+check(
+  'which is the type-specific text, not the generic sentence',
+  /no pending case|derogatory/i.test(clearance?.attestation ?? ''),
+  clearance?.attestation?.slice(0, 60)
+)
+
+// Placeholders the renderer cannot fill would print as literal braces on an
+// official document, so they are refused at the save — the only moment somebody
+// is still looking at what they typed.
+// The body is checked before the row is looked up, so a bad placeholder is
+// refused whether or not the caller could have reached that row — the schema
+// does not need to know about scoping to do its job.
+const badPlaceholder = await j(`/barangay-staff/certificates/${typeId}`, {
+  method: 'PATCH', token: admin,
+  body: { attestation: 'This certifies that {name} of {municipality} is a {wizard}.' },
+})
+check('an unknown placeholder is refused', badPlaceholder.status === 400, badPlaceholder.status)
+
+// And with wording the schema accepts, a barangay still cannot rewrite a shared
+// certificate: from inside a barangay console a shared row is not found, which
+// is the same answer another barangay's row gives.
+const sharedEdit = await j(`/barangay-staff/certificates/${typeId}`, {
+  method: 'PATCH', token: admin,
+  body: { attestation: 'This is to certify that {name} lives in {residence}.' },
+})
+check('a barangay cannot rewrite a shared certificate', sharedEdit.status === 404, sharedEdit.status)
+check(
+  'and the shared wording is untouched',
+  (await j('/barangay-staff/certificates', { token: admin })).json
+    .find((c) => c.id === typeId)?.attestation === clearance.attestation
+)
+
+const mineId = (await j('/barangay-staff/certificates', {
+  method: 'POST', token: admin,
+  body: {
+    name: `Barangay Attestation Test ${stamp}`,
+    description: 'A document added to check that authored wording round-trips.',
+    fee: 0,
+  },
+})).json.id
+
+check(
+  'a certificate added in the console starts with no attestation',
+  (await j('/barangay-staff/certificates', { token: admin })).json
+    .find((c) => c.id === mineId)?.attestation === null
+)
+
+const rejected = await j(`/barangay-staff/certificates/${mineId}`, {
+  method: 'PATCH', token: admin,
+  body: { attestation: 'This certifies that {name} is a {wizard} of {nowhere}.' },
+})
+check('an unknown placeholder on its own certificate is refused', rejected.status === 400, rejected.status)
+check('and the refusal names the one that is wrong', /\{wizard\}/.test(rejected.json?.error ?? ''), rejected.json?.error)
+check('as well as the ones that are right', /\{residence\}/.test(rejected.json?.error ?? ''))
+
+const authored = await j(`/barangay-staff/certificates/${mineId}`, {
+  method: 'PATCH', token: admin,
+  body: { attestation: 'This is to certify that {name} of {residence} is known to this office.\n\nIssued this {date} for {purpose}.' },
+})
+check('a valid one is accepted', authored.status === 200, authored.status)
+check('and comes back as written', /\{name\}/.test(authored.json?.attestation ?? ''))
+
+const cleared = await j(`/barangay-staff/certificates/${mineId}`, {
+  method: 'PATCH', token: admin, body: { attestation: null },
+})
+check('it can be cleared back to the plain sentence', cleared.json?.attestation === null, cleared.status)
+
+// Withdraw the test row so a second run of the suite does not pile them up.
+await j(`/barangay-staff/certificates/${mineId}`, { method: 'DELETE', token: admin })
+
 console.log('\n== an issued certificate is frozen ==')
 
 // Changing who holds the office must not rewrite a certificate somebody is

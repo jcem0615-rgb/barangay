@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v24'
+const STORE_KEY = 'elgu-demo-state-v25'
 
 interface DemoIncident {
   id: string
@@ -301,7 +301,14 @@ interface DemoCertificateType {
   purposeHint: string; sortOrder: number; active: boolean
   validityDays: number | null; barangayId: string | null
   steps: unknown[]
+  /** What the certificate says; null falls back to the plain sentence. */
+  attestation: string | null
 }
+
+/** What the renderer can fill in. Mirrors the server's closed list. */
+const ATTESTATION_PLACEHOLDERS = [
+  'name', 'residence', 'barangay', 'municipality', 'province', 'purpose', 'date',
+]
 
 interface DemoBarangayOffice {
   captain: string | null; secretary: string | null
@@ -494,6 +501,7 @@ function seed(): DemoState {
       purposeHint: c.purposeHint, sortOrder: index, active: true,
       validityDays: c.validityDays ?? null, barangayId: null,
       steps: c.steps ?? [],
+      attestation: c.attestation ?? null,
     })),
     barangayOffices: Object.fromEntries(
       BARANGAYS.map((b) => [b.id, {
@@ -911,6 +919,7 @@ const certificates = (): DemoCertificateType[] =>
     id: c.id, name: c.name, description: c.description, fee: c.fee,
     purposeHint: c.purposeHint, sortOrder: index, active: true,
     validityDays: c.validityDays ?? null, barangayId: null, steps: c.steps ?? [],
+    attestation: c.attestation ?? null,
   }))
 
 /** Shared rows plus this barangay's own — never another barangay's. */
@@ -923,6 +932,7 @@ const serializeCertificate = (c: DemoCertificateType) => ({
   id: c.id, name: c.name, description: c.description, fee: c.fee,
   purposeHint: c.purposeHint, sortOrder: c.sortOrder, active: c.active,
   validityDays: c.validityDays, barangayId: c.barangayId,
+  attestation: c.attestation,
 })
 
 /**
@@ -945,7 +955,27 @@ const readCertificateBody = (body: Record<string, unknown> | undefined, partial:
   const validityDays = 'validityDays' in (body ?? {})
     ? (body!.validityDays === null ? null : Number(body!.validityDays))
     : undefined
-  return { name, description, fee, validityDays }
+  // The placeholder check is at the save rather than at the print, as on the
+  // server: a name the renderer cannot fill would come out as literal braces in
+  // the middle of an official document.
+  const attestation = 'attestation' in (body ?? {})
+    ? (body!.attestation === null ? null : String(body!.attestation))
+    : undefined
+  if (attestation) {
+    const unknown = [...new Set(
+      [...attestation.matchAll(/\{([a-zA-Z0-9_]*)\}/g)]
+        .filter((m) => !ATTESTATION_PLACEHOLDERS.includes(m[1] ?? ''))
+        .map((m) => m[0])
+    )]
+    if (unknown.length > 0) {
+      throw new DemoError(
+        400,
+        `${unknown.join(', ')} is not something a certificate can fill in. ` +
+          `Use ${ATTESTATION_PLACEHOLDERS.map((p) => `{${p}}`).join(', ')}.`
+      )
+    }
+  }
+  return { name, description, fee, validityDays, attestation }
 }
 
 /** Slug plus a tail: two barangays will both add "Tricycle Permit". */
@@ -1071,6 +1101,56 @@ const serializeBarangayRequest = (r: DemoBarangayRequest) => ({
   certificateCode: r.certificate?.verificationCode ?? null,
 })
 
+/**
+ * What the barangay attests, as the barangay wrote it — the authored text off
+ * the certificate type, with the names filled in. A type with none falls back
+ * to a sentence claiming only what the barangay actually did.
+ */
+function attestationLines(r: DemoBarangayRequest, barangayName: string): string[] {
+  const resident = state.users.find((u) => u.id === r.residentId)
+  const address = resident?.profile.address
+  const residence = address ? `${address}, Barangay ${barangayName}` : `Barangay ${barangayName}`
+  const template = certificateType(r.typeId)?.attestation?.trim()
+  const body = template
+    ? template.replace(/\{([a-zA-Z0-9_]*)\}/g, (whole, key: string) => {
+        const values: Record<string, string> = {
+          name: r.residentName,
+          residence,
+          barangay: barangayName,
+          municipality: MUNICIPALITY.name,
+          province: MUNICIPALITY.province,
+          purpose: r.purpose,
+          date: r.certificate
+            ? new Date(r.certificate.issuedAt).toLocaleDateString('en-PH', {
+                year: 'numeric', month: 'long', day: 'numeric',
+              })
+            : '',
+        }
+        return key in values ? values[key]! : whole
+      })
+    : `This is to certify that ${r.residentName}, a resident of ${residence}, ` +
+      `has been issued this ${r.typeName} by the Barangay Government.\n\n` +
+      `Issued upon request for the purpose of: ${r.purpose}.`
+  // The hand-rolled PDF writer takes one line at a time, so paragraphs are
+  // wrapped here rather than by a layout engine.
+  return body
+    .split(/\n\s*\n/)
+    .flatMap((paragraph) => [...wrapLine(paragraph.replace(/\s+/g, ' ').trim()), ''])
+    .slice(0, -1)
+}
+
+/** Breaks a paragraph at roughly the width the demo's PDF page holds. */
+function wrapLine(text: string, width = 92): string[] {
+  const out: string[] = []
+  let line = ''
+  for (const word of text.split(' ')) {
+    if (line && (line + ' ' + word).length > width) { out.push(line); line = word }
+    else line = line ? `${line} ${word}` : word
+  }
+  if (line) out.push(line)
+  return out
+}
+
 /** The barangay certificate PDF, assembled by hand like the municipal one. */
 function barangayCertificateFor(r: DemoBarangayRequest): Blob {
   const barangay = BARANGAYS.find((b) => b.id === r.barangayId)
@@ -1086,9 +1166,7 @@ function barangayCertificateFor(r: DemoBarangayRequest): Blob {
     `Reference No. ${r.referenceNo}`,
     '',
     'TO WHOM IT MAY CONCERN:',
-    `This is to certify that ${r.residentName}, a resident of Barangay ${barangay?.name ?? ''},`,
-    `has been issued this ${r.typeName} by the Barangay Government.`,
-    `Issued upon request for the purpose of: ${r.purpose}.`,
+    ...attestationLines(r, barangay?.name ?? ''),
     '',
     `Issued on: ${r.certificate ? new Date(r.certificate.issuedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}`,
     `Valid until: ${r.validUntil ?? 'This barangay states no validity period for this certificate.'}`,
@@ -2431,6 +2509,7 @@ async function route(
           fee: input.fee!, purposeHint: '', active: true,
           sortOrder: Math.max(0, ...certificates().map((c) => c.sortOrder)) + 1,
           validityDays: input.validityDays ?? null, barangayId: own.id, steps: [],
+          attestation: input.attestation ?? null,
         }
         state.certificates.push(row)
         auditCertificate(user, 'certificate.create', row.id, null, serializeCertificate(row))
@@ -2450,6 +2529,7 @@ async function route(
         if (input.description !== undefined) mineOnly.description = input.description
         if (input.fee !== undefined) mineOnly.fee = input.fee
         if (input.validityDays !== undefined) mineOnly.validityDays = input.validityDays
+        if (input.attestation !== undefined) mineOnly.attestation = input.attestation
         auditCertificate(user, 'certificate.update', mineOnly.id, before, serializeCertificate(mineOnly))
         persist()
         return { status: 200, body: { ...serializeCertificate(mineOnly), own: true } }
@@ -4128,6 +4208,7 @@ async function route(
           fee: input.fee!, purposeHint: '', active: true,
           sortOrder: Math.max(0, ...certificates().map((c) => c.sortOrder)) + 1,
           validityDays: input.validityDays ?? null, barangayId: null, steps: [],
+          attestation: input.attestation ?? null,
         }
         state.certificates.push(row)
         audit('certificate.create', row.id, null, serializeCertificate(row))
@@ -4143,6 +4224,7 @@ async function route(
         if (input.description !== undefined) sharedOnly.description = input.description
         if (input.fee !== undefined) sharedOnly.fee = input.fee
         if (input.validityDays !== undefined) sharedOnly.validityDays = input.validityDays
+        if (input.attestation !== undefined) sharedOnly.attestation = input.attestation
         audit('certificate.update', sharedOnly.id, before, serializeCertificate(sharedOnly))
         persist()
         return { status: 200, body: serializeCertificate(sharedOnly) }

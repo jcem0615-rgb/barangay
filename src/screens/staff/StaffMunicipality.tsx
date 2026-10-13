@@ -819,6 +819,9 @@ function SharedCertificates() {
     description: draft.description.trim(),
     fee: Number(draft.fee),
     validityDays: draft.validityDays.trim() === '' ? null : Number(draft.validityDays),
+    // Blank clears it back to the plain sentence, which is a change rather than
+    // "leave it alone" — the same shape validityDays has one line up.
+    attestation: draft.attestation.trim() === '' ? null : draft.attestation,
   })
 
   return (

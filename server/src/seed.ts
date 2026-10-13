@@ -167,16 +167,19 @@ async function main() {
     for (const [index, type] of BARANGAY_CERTIFICATES.entries()) {
       await client.query(
         `insert into barangay_certificate_types
-           (id, name, description, fee_centavos, purpose_hint, sort_order, steps, validity_days)
-         values ($1, $2, $3, $4, $5, $6, $7, $8)
+           (id, name, description, fee_centavos, purpose_hint, sort_order, steps,
+            validity_days, attestation)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          on conflict (id) do update set
            name = excluded.name, description = excluded.description,
            fee_centavos = excluded.fee_centavos, purpose_hint = excluded.purpose_hint,
            sort_order = excluded.sort_order, steps = excluded.steps,
-           validity_days = excluded.validity_days`,
+           validity_days = excluded.validity_days,
+           attestation = excluded.attestation`,
         [
           type.id, type.name, type.description, toCentavos(type.fee), type.purposeHint,
           index, JSON.stringify(type.steps ?? []), type.validityDays ?? null,
+          type.attestation?.trim() || null,
         ]
       )
     }

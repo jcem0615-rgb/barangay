@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { PoolClient } from 'pg'
 import { toCentavos, toPesos } from './serialize.ts'
 import { recordAudit } from './municipality.ts'
+import { ATTESTATION_PLACEHOLDERS, unknownPlaceholders } from './barangayDocuments.ts'
 
 /**
  * The barangay certificate catalogue, and who may change what in it.
@@ -30,6 +31,30 @@ export const CERTIFICATE_FIELDS = z.object({
    * thing from forever and is said in those words on the resident's screen.
    */
   validityDays: z.number().int().min(1).max(3650).nullable().optional(),
+  /**
+   * What the certificate says, as the barangay says it. Paragraphs separated by
+   * a blank line.
+   *
+   * The placeholder check is here rather than in the renderer on purpose: a
+   * name the renderer cannot fill would print as literal braces in the middle
+   * of an official document, and the first person to see it would be a resident
+   * at a bank. Refusing the save is the only point at which somebody is still
+   * looking at the thing they typed.
+   */
+  attestation: z.string().max(4000).nullable().optional().superRefine((value, ctx) => {
+    if (!value) return
+    const unknown = unknownPlaceholders(value)
+    if (unknown.length === 0) return
+    ctx.addIssue({
+      code: 'custom',
+      // Names the one that is wrong as well as the ones that are right: "use
+      // these seven" leaves somebody hunting through four paragraphs for the
+      // typo they just made.
+      message:
+        `${unknown.join(', ')} is not something a certificate can fill in. ` +
+        `Use ${ATTESTATION_PLACEHOLDERS.map((p) => `{${p}}`).join(', ')}.`,
+    })
+  }),
 })
 
 export const certificateCreateSchema = CERTIFICATE_FIELDS
@@ -54,6 +79,7 @@ export interface CertificateRow {
   id: string; name: string; description: string; fee_centavos: number
   purpose_hint: string; sort_order: number; active: boolean
   validity_days: number | null; barangay_id: string | null
+  attestation: string | null
 }
 
 export function serializeCertificateType(row: CertificateRow) {
@@ -66,6 +92,12 @@ export function serializeCertificateType(row: CertificateRow) {
     sortOrder: row.sort_order,
     active: row.active,
     validityDays: row.validity_days,
+    /**
+     * Null means the certificate falls back to a plain sentence that claims
+     * only what the barangay actually did — the same stopping point `steps` has
+     * for a type added in a console.
+     */
+    attestation: row.attestation,
     /** Null for the shared catalogue; a barangay id for one barangay's own. */
     barangayId: row.barangay_id,
   }
@@ -90,14 +122,15 @@ export async function createCertificateType(
   const inserted = await client.query<CertificateRow>(
     `insert into barangay_certificate_types
        (id, name, description, fee_centavos, purpose_hint, sort_order, steps,
-        validity_days, barangay_id)
+        validity_days, barangay_id, attestation)
      values ($1, $2, $3, $4, $5,
              (select coalesce(max(sort_order), 0) + 1 from barangay_certificate_types),
-             '[]'::jsonb, $6, $7)
+             '[]'::jsonb, $6, $7, $8)
      returning *`,
     [
       id, input.name.trim(), input.description.trim(), toCentavos(input.fee),
       input.purposeHint?.trim() ?? '', input.validityDays ?? null, barangayId,
+      input.attestation?.trim() || null,
     ]
   )
   const row = inserted.rows[0]!
@@ -141,7 +174,8 @@ export async function updateCertificateType(
             fee_centavos = coalesce($5, fee_centavos),
             purpose_hint = coalesce($6, purpose_hint),
             sort_order   = coalesce($7, sort_order),
-            validity_days = case when $8 then $9 else validity_days end
+            validity_days = case when $8 then $9 else validity_days end,
+            attestation  = case when $10 then $11 else attestation end
       where id = $1 and barangay_id is not distinct from $2
       returning *`,
     [
@@ -152,6 +186,10 @@ export async function updateCertificateType(
       input.purposeHint?.trim() ?? null,
       input.sortOrder ?? null,
       'validityDays' in input, input.validityDays ?? null,
+      // Clearing it back to the plain sentence has to be possible, so an
+      // explicit null is a change rather than "leave it alone" — the same
+      // shape validityDays uses one line up.
+      'attestation' in input, input.attestation?.trim() || null,
     ]
   )
   const after = updated.rows[0]!

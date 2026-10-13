@@ -48,6 +48,11 @@ export interface CertificateType {
   sortOrder: number
   active: boolean
   validityDays: number | null
+  /**
+   * What the certificate says, as the barangay says it. Null falls back to a
+   * plain sentence claiming only that this barangay issued it.
+   */
+  attestation: string | null
   /** Null for the shared catalogue; a barangay id for one barangay's own. */
   barangayId: string | null
   /** Barangay console only: whether this barangay may edit it. */
@@ -910,14 +915,14 @@ export const api = {
 
   addSharedCertificate: (body: {
     name: string; description: string; fee: number
-    purposeHint?: string; validityDays?: number | null
+    purposeHint?: string; validityDays?: number | null; attestation?: string | null
   }) => request<CertificateType>('/admin/certificates', {
     method: 'POST', body: JSON.stringify(body),
   }),
 
   editSharedCertificate: (id: string, body: Partial<{
     name: string; description: string; fee: number
-    purposeHint: string; validityDays: number | null
+    purposeHint: string; validityDays: number | null; attestation: string | null
   }>) => request<CertificateType>(`/admin/certificates/${id}`, {
     method: 'PATCH', body: JSON.stringify(body),
   }),
@@ -936,14 +941,14 @@ export const api = {
 
   addBarangayCertificate: (body: {
     name: string; description: string; fee: number
-    purposeHint?: string; validityDays?: number | null
+    purposeHint?: string; validityDays?: number | null; attestation?: string | null
   }) => request<CertificateType>('/barangay-staff/certificates', {
     method: 'POST', body: JSON.stringify(body),
   }),
 
   editBarangayCertificate: (id: string, body: Partial<{
     name: string; description: string; fee: number
-    purposeHint: string; validityDays: number | null
+    purposeHint: string; validityDays: number | null; attestation: string | null
   }>) => request<CertificateType>(`/barangay-staff/certificates/${id}`, {
     method: 'PATCH', body: JSON.stringify(body),
   }),

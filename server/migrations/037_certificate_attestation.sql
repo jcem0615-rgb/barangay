@@ -1,0 +1,24 @@
+-- What a certificate actually says.
+--
+-- The renderer printed one sentence for every type: that the barangay issued
+-- this certificate to this person for this purpose. True of all six, and the
+-- text of none of them. A real clearance says the holder has no pending case
+-- before the barangay; an indigency certificate says the family has no
+-- sufficient means; the first-time jobseeker certificate cites RA 11261 and the
+-- exemption it carries. Those sentences are the document — the rest is a
+-- letterhead.
+--
+-- So the attestation becomes authored catalogue data, like `steps` beside it:
+-- one text per type, with placeholders the renderer fills. Null keeps the
+-- generic sentence, which is what a certificate added in a console gets until
+-- somebody writes one — the same stopping point `steps` has, and for the same
+-- reason: this is an authoring job rather than a form field somebody fills in
+-- between two other things.
+--
+-- **It is the barangay's statement, not the app's.** Nothing here cross-checks
+-- the blotter before printing "no pending case", and nothing could: the blotter
+-- names parties as free text precisely so that it is not a lookup on the user
+-- table. The officer releasing the certificate is the one making the statement,
+-- and the console says so at the moment they press the button.
+alter table barangay_certificate_types
+  add column attestation text;
