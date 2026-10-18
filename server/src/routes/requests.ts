@@ -291,10 +291,16 @@ requestsRouter.get('/:id', async (req, res) => {
   // The receipt, if the payment settled. Carried on the detail rather than the
   // list: it is one join, and the only screen that offers the download is this
   // one.
-  const receipt = await one<{ receipt_no: string; issued_at: Date; verification_code: string }>(
-    `select receipt_no, issued_at, verification_code from receipts where request_id = $1`,
-    [row.id]
-  )
+  const [receipt, document] = await Promise.all([
+    one<{ receipt_no: string; issued_at: Date; verification_code: string }>(
+      `select receipt_no, issued_at, verification_code from receipts where request_id = $1`,
+      [row.id]
+    ),
+    one<{ verification_code: string }>(
+      `select verification_code from documents where request_id = $1`,
+      [row.id]
+    ),
+  ])
   res.json({
     ...(await serializeWithReady(row)),
     events,
@@ -304,6 +310,11 @@ requestsRouter.get('/:id', async (req, res) => {
     // paper they are already holding — and it saves a resident at a counter
     // from having to open a PDF to read it out.
     receiptCode: receipt?.verification_code ?? null,
+    // The same, for the released document. The receipt and the barangay
+    // certificate have published theirs for a while and this one never did,
+    // which left the resident with the one code they could not read out
+    // without opening a PDF on a phone.
+    documentCode: document?.verification_code ?? null,
   })
 })
 

@@ -47,7 +47,7 @@ Everything is environment variables. Only the first two are required.
 | `MAX_EVIDENCE_MB` | no | Largest incident evidence file, default 512. Half an hour of 1080p phone video is 1–2 GB, so raise it only if storage and bandwidth can take it |
 | `PAYMENT_PROVIDER` | **to take money** | The gateway. `mock` is the development provider and **must not** be deployed — it exposes a route that settles a payment without one being made |
 | `PAYMENT_SECRET` | **to take money** | The secret the gateway signs callbacks with. The server refuses to start in production without it |
-| `PUBLIC_URL` | **yes, if mailing** | Address residents reach; reset and notification links use it |
+| `PUBLIC_URL` | **yes** | Address residents reach. Reset and notification links use it, and so does the QR printed on every document — see the checklist, because that one is frozen into each PDF at issue |
 | `SMS_TRANSPORT` | optional | `http` plus `SMS_URL`/`SMS_API_KEY` to text residents |
 | `MUNICIPALITY_ADDRESS` | for receipts | The hall's address as it should read on an official receipt |
 | `MUNICIPALITY_PHONE` | for receipts | Printed on the receipt. Ring it before you set it |
@@ -118,6 +118,16 @@ usually `1` behind a single load balancer or ingress.
 - [ ] `UPLOAD_DIR` points at persistent storage, not the container filesystem
 - [ ] `CLAMAV_HOST` is set and `/api/health` reports `virusScanning: enabled`
 - [ ] `SMTP_URL` and `PUBLIC_URL` are set, and a test reset email actually arrives
+- [ ] **`PUBLIC_URL` is the address the public actually reaches, and it has been checked
+      by scanning a real document with a phone.** The QR on every permit, receipt and
+      certificate is built from it, and the rendered PDF is *stored* rather than re-made —
+      so a wrong value is baked into every document issued under it and cannot be corrected
+      afterwards without reissuing them. This is the one setting here that a later fix does
+      not reach backwards. Scan one before the first real release, not after
+- [ ] Somebody has scanned a released document with an ordinary phone, landed on the check,
+      and read what it says — including the line about a photocopy verifying too. A counter
+      that reads a green tick as "this document is the only one" has been taught the wrong
+      thing by the screen rather than by the forger
 - [ ] `PAYMENT_PROVIDER` is a real gateway, **not** `mock`, and `PAYMENT_SECRET` comes
       from a secret store
 - [ ] A test payment has been taken end to end, and the treasury's **Payments** tab shows

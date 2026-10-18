@@ -32,6 +32,8 @@ import BarangayHub from './screens/BarangayHub'
 import BarangayRequestForm from './screens/BarangayRequestForm'
 import DocumentGuide from './screens/DocumentGuide'
 import BarangayConsole from './screens/barangay/BarangayConsole'
+import VerifyDocument from './screens/VerifyDocument'
+import { clearScannedDocumentCode, scannedDocumentCode } from './lib/scannedDocument'
 import KagawadConsole from './screens/barangay/KagawadConsole'
 
 function ScreenRouter() {
@@ -117,9 +119,28 @@ function takeResetToken(): string | null {
 function RoleShell() {
   const { user, loading } = useAuth()
   const [resetToken, setResetToken] = useState<string | null>(takeResetToken)
+  const [docCode, setDocCode] = useState<string | null>(scannedDocumentCode)
 
   if (resetToken) {
     return <ResetPassword token={resetToken} onDone={() => setResetToken(null)} />
+  }
+
+  /*
+   * The document check, before the session gate and before the loading spinner.
+   *
+   * Whoever scanned the QR on a permit is a bank, an employer or a clerk in
+   * another office — none of them have an account here, and waiting on
+   * `/auth/me` to decide which shell they get would make them wait for an
+   * answer that has nothing to do with the question they asked. A staff member
+   * who scans one lands here too and closes it back into their console.
+   */
+  if (docCode !== null) {
+    return (
+      <VerifyDocument
+        code={docCode}
+        onClose={() => { clearScannedDocumentCode(); setDocCode(null) }}
+      />
+    )
   }
 
   if (loading) {

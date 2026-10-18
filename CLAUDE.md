@@ -1661,6 +1661,77 @@ municipal accounts get 403 from the whole `/barangay-staff` mount, administrator
 included, and barangay accounts get 403 from `/admin`. No resident route serves any of
 them — the preview is a console read, scoped to the account asking.
 
+## Checking a document at a counter
+
+Every PDF this app issues has carried a verification code since the first release, and
+`/api/verify/:code` has answered for it just as long. **Nothing ever called it.** The code
+sat on the paper, the endpoint sat on the server, and in practice the only way to check a
+permit was for somebody to know to open a JSON endpoint by hand — so nobody did. The QR
+and the page it opens are the two halves that were missing.
+
+**What this defeats is the altered printout, and that is worth being exact about.** A
+clerk scans, the server says what the office actually recorded, and the two disagree. What
+it does *not* defeat is a copy: a photocopy carries a genuine code and verifies genuinely,
+because the data is genuine. **No QR, barcode, watermark or signature can change that**,
+so the verify page says so in as many words and tells the reader to match the name against
+an ID. A green tick that implied more than this check knows would be worse than no check.
+
+**A QR rather than a barcode**, for the reason the digital ID already gives one tier up: a
+1D barcode holds about twenty characters, has no error correction and wants a laser
+scanner, and a permit lives folded in a wallet. A QR carries a whole URL, every phone
+camera reads it with no app installed, and error correction M recovers roughly 15% of a
+creased or smudged symbol. It is drawn as vector rectangles rather than an embedded image
+(`drawQr` in `server/src/qr.ts`), so it stays crisp at whatever resolution the hall's
+printer runs at — a QR printed soft is a QR that does not scan.
+
+**It is 78pt, about 27mm, which is larger than the layout wants.** A 33-module symbol at
+that size is roughly 0.8mm per module, which is what a phone camera needs from a page that
+has been folded and printed on whatever the office owns. A smaller code fits more neatly
+and reads less reliably, and a code that *usually* scans is worse than one that always
+does — the clerk stops trying.
+
+**The QR carries a link, not the bare code.** The scanner is whoever's phone is nearest —
+a counter clerk, a bank, an employer — and a phone knows what to do with a URL and nothing
+at all with sixteen loose characters.
+
+**`?doc=` and not the ID card's `?verify=`, deliberately.** That one opens a staff-only
+identity check against a code that is spent the first time it is used; this one opens a
+public, repeatable document check. Both codes are Crockford base32 and they differ only in
+length, so telling the two checks apart by the shape of the code would be exactly the kind
+of filter that eventually gets it wrong. Two different checks, two different parameters.
+
+**The check needs no account, and that is the point.** The people who have to verify a
+permit are a bank, an employer, a barangay clerk and a counter in another office — none of
+whom have a login here, and a check that needs one is a check that does not happen.
+Nothing is disclosed that the holder of the paper does not already have in their hand: the
+document type, the reference, who holds it, when it was issued, what it is valid until,
+and the live status. No email, no address, no form values, no internal id. The codes are
+long and random, so the endpoint cannot be walked.
+
+**It renders before the session gate** (`App.tsx`), ahead of even the loading spinner: the
+person who scanned has asked a question that has nothing to do with which shell they would
+otherwise get, and making them wait on `/auth/me` to find that out would be ceremony. A
+staff member who scans one lands on the same page and closes it back into their console.
+
+**The code is left in the address bar**, unlike the ID card's. A document code is public
+and repeatable, so the link is worth being able to reload, bookmark or send to a
+colleague, and a reload landing back on the same answer is the honest behaviour. Closing
+the check clears it.
+
+**Lapsed is amber and in words**, like everywhere else this app has a date that runs out,
+and it is kept apart from the forgery verdict — a lapsed certificate is not a fake one,
+it is a real one somebody needs to replace.
+
+**The released municipal document now publishes its code to the resident too**
+(`documentCode` on `GET /requests/:id`). The receipt and the barangay certificate had
+published theirs for a while; this was the one code a resident could not read out at a
+counter without opening a PDF on a phone.
+
+**The QR is built from `PUBLIC_URL`.** Get that wrong and every document issued under it
+carries a dead link *permanently*, because the rendered PDF is stored rather than
+re-rendered — see the pre-launch checklist in `DEPLOY.md`, where this is the one setting
+that cannot be corrected after the fact.
+
 ## Known simplifications (intentional, flag if scope grows)
 
 - **PhilSys sync** is visual only. A production build would call a real PhilSys
@@ -1672,6 +1743,15 @@ them — the preview is a console read, scoped to the account asking.
   `PAYMENT_SECRET`; nothing else about the flow changes. **Do not deploy with
   `PAYMENT_PROVIDER=mock`:** it exposes a route that settles a payment without one being
   made.
+- **Nothing counts how often a code is checked.** Verification is a read and leaves no
+  trace, so the one signal that would actually catch a photocopy — the same permit
+  verified forty times across three barangays in a week — is not collected. That is a
+  `document_verifications` row per check and a figure on the verify page, and it is the
+  natural next step after this.
+- **A released document cannot be revoked.** Its status is `completed` for ever, so a
+  permit that was cancelled, superseded or issued in error goes on verifying as genuine.
+  Combined with the point above, this is the whole of what is missing against copying:
+  detecting a copy is worth little if nothing can then be done about it.
 - **Document release** produces a real PDF with a verification code, but it is not
   digitally signed. A production system would sign it so tampering is detectable
   rather than relying on the code lookup alone. **The e-signature does not change

@@ -32,6 +32,8 @@ export default function ApplicationDetail({ id }: { id: string }) {
   // on one screen, and the list does not need it. Same shape as the rating
   // below, which is already fetched here for the same reason.
   const [receipt, setReceipt] = useState<{ no: string; code: string | null } | null>(null)
+  /** The code printed on the released document, for reading out at a counter. */
+  const [documentCode, setDocumentCode] = useState<string | null>(null)
   // A rating already given must show as given, or the app asks the same
   // question every time the screen is opened.
   const [rating, setRating] = useState<{ rating: number; comment: string | null } | null>(null)
@@ -49,7 +51,9 @@ export default function ApplicationDetail({ id }: { id: string }) {
     let live = true
     void api.myRequest(id)
       .then((full) => {
-        if (live && full.receiptNo) setReceipt({ no: full.receiptNo, code: full.receiptCode })
+        if (!live) return
+        if (full.receiptNo) setReceipt({ no: full.receiptNo, code: full.receiptCode })
+        setDocumentCode(full.documentCode)
       })
       // A receipt that will not load is not worth an error banner on a screen
       // whose job is the request itself; the button simply does not appear.
@@ -256,6 +260,18 @@ export default function ApplicationDetail({ id }: { id: string }) {
             >
               <Download size={16} /> {downloading ? t('detail.preparing') : t('detail.download')}
             </button>
+            {/*
+              The code printed on the document, beside the button that fetches
+              it — so a resident asked to prove it at a counter can read it out
+              rather than opening a PDF on a phone, which is the same reason the
+              receipt shows its own.
+            */}
+            {documentCode && (
+              <p className="mt-2 text-center text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
+                {t('detail.documentCode')}{' '}
+                <span className="font-mono tracking-wide text-navy-800">{documentCode}</span>
+              </p>
+            )}
             {downloadError && (
               <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[calc(13.5px_*_var(--text-scale))] text-rose-700">
                 {downloadError}

@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import PDFDocument from 'pdfkit'
 import { one } from './db.ts'
 import { getFile } from './storage.ts'
+import { documentVerificationUrl, drawQr, QR_BOX_HEIGHT, QR_SIZE } from './qr.ts'
 
 /**
  * Verification codes are printed on the document and looked up by anyone
@@ -202,19 +203,34 @@ export function renderDocument(data: DocumentData): Promise<Buffer> {
       align: 'center',
     })
 
-    // Verification block
+    // ----------------------------------------------------------- verification
+    //
+    // The QR and the code say the same thing, and both are here because they
+    // are read by different people: a clerk points a phone, and somebody on a
+    // telephone reads the characters out. The code alone was what this carried,
+    // and sixteen characters is enough work that in practice nobody checked.
     doc.y = Math.max(doc.y, sigY + 70)
     doc.moveDown(1.6)
     const boxY = doc.y
-    doc.roundedRect(left, boxY, width, 74, 6).fillAndStroke('#f2f5fd', '#c7d2fe')
+    doc.roundedRect(left, boxY, width, QR_BOX_HEIGHT, 6).fillAndStroke('#f2f5fd', '#c7d2fe')
+
+    drawQr(doc, documentVerificationUrl(data.verificationCode), {
+      x: left + width - 16 - QR_SIZE,
+      y: boxY + (QR_BOX_HEIGHT - QR_SIZE) / 2,
+      size: QR_SIZE,
+      color: INK,
+    })
+    const codeWidth = width - 32 - QR_SIZE - 20
+
     doc.fillColor(MUTED).font('Helvetica').fontSize(8.5)
-      .text('VERIFICATION CODE', left + 16, boxY + 13, { width: width - 32, characterSpacing: 0.8 })
+      .text('VERIFICATION CODE', left + 16, boxY + 14, { width: codeWidth, characterSpacing: 0.8 })
     doc.fillColor(INK).font('Courier-Bold').fontSize(15)
-      .text(data.verificationCode, left + 16, boxY + 28, { width: width - 32 })
+      .text(data.verificationCode, left + 16, boxY + 29, { width: codeWidth })
     doc.fillColor(MUTED).font('Helvetica').fontSize(8)
       .text(
-        'Verify this document at the LGU portal or at any municipal counter. A document without a matching code is not valid.',
-        left + 16, boxY + 52, { width: width - 32 }
+        'Scan the code or check this reference at the LGU portal. The record there is what ' +
+          'this document says; a printout that disagrees with it has been altered.',
+        left + 16, boxY + 53, { width: codeWidth }
       )
 
     // Footer

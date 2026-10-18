@@ -1651,6 +1651,81 @@ async function route(
   const query = new URLSearchParams(path.split('?')[1] ?? '')
 
   // ---- catalogue ----
+  /**
+   * The public document check, with no session — the same rule as the server.
+   *
+   * One endpoint for all three kinds, because somebody holding a printout
+   * should not have to know which tier issued it before they can check it.
+   */
+  if (parts[0] === 'verify' && parts[1] && method === 'GET') {
+    const code = decodeURIComponent(parts[1]).trim().toUpperCase()
+
+    const request = state.requests.find((r) => r.document?.verificationCode === code)
+    if (request) {
+      return {
+        status: 200,
+        body: {
+          valid: true, kind: 'document',
+          referenceNo: request.referenceNo,
+          documentType: request.serviceName,
+          issuedBy: officeName(request.categoryId),
+          issuedTo: state.users.find((u) => u.id === request.residentId)?.fullName ?? '',
+          // The demo keeps no release timestamp, so the last event stands in —
+          // the real server reads `documents.issued_at`.
+          issuedAt: request.events.at(-1)?.createdAt ?? request.dateSubmitted,
+          status: request.status,
+        },
+      }
+    }
+
+    const payment = state.payments.find((p) => p.receipt?.verificationCode === code)
+    if (payment?.receipt) {
+      return {
+        status: 200,
+        body: {
+          valid: true, kind: 'receipt',
+          referenceNo: payment.receipt.receiptNo,
+          documentType: 'Official Receipt',
+          issuedBy: MUNICIPALITY.name,
+          issuedTo: payment.receipt.issuedTo,
+          issuedAt: payment.receipt.issuedAt,
+          particulars: payment.receipt.particulars,
+          amount: payment.amountCentavos / 100,
+          status: 'settled',
+        },
+      }
+    }
+
+    const certificate = state.barangayRequests.find(
+      (r) => r.certificate?.verificationCode === code
+    )
+    if (certificate?.certificate) {
+      return {
+        status: 200,
+        body: {
+          valid: true, kind: 'barangay_certificate',
+          referenceNo: certificate.referenceNo,
+          documentType: certificate.typeName,
+          issuedBy: `Barangay ${BARANGAYS.find((b) => b.id === certificate.barangayId)?.name ?? ''}`,
+          issuedTo: state.users.find((u) => u.id === certificate.residentId)?.fullName ?? '',
+          issuedAt: certificate.certificate.issuedAt,
+          validUntil: certificate.validUntil,
+          // Derived on read, like the server: one that lapsed yesterday has to
+          // say so today, and nothing is scheduled to make that true.
+          expired:
+            certificate.validUntil !== null &&
+            certificate.validUntil < new Date().toLocaleDateString('en-CA'),
+          status: certificate.status,
+        },
+      }
+    }
+
+    throw new DemoError(
+      404,
+      'No document, receipt or certificate matches that code. It may have been mistyped.'
+    )
+  }
+
   if (parts[0] === 'catalogue') {
     return {
       status: 200,
@@ -3187,6 +3262,7 @@ async function route(
           receiptNo: paid?.receipt?.receiptNo ?? null,
           receiptIssuedAt: paid?.receipt?.issuedAt ?? null,
           receiptCode: paid?.receipt?.verificationCode ?? null,
+          documentCode: target.document?.verificationCode ?? null,
         },
       }
     }

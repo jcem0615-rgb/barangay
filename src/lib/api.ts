@@ -559,6 +559,30 @@ export interface Holiday {
   isLocal: boolean
 }
 
+/**
+ * What `/verify/:code` answers for, across the three kinds of paper this app
+ * issues. One endpoint, because a clerk holding a printout should not have to
+ * know which tier issued it before they can check it.
+ */
+export interface VerifyResult {
+  valid: boolean
+  kind?: 'document' | 'receipt' | 'barangay_certificate'
+  referenceNo?: string
+  documentType?: string
+  issuedBy?: string
+  issuedTo?: string
+  issuedAt?: string
+  /** Certificates only; null where the type states no period. */
+  validUntil?: string | null
+  /** Certificates only. Derived on the server, on read. */
+  expired?: boolean
+  /** Receipts only. */
+  particulars?: string
+  amount?: number
+  status?: string
+  error?: string
+}
+
 export interface OfficeContact {
   id: string
   name: string
@@ -703,6 +727,8 @@ export const api = {
       receiptIssuedAt: string | null
       /** The code printed on it, for reading out at a counter. */
       receiptCode: string | null
+      /** The same, for the released document. Null until it is released. */
+      documentCode: string | null
     }>(`/requests/${id}`),
 
   submitRequest: (
@@ -781,10 +807,12 @@ export const api = {
 
   staffDocument: (id: string) => downloadPdf(`/staff/requests/${id}/document`),
 
-  verify: (code: string) =>
-    request<{ valid: boolean; referenceNo?: string; documentType?: string; issuedBy?: string; issuedTo?: string; issuedAt?: string }>(
-      `/verify/${encodeURIComponent(code)}`
-    ),
+  /**
+   * The public document check. No session: whoever is holding the paper already
+   * has everything on it, and a check that needs an account is a check that
+   * does not happen at a bank counter.
+   */
+  verify: (code: string) => request<VerifyResult>(`/verify/${encodeURIComponent(code)}`),
 
   /**
    * Start a payment. The amount is not in the body on purpose: the server reads

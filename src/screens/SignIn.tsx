@@ -279,8 +279,10 @@ export default function SignIn() {
               {' '}<span className="font-medium">Municipality &rarr; Office details</span> and
               {' '}<span className="font-medium">Official receipt</span>, a barangay&rsquo;s under
               {' '}<span className="font-medium">The hall</span>. They upload and preview here,
-              but the demo draws its PDFs in the browser and cannot embed an image, so they
-              are missing from the documents it downloads. The real server prints them.
+              but the demo draws its PDFs in the browser as plain text, so neither they nor the
+              verification QR appear on the documents it downloads. The real server prints all
+              three. The code itself is on them, and typing it into{' '}
+              <span className="font-mono">/?doc=</span> checks it here exactly as it would for real.
             </p>
           </div>
         ) : (

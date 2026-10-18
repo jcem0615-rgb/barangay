@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg'
 import PDFDocument from 'pdfkit'
 import { one } from './db.ts'
 import { drawableMark, drawSignature, makeVerificationCode } from './documents.ts'
+import { documentVerificationUrl, drawQr, QR_BOX_HEIGHT, QR_SIZE } from './qr.ts'
 import { getFile } from './storage.ts'
 
 /**
@@ -438,18 +439,31 @@ export function renderReceipt(data: ReceiptRender): Promise<Buffer> {
     y = doc.y + 20
 
     // ------------------------------------------------------------ verification
-    doc.roundedRect(left, y, width, 72, 6).fillAndStroke('#ffffff', RULE)
+    //
+    // The QR and the code carry the same reference, because they are read by
+    // different people: a counter points a phone at one, and somebody on a
+    // telephone reads the other out.
+    doc.roundedRect(left, y, width, QR_BOX_HEIGHT, 6).fillAndStroke('#ffffff', RULE)
+
+    drawQr(doc, documentVerificationUrl(data.verificationCode), {
+      x: left + width - 16 - QR_SIZE,
+      y: y + (QR_BOX_HEIGHT - QR_SIZE) / 2,
+      size: QR_SIZE,
+      color: INK,
+    })
+    const codeWidth = width - 32 - QR_SIZE - 20
+
     doc.fillColor(MUTED).font('Helvetica').fontSize(8)
-      .text('VERIFICATION CODE', left + 16, y + 12, { width: width - 32, characterSpacing: 0.8 })
+      .text('VERIFICATION CODE', left + 16, y + 13, { width: codeWidth, characterSpacing: 0.8 })
     doc.fillColor(INK).font('Courier-Bold').fontSize(14)
-      .text(data.verificationCode, left + 16, y + 26, { width: width - 32 })
+      .text(data.verificationCode, left + 16, y + 27, { width: codeWidth })
     doc.fillColor(MUTED).font('Helvetica').fontSize(8)
       .text(
-        'Check this receipt against the municipality\'s portal or at any municipal counter. ' +
-          'A receipt whose code does not match the record is not one this municipality issued.',
-        left + 16, y + 48, { width: width - 32 }
+        'Scan the code or check this reference at the municipality\'s portal. A receipt whose ' +
+          'code does not match the record is not one this municipality issued.',
+        left + 16, y + 49, { width: codeWidth }
       )
-    y += 86
+    y += QR_BOX_HEIGHT + 14
 
     // ----------------------------------------------------------------- footing
     if (data.issuer.footer) {

@@ -3,6 +3,7 @@ import PDFDocument from 'pdfkit'
 import { one } from './db.ts'
 import { drawableMark, drawSignature, makeVerificationCode } from './documents.ts'
 import { getFile } from './storage.ts'
+import { documentVerificationUrl, drawQr, QR_BOX_HEIGHT, QR_SIZE } from './qr.ts'
 
 /**
  * The barangay certificate, rendered.
@@ -360,17 +361,30 @@ export function renderBarangayCertificate(data: BarangayCertificateData): Promis
     })
 
     // ------------------------------------------------------------ verification
+    //
+    // The QR and the code carry the same reference. Both, because they are read
+    // by different people: a bank or an employer points a phone at one, and
+    // somebody checking over a telephone reads the other out.
     const boxY = sigY + 86
-    doc.roundedRect(left, boxY, width, 74, 6).fillAndStroke('#f2f5fd', RULE)
+    doc.roundedRect(left, boxY, width, QR_BOX_HEIGHT, 6).fillAndStroke('#f2f5fd', RULE)
+
+    drawQr(doc, documentVerificationUrl(data.verificationCode), {
+      x: left + width - 16 - QR_SIZE,
+      y: boxY + (QR_BOX_HEIGHT - QR_SIZE) / 2,
+      size: QR_SIZE,
+      color: INK,
+    })
+    const codeWidth = width - 32 - QR_SIZE - 20
+
     doc.fillColor(MUTED).font('Helvetica').fontSize(8.5)
-      .text('VERIFICATION CODE', left + 16, boxY + 13, { width: width - 32, characterSpacing: 0.8 })
+      .text('VERIFICATION CODE', left + 16, boxY + 14, { width: codeWidth, characterSpacing: 0.8 })
     doc.fillColor(INK).font('Courier-Bold').fontSize(15)
-      .text(data.verificationCode, left + 16, boxY + 28, { width: width - 32 })
+      .text(data.verificationCode, left + 16, boxY + 29, { width: codeWidth })
     doc.fillColor(MUTED).font('Helvetica').fontSize(8)
       .text(
-        'Check this certificate at the municipality\'s portal or at any barangay or municipal ' +
-          'counter. A certificate whose code does not match the record is not one this barangay issued.',
-        left + 16, boxY + 52, { width: width - 32 }
+        'Scan the code or check this reference at the municipality\'s portal. A certificate ' +
+          'whose code does not match the record is not one this barangay issued.',
+        left + 16, boxY + 53, { width: codeWidth }
       )
 
     // ----------------------------------------------------------------- footing
