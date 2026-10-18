@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg'
 import PDFDocument from 'pdfkit'
 import { one } from './db.ts'
-import { makeVerificationCode } from './documents.ts'
+import { drawableMark, drawSignature, makeVerificationCode } from './documents.ts'
 import { getFile } from './storage.ts'
 
 /**
@@ -44,6 +44,9 @@ export interface ReceiptIssuer {
   /** PNG or JPEG bytes, or null where the municipality has uploaded no seal. */
   seal: Buffer | null
   sealType: string | null
+  /** The treasurer's signature, printed above their name. Same rules as the seal. */
+  treasurerSignature: Buffer | null
+  treasurerSignatureType: string | null
 }
 
 export interface MunicipalityRow {
@@ -61,12 +64,15 @@ export interface MunicipalityRow {
   receipt_footer: string | null
   seal_key: string | null
   seal_type: string | null
+  treasurer_signature_key: string | null
+  treasurer_signature_type: string | null
 }
 
 export const MUNICIPALITY_SELECT = `
   code, name, province, address, phone, email, website, tin,
   treasurer_name, treasurer_title, receipt_prefix, receipt_form_label,
-  receipt_footer, seal_key, seal_type, seal_updated_at
+  receipt_footer, seal_key, seal_type, seal_updated_at,
+  treasurer_signature_key, treasurer_signature_type, treasurer_signature_updated_at
 `
 
 /**
@@ -83,14 +89,18 @@ export const MUNICIPALITY_SELECT = `
  */
 export async function loadIssuer(): Promise<ReceiptIssuer> {
   const row = await one<MunicipalityRow>(`select ${MUNICIPALITY_SELECT} from municipality limit 1`)
-  let seal: Buffer | null = null
-  if (row?.seal_key) {
+  const read = async (key: string | null | undefined): Promise<Buffer | null> => {
+    if (!key) return null
     try {
-      seal = await getFile(row.seal_key)
+      return await getFile(key)
     } catch {
-      seal = null
+      return null
     }
   }
+  const [seal, treasurerSignature] = await Promise.all([
+    read(row?.seal_key),
+    read(row?.treasurer_signature_key),
+  ])
   return {
     municipality: row?.name ?? 'Municipality',
     province: row?.province ?? '',
@@ -106,6 +116,8 @@ export async function loadIssuer(): Promise<ReceiptIssuer> {
     footer: row?.receipt_footer ?? null,
     seal,
     sealType: row?.seal_type ?? null,
+    treasurerSignature,
+    treasurerSignatureType: treasurerSignature ? row?.treasurer_signature_type ?? null : null,
   }
 }
 
@@ -194,8 +206,16 @@ export async function issueReceipt(
 
 /** The seal bytes are not part of the record; everything else about it is. */
 function serializeIssuer(issuer: ReceiptIssuer) {
-  const { seal: _seal, sealType: _sealType, ...rest } = issuer
-  return { ...rest, hadSeal: issuer.seal !== null }
+  const {
+    seal: _seal, sealType: _sealType,
+    treasurerSignature: _sig, treasurerSignatureType: _sigType,
+    ...rest
+  } = issuer
+  return {
+    ...rest,
+    hadSeal: issuer.seal !== null,
+    hadTreasurerSignature: issuer.treasurerSignature !== null,
+  }
 }
 
 export function receiptFileName(receiptNo: string): string {
@@ -287,16 +307,6 @@ const peso = (centavos: number) =>
 const longDate = (d: Date) =>
   d.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
 
-/**
- * Only PNG and JPEG are drawn. pdfkit embeds nothing else, and the upload route
- * refuses everything else for that reason — but a row written before that rule,
- * or a file that changed underneath us, must not take down a settlement.
- */
-function drawable(issuer: ReceiptIssuer): Buffer | null {
-  if (!issuer.seal) return null
-  if (issuer.sealType !== 'image/png' && issuer.sealType !== 'image/jpeg') return null
-  return issuer.seal
-}
 
 export function renderReceipt(data: ReceiptRender): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -309,7 +319,13 @@ export function renderReceipt(data: ReceiptRender): Promise<Buffer> {
     const left = doc.page.margins.left
     const right = doc.page.width - doc.page.margins.right
     const width = right - left
-    const seal = drawable(data.issuer)
+    // pdfkit embeds nothing but PNG and JPEG, and the upload route refuses
+    // everything else for that reason — but a row written before that rule, or
+    // a file that changed underneath us, must not take down a settlement.
+    const seal = drawableMark(data.issuer.seal, data.issuer.sealType)
+    const signature = drawableMark(
+      data.issuer.treasurerSignature, data.issuer.treasurerSignatureType
+    )
 
     // The watermark goes down first so everything else sits over it. Faint
     // enough to be a texture rather than a thing to read through.
@@ -404,13 +420,22 @@ export function renderReceipt(data: ReceiptRender): Promise<Buffer> {
     if (data.providerRef) row('Gateway reference', data.providerRef)
 
     // --------------------------------------------------------------- signature
+    //
+    // The treasurer's own, uploaded in the Municipality tab and frozen into
+    // this PDF at issue — which is why replacing it never reprints last year's
+    // receipt over this year's treasurer.
     y += 22
-    doc.fillColor(INK).font('Helvetica-Bold').fontSize(11)
-      .text(data.issuer.treasurerName ?? '', left + width * 0.52, y, { width: width * 0.48, align: 'right' })
-    doc.moveTo(left + width * 0.52, doc.y + 2).lineTo(right, doc.y + 2).lineWidth(0.7).stroke(RULE)
-    doc.fillColor(MUTED).font('Helvetica').fontSize(8.5)
-      .text(data.issuer.treasurerTitle, left + width * 0.52, doc.y + 6, { width: width * 0.48, align: 'right' })
-    y = doc.y + 24
+    const sigWidth = width * 0.46
+    drawSignature(doc, {
+      x: right - sigWidth,
+      y,
+      width: sigWidth,
+      name: data.issuer.treasurerName,
+      title: data.issuer.treasurerTitle,
+      image: signature,
+      align: 'right',
+    })
+    y = doc.y + 20
 
     // ------------------------------------------------------------ verification
     doc.roundedRect(left, y, width, 72, 6).fillAndStroke('#ffffff', RULE)
@@ -433,9 +458,14 @@ export function renderReceipt(data: ReceiptRender): Promise<Buffer> {
     }
     doc.fillColor(MUTED).font('Helvetica').fontSize(8)
       .text(
-        'Issued electronically for a payment confirmed by the payment provider. ' +
-          'Valid without a manual signature.',
-        left, doc.page.height - 66, { width, align: 'center' }
+        signature
+          ? 'Issued electronically for a payment confirmed by the payment provider. The ' +
+            'signature is a copy held on file — the verification code is what proves this receipt.'
+          : 'Issued electronically for a payment confirmed by the payment provider. ' +
+            'Valid without a manual signature.',
+        // High enough that a second line sits inside the bottom margin rather
+        // than pushing the footer onto a page of its own.
+        left, doc.page.height - 86, { width, align: 'center' }
       )
 
     doc.end()

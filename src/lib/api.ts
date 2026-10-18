@@ -78,9 +78,13 @@ export interface BarangayOffice {
   officeHours: string | null
   phone: string | null
   email: string | null
-  /** Only on the barangay's own console read; the public list carries neither. */
+  /** Only on the barangay's own console read; the public list carries none of these. */
   hasSeal?: boolean
   sealUpdatedAt?: string | null
+  hasCaptainSignature?: boolean
+  captainSignatureUpdatedAt?: string | null
+  hasSecretarySignature?: boolean
+  secretarySignatureUpdatedAt?: string | null
 }
 
 export interface BlotterEntry {
@@ -293,6 +297,8 @@ export interface MunicipalityDetails {
   receiptFooter: string | null
   hasSeal: boolean
   sealUpdatedAt: string | null
+  hasTreasurerSignature: boolean
+  treasurerSignatureUpdatedAt: string | null
 }
 
 export interface ReportRow {
@@ -561,6 +567,11 @@ export interface OfficeContact {
   hours: string | null
   phone: string | null
   email: string | null
+  /** Who signs what this office releases, and whether a signature is on file. */
+  headName: string | null
+  headTitle: string | null
+  hasSignature: boolean
+  signatureUpdatedAt: string | null
 }
 
 export interface AuditRow {
@@ -887,7 +898,9 @@ export const api = {
   /** The hall's own details: both roles read, only the administrator writes. */
   barangayOffice: () => request<BarangayOffice>('/barangay-staff/office'),
 
-  updateBarangayOffice: (patch: Partial<Omit<BarangayOffice, 'id' | 'name' | 'hasSeal' | 'sealUpdatedAt'>>) =>
+  updateBarangayOffice: (patch: Partial<Pick<
+    BarangayOffice, 'captain' | 'secretary' | 'hallAddress' | 'officeHours' | 'phone' | 'email'
+  >>) =>
     request<BarangayOffice>('/barangay-staff/office', {
       method: 'PATCH', body: JSON.stringify(patch),
     }),
@@ -899,10 +912,24 @@ export const api = {
   barangaySeal: () => fetchBlob('/barangay-staff/office/seal'),
 
   uploadBarangaySeal: (file: File) =>
-    uploadFile<{ hasSeal: boolean }>('/barangay-staff/office/seal', file, undefined, 'PUT'),
+    uploadFile<BarangayOffice>('/barangay-staff/office/seal', file, undefined, 'PUT'),
 
   removeBarangaySeal: () =>
-    request<void>('/barangay-staff/office/seal', { method: 'DELETE' }),
+    request<BarangayOffice>('/barangay-staff/office/seal', { method: 'DELETE' }),
+
+  /**
+   * The two officials' signatures, printed above their names on a certificate.
+   * A picture, not a digital signature — the verification code is what proves
+   * the certificate, and the console says so where these are uploaded.
+   */
+  barangaySignature: (who: 'captain' | 'secretary') =>
+    fetchBlob(`/barangay-staff/office/signature/${who}`),
+
+  uploadBarangaySignature: (who: 'captain' | 'secretary', file: File) =>
+    uploadFile<BarangayOffice>(`/barangay-staff/office/signature/${who}`, file, undefined, 'PUT'),
+
+  removeBarangaySignature: (who: 'captain' | 'secretary') =>
+    request<BarangayOffice>(`/barangay-staff/office/signature/${who}`, { method: 'DELETE' }),
 
   /** A copy of a certificate this barangay released, for the counter. */
   barangayStaffCertificate: (id: string) =>
@@ -1281,13 +1308,28 @@ export const api = {
 
   listOffices: () => request<OfficeContact[]>('/admin/offices'),
 
-  updateOffice: (id: string, body: Partial<Omit<OfficeContact, 'id' | 'name' | 'officeName'>>) =>
+  updateOffice: (id: string, body: Partial<Pick<
+    OfficeContact, 'address' | 'hours' | 'phone' | 'email' | 'headName' | 'headTitle'
+  >>) =>
     request<OfficeContact>(`/admin/offices/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  /** The head's signature, printed on every document this office releases. */
+  officeSignature: (id: string) => fetchBlob(`/admin/offices/${id}/signature`),
+
+  uploadOfficeSignature: (id: string, file: File) =>
+    uploadFile<OfficeContact>(`/admin/offices/${id}/signature`, file, undefined, 'PUT'),
+
+  removeOfficeSignature: (id: string) =>
+    request<OfficeContact>(`/admin/offices/${id}/signature`, { method: 'DELETE' }),
 
   /** What the municipality prints on a receipt, and its seal. */
   municipalityDetails: () => request<MunicipalityDetails>('/admin/municipality'),
 
-  updateMunicipality: (body: Partial<Omit<MunicipalityDetails, 'code' | 'name' | 'province' | 'hasSeal' | 'sealUpdatedAt'>>) =>
+  updateMunicipality: (body: Partial<Pick<
+    MunicipalityDetails,
+    'address' | 'phone' | 'email' | 'website' | 'tin' | 'treasurerName' |
+    'treasurerTitle' | 'receiptPrefix' | 'receiptFormLabel' | 'receiptFooter'
+  >>) =>
     request<MunicipalityDetails>('/admin/municipality', {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -1301,6 +1343,15 @@ export const api = {
 
   removeMunicipalSeal: () =>
     request<MunicipalityDetails>('/admin/municipality/seal', { method: 'DELETE' }),
+
+  /** The treasurer's signature, printed above their name on a receipt. */
+  treasurerSignature: () => fetchBlob('/admin/municipality/treasurer-signature'),
+
+  uploadTreasurerSignature: (file: File) =>
+    uploadFile<MunicipalityDetails>('/admin/municipality/treasurer-signature', file, undefined, 'PUT'),
+
+  removeTreasurerSignature: () =>
+    request<MunicipalityDetails>('/admin/municipality/treasurer-signature', { method: 'DELETE' }),
 
   auditTrail: (limit = 50) => request<AuditRow[]>(`/admin/audit?limit=${limit}`),
 

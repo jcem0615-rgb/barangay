@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle, Building2, CalendarDays, Loader2, Phone, Plus, ReceiptText, Trash2,
-  FileText, Upload,
+  FileText,
 } from 'lucide-react'
+import MarkUpload, { SignatureCaveat } from '../../components/MarkUpload'
 import CertificateCatalogue, { type CatalogueDraft } from '../../components/CertificateCatalogue'
 import {
   api, ApiError,
@@ -339,25 +340,38 @@ function Offices() {
   return (
     <Panel
       title="Office details"
-      blurb="Where to find an office when the app cannot help — a resident whose permit is stuck needs an address, an opening time and a number to ring. What an office is called and what it offers is the service catalogue, and is not editable here."
+      blurb="Where to find an office when the app cannot help — a resident whose permit is stuck needs an address, an opening time and a number to ring — and who signs what it releases. What an office is called and what it offers is the service catalogue, and is not editable here."
       error={error}
       loading={loading}
     >
+      <SignatureCaveat />
       <ul className="space-y-3">
         {rows.map((row) => (
-          <OfficeRow key={row.id} row={row} onSave={(patch) => run(async () => { await api.updateOffice(row.id, patch); await reload() })} />
+          <OfficeRow
+            key={row.id}
+            row={row}
+            onSave={(patch) => run(async () => { await api.updateOffice(row.id, patch); await reload() })}
+            onChanged={reload}
+          />
         ))}
       </ul>
     </Panel>
   )
 }
 
-function OfficeRow({ row, onSave }: { row: OfficeContact; onSave: (patch: Partial<OfficeContact>) => Promise<boolean> }) {
+function OfficeRow({
+  row, onSave, onChanged,
+}: {
+  row: OfficeContact
+  onSave: (patch: Partial<OfficeContact>) => Promise<boolean>
+  onChanged: () => Promise<void>
+}) {
   const [edit, setEdit] = useState(row)
   useEffect(() => setEdit(row), [row])
   const dirty =
     edit.address !== row.address || edit.hours !== row.hours ||
-    edit.phone !== row.phone || edit.email !== row.email
+    edit.phone !== row.phone || edit.email !== row.email ||
+    edit.headName !== row.headName || edit.headTitle !== row.headTitle
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
@@ -375,11 +389,25 @@ function OfficeRow({ row, onSave }: { row: OfficeContact; onSave: (patch: Partia
         <Field label="Email">
           <Input value={edit.email ?? ''} onChange={(v) => setEdit({ ...edit, email: v || null })} placeholder="treasury@malasiqui.gov.ph" />
         </Field>
+        {/*
+          Who holds the office, which is what gets printed on what the office
+          releases — the same kind of fact as the barangay's captain and
+          secretary, and it changes when somebody leaves the post.
+        */}
+        <Field label="Who signs (name)">
+          <Input value={edit.headName ?? ''} onChange={(v) => setEdit({ ...edit, headName: v || null })} placeholder="Nobody is named yet" />
+        </Field>
+        <Field label="Their title">
+          <Input value={edit.headTitle ?? ''} onChange={(v) => setEdit({ ...edit, headTitle: v || null })} placeholder={row.officeName} />
+        </Field>
       </div>
       {dirty && (
         <div className="mt-3 flex gap-2">
           <button
-            onClick={() => void onSave({ address: edit.address, hours: edit.hours, phone: edit.phone, email: edit.email })}
+            onClick={() => void onSave({
+              address: edit.address, hours: edit.hours, phone: edit.phone, email: edit.email,
+              headName: edit.headName, headTitle: edit.headTitle,
+            })}
             className="rounded-xl bg-navy-800 px-4 py-2 text-[13px] font-semibold text-white active:bg-navy-900"
           >
             Save changes
@@ -389,6 +417,25 @@ function OfficeRow({ row, onSave }: { row: OfficeContact; onSave: (patch: Partia
           </button>
         </div>
       )}
+
+      <div className="mt-3">
+        <MarkUpload
+          title="Signature"
+          shape="wide"
+          blurb={
+            row.headName
+              ? `Printed above ${row.headName}'s name on every document this office releases. Leave it empty and the document prints the rule and the title, so the paper can still be signed by hand.`
+              : 'Printed on every document this office releases, above whoever is named above. Name somebody first — a signature with no name under it is not worth much on a counter.'
+          }
+          present={row.hasSignature}
+          updatedAt={row.signatureUpdatedAt}
+          keepsNote="Documents released before now keep the signature they were printed with."
+          load={() => api.officeSignature(row.id)}
+          upload={(file) => api.uploadOfficeSignature(row.id, file)}
+          remove={() => api.removeOfficeSignature(row.id)}
+          onChanged={onChanged}
+        />
+      </div>
     </li>
   )
 }
@@ -440,6 +487,10 @@ const ACTIONS: Record<string, string> = {
   'municipality.update': 'Changed what the official receipt says',
   'municipality.seal.update': 'Uploaded a new municipal seal',
   'municipality.seal.remove': 'Removed the municipal seal',
+  'municipality.signature.update': "Uploaded a new treasurer's signature",
+  'municipality.signature.remove': "Removed the treasurer's signature",
+  'office.signature.update': "Uploaded a new office head's signature",
+  'office.signature.remove': "Removed an office head's signature",
 }
 
 const describe = (row: AuditRow) => `${ACTIONS[row.action] ?? row.action} — ${row.target}`
@@ -449,7 +500,8 @@ const READABLE = [
   'label', 'agency', 'phone', 'name', 'officeName', 'address', 'hours', 'email',
   'isLocal', 'isNational',
   'website', 'tin', 'treasurerName', 'treasurerTitle', 'receiptPrefix',
-  'receiptFormLabel', 'receiptFooter', 'hasSeal',
+  'receiptFormLabel', 'receiptFooter', 'hasSeal', 'hasTreasurerSignature',
+  'headName', 'headTitle', 'hasSignature',
 ] as const
 
 const show = (value: unknown) =>
@@ -615,7 +667,6 @@ const Input = ({ value, onChange, placeholder }: { value: string; onChange: (v: 
 function Receipt() {
   const [row, setRow] = useState<MunicipalityDetails | null>(null)
   const [edit, setEdit] = useState<MunicipalityDetails | null>(null)
-  const [seal, setSeal] = useState<string | null>(null)
   const { loading, error, setError, run, reload } = useLoader(
     useCallback(async () => {
       const next = await api.municipalityDetails()
@@ -623,27 +674,6 @@ function Receipt() {
       setEdit(next)
     }, [])
   )
-
-  // The seal is fetched as a blob and handed to the DOM as an object URL,
-  // because <img src> cannot carry the bearer token — the same reason the ID
-  // portrait is loaded this way.
-  useEffect(() => {
-    if (!row?.hasSeal) { setSeal(null); return }
-    let url: string | null = null
-    let live = true
-    void api.municipalSeal()
-      .then((blob) => {
-        // Null where the row says there is a seal and the stored file has gone.
-        if (!live || !blob) return
-        url = URL.createObjectURL(blob)
-        setSeal(url)
-      })
-      .catch(() => setSeal(null))
-    return () => {
-      live = false
-      if (url) URL.revokeObjectURL(url)
-    }
-  }, [row?.hasSeal, row?.sealUpdatedAt])
 
   const dirty = !!row && !!edit && FIELDS.some(([key]) => (edit[key] ?? '') !== (row[key] ?? ''))
 
@@ -656,53 +686,33 @@ function Receipt() {
     >
       {edit && row && (
         <div className="space-y-4">
-          {/* The seal */}
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="font-display text-[14px] font-bold text-navy-950">Municipal seal</p>
-            <p className="mt-0.5 max-w-2xl text-[12.5px] leading-snug text-slate-600">
-              Printed at the head of every receipt and faintly behind it. PNG or JPEG only —
-              those are the two a receipt can actually be printed with, so anything else is
-              refused rather than accepted and silently left off. A transparent PNG looks best.
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-4">
-              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50">
-                {seal ? (
-                  <img src={seal} alt="The municipality's seal" className="max-h-20 max-w-20 object-contain" />
-                ) : (
-                  <span className="px-2 text-center text-[11px] text-slate-500">No seal</span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <label className="tap-target inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-navy-800 px-4 py-2 text-[13px] font-semibold text-white active:bg-navy-900">
-                  <Upload size={14} /> {row.hasSeal ? 'Replace seal' : 'Upload seal'}
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      e.target.value = ''
-                      if (file) void run(async () => { await api.uploadMunicipalSeal(file); await reload() })
-                    }}
-                  />
-                </label>
-                {row.hasSeal && (
-                  <button
-                    onClick={() => void run(async () => { await api.removeMunicipalSeal(); await reload() })}
-                    className="tap-target inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-medium text-slate-600"
-                  >
-                    <Trash2 size={14} /> Remove
-                  </button>
-                )}
-              </div>
-            </div>
-            {row.sealUpdatedAt && (
-              <p className="mt-3 text-[12px] text-slate-500">
-                Uploaded {new Date(row.sealUpdatedAt).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}.
-                Receipts issued before now keep the seal they were printed with.
-              </p>
-            )}
-          </div>
+          {/* The seal and the treasurer's signature */}
+          <MarkUpload
+            title="Municipal seal"
+            blurb="Printed at the head of every receipt and faintly behind it — and on every document the offices release. PNG or JPEG only: those are the two a PDF can actually be printed with, so anything else is refused rather than accepted and silently left off. A transparent PNG looks best."
+            present={row.hasSeal}
+            updatedAt={row.sealUpdatedAt}
+            keepsNote="Receipts and documents issued before now keep the seal they were printed with."
+            load={api.municipalSeal}
+            upload={(file) => api.uploadMunicipalSeal(file)}
+            remove={() => api.removeMunicipalSeal()}
+            onChanged={reload}
+          />
+
+          <SignatureCaveat />
+
+          <MarkUpload
+            title="Treasurer's signature"
+            shape="wide"
+            blurb={`Printed above ${row.treasurerName ?? 'the treasurer'}'s name on every receipt. Scan it on white paper and upload a transparent PNG if you can — a photograph with a grey background prints as a grey box. Leave it empty and the receipt prints the rule and the title, so a printout can still be signed by hand.`}
+            present={row.hasTreasurerSignature}
+            updatedAt={row.treasurerSignatureUpdatedAt}
+            keepsNote="Receipts issued before now keep the signature they were printed with."
+            load={api.treasurerSignature}
+            upload={(file) => api.uploadTreasurerSignature(file)}
+            remove={() => api.removeTreasurerSignature()}
+            onChanged={reload}
+          />
 
           {/* The municipality, as it is printed */}
           <div className="rounded-xl border border-slate-200 bg-white p-4">

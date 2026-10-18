@@ -4,7 +4,7 @@ import { one, query, transaction } from '../db.ts'
 import { authenticate, canActOnDepartment, requireRole } from '../auth.ts'
 import { REQUEST_SELECT, serializeWithReady, toCentavos, toPesos, withReadyDates, type RequestRow } from '../serialize.ts'
 import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
-import { documentFileName, makeVerificationCode, renderDocument } from '../documents.ts'
+import { documentFileName, loadReleaseMarks, makeVerificationCode, renderDocument } from '../documents.ts'
 import { sendAttachment, sendEvidence } from '../attachments.ts'
 import {
   deliverNotification, notificationFor, recordNotification, type NotificationInput,
@@ -277,8 +277,12 @@ staffRouter.post('/requests/:id/advance', async (req, res) => {
         where r.id = $1`,
       [row.id]
     )
+    // The seal and the office head's signature, read before the transaction for
+    // the reason `loadReleaseMarks` gives.
+    const marks = await loadReleaseMarks(row.department_id)
     const code = makeVerificationCode()
     const content = await renderDocument({
+      ...marks,
       referenceNo: row.reference_no,
       serviceName: row.service_name ?? 'Municipal Document',
       officeName: context?.office_name ?? 'Municipal Office',

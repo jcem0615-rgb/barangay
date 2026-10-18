@@ -41,6 +41,7 @@
     "test:certificates": "node test/certificates.mjs",
     "test:barangay-certificate": "node test/barangay-certificate.mjs",
     "test:receipts": "node test/receipts.mjs",
+    "test:signatures": "node test/signatures.mjs",
     "test:deployment": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/deployment.mjs",
     "test:residency": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/residency.mjs",
     "test:id-verification": "node test/id-verification.mjs",

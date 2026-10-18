@@ -309,8 +309,11 @@ check(
   !(await bin(`/barangay/requests/${afterEdit}/certificate`, resident)).bytes.equals(sealedPdf.bytes)
 )
 
+// 200 with the hall's own state rather than a bare 204: the console renders
+// the response, and a 204 left it showing a seal that is no longer there.
 const removed = await j('/barangay-staff/office/seal', { method: 'DELETE', token: admin })
-check('the seal can be removed', removed.status === 204, removed.status)
+check('the seal can be removed', removed.status === 200, removed.status)
+check('and the response says it is gone', removed.json?.hasSeal === false)
 check('removing it twice is not found', (await j('/barangay-staff/office/seal', { method: 'DELETE', token: admin })).status === 404)
 check(
   'and a certificate printed with it is unchanged',

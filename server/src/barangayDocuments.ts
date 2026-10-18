@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg'
 import PDFDocument from 'pdfkit'
 import { one } from './db.ts'
-import { makeVerificationCode } from './documents.ts'
+import { drawableMark, drawSignature, makeVerificationCode } from './documents.ts'
 import { getFile } from './storage.ts'
 
 /**
@@ -80,6 +80,11 @@ export interface BarangaySealSource {
   /** PNG or JPEG bytes, or null where the barangay has uploaded none. */
   seal: Buffer | null
   sealType: string | null
+  /** The two officials' signatures, under the same rules as the seal. */
+  captainSignature: Buffer | null
+  captainSignatureType: string | null
+  secretarySignature: Buffer | null
+  secretarySignatureType: string | null
 }
 
 /**
@@ -93,15 +98,40 @@ export interface BarangaySealSource {
  * missing is a resident standing at a counter being told to come back.
  */
 export async function loadBarangaySeal(barangayId: string): Promise<BarangaySealSource> {
-  const row = await one<{ seal_key: string | null; seal_type: string | null }>(
-    `select seal_key, seal_type from barangays where id = $1`,
+  const row = await one<{
+    seal_key: string | null; seal_type: string | null
+    captain_signature_key: string | null; captain_signature_type: string | null
+    secretary_signature_key: string | null; secretary_signature_type: string | null
+  }>(
+    `select seal_key, seal_type,
+            captain_signature_key, captain_signature_type,
+            secretary_signature_key, secretary_signature_type
+       from barangays where id = $1`,
     [barangayId]
   )
-  if (!row?.seal_key) return { seal: null, sealType: null }
-  try {
-    return { seal: await getFile(row.seal_key), sealType: row.seal_type }
-  } catch {
-    return { seal: null, sealType: null }
+
+  const read = async (key: string | null | undefined): Promise<Buffer | null> => {
+    if (!key) return null
+    try {
+      return await getFile(key)
+    } catch {
+      return null
+    }
+  }
+
+  const [seal, captainSignature, secretarySignature] = await Promise.all([
+    read(row?.seal_key),
+    read(row?.captain_signature_key),
+    read(row?.secretary_signature_key),
+  ])
+
+  return {
+    seal,
+    sealType: seal ? row?.seal_type ?? null : null,
+    captainSignature,
+    captainSignatureType: captainSignature ? row?.captain_signature_type ?? null : null,
+    secretarySignature,
+    secretarySignatureType: secretarySignature ? row?.secretary_signature_type ?? null : null,
   }
 }
 
@@ -127,6 +157,10 @@ export interface BarangayCertificateData {
   verificationCode: string
   seal: Buffer | null
   sealType: string | null
+  captainSignature: Buffer | null
+  captainSignatureType: string | null
+  secretarySignature: Buffer | null
+  secretarySignatureType: string | null
 }
 
 export interface IssuedBarangayCertificate {
@@ -194,12 +228,6 @@ const longDay = (iso: string) =>
     year: 'numeric', month: 'long', day: 'numeric',
   })
 
-/** Only PNG and JPEG are drawn; pdfkit embeds nothing else. */
-function drawable(data: BarangayCertificateData): Buffer | null {
-  if (!data.seal) return null
-  if (data.sealType !== 'image/png' && data.sealType !== 'image/jpeg') return null
-  return data.seal
-}
 
 export function renderBarangayCertificate(data: BarangayCertificateData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -212,7 +240,7 @@ export function renderBarangayCertificate(data: BarangayCertificateData): Promis
     const left = doc.page.margins.left
     const right = doc.page.width - doc.page.margins.right
     const width = right - left
-    const seal = drawable(data)
+    const seal = drawableMark(data.seal, data.sealType)
 
     // The watermark first, so everything else sits over it.
     if (seal) {
@@ -314,24 +342,25 @@ export function renderBarangayCertificate(data: BarangayCertificateData): Promis
     const sigY = Math.max(doc.y, 520)
     const sigWidth = (width - 40) / 2
 
-    const signature = (x: number, name: string | null, title: string) => {
-      doc.fillColor(INK).font('Helvetica-Bold').fontSize(11)
-        .text(name ?? ' ', x, sigY + 16, { width: sigWidth, align: 'center' })
-      doc.moveTo(x, sigY + 32).lineTo(x + sigWidth, sigY + 32).lineWidth(0.7).stroke(RULE)
-      doc.fillColor(MUTED).font('Helvetica').fontSize(8.5)
-        .text(title, x, sigY + 37, { width: sigWidth, align: 'center' })
-    }
     doc.fillColor(MUTED).font('Helvetica').fontSize(8)
       .text('ATTESTED BY', left, sigY, { width: sigWidth, align: 'center', characterSpacing: 0.8 })
     doc.fillColor(MUTED).font('Helvetica').fontSize(8)
       .text('ISSUED BY', left + sigWidth + 40, sigY, {
         width: sigWidth, align: 'center', characterSpacing: 0.8,
       })
-    signature(left, data.secretary, 'Barangay Secretary')
-    signature(left + sigWidth + 40, data.captain, 'Punong Barangay')
+    drawSignature(doc, {
+      x: left, y: sigY + 14, width: sigWidth,
+      name: data.secretary, title: 'Barangay Secretary',
+      image: drawableMark(data.secretarySignature, data.secretarySignatureType),
+    })
+    drawSignature(doc, {
+      x: left + sigWidth + 40, y: sigY + 14, width: sigWidth,
+      name: data.captain, title: 'Punong Barangay',
+      image: drawableMark(data.captainSignature, data.captainSignatureType),
+    })
 
     // ------------------------------------------------------------ verification
-    const boxY = sigY + 72
+    const boxY = sigY + 86
     doc.roundedRect(left, boxY, width, 74, 6).fillAndStroke('#f2f5fd', RULE)
     doc.fillColor(MUTED).font('Helvetica').fontSize(8.5)
       .text('VERIFICATION CODE', left + 16, boxY + 13, { width: width - 32, characterSpacing: 0.8 })
@@ -347,8 +376,13 @@ export function renderBarangayCertificate(data: BarangayCertificateData): Promis
     // ----------------------------------------------------------------- footing
     doc.fillColor(MUTED).font('Helvetica').fontSize(8)
       .text(
-        'Issued electronically by the barangay named above. This copy is valid without a manual signature.',
-        left, doc.page.height - 70, { width, align: 'center' }
+        data.captainSignature || data.secretarySignature
+          ? 'Issued electronically by the barangay named above. The signatures are copies held ' +
+            'on file — the verification code is what proves this certificate.'
+          : 'Issued electronically by the barangay named above. This copy is valid without a manual signature.',
+        // High enough that a second line sits inside the bottom margin rather
+        // than pushing the footer onto a page of its own.
+        left, doc.page.height - 86, { width, align: 'center' }
       )
 
     doc.end()

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Phone, Trash2, Upload } from 'lucide-react'
+import { Loader2, Phone } from 'lucide-react'
 import { api, ApiError, type BarangayOffice as Office } from '../../lib/api'
+import MarkUpload, { SignatureCaveat } from '../../components/MarkUpload'
 
 /**
  * The hall's own details, as residents read them.
@@ -22,8 +23,8 @@ import { api, ApiError, type BarangayOffice as Office } from '../../lib/api'
  * it, which is what changes at every barangay election.
  */
 
-/** The editable text fields. `hasSeal` is read-only state, not a form field. */
-type EditableKey = keyof Omit<Office, 'id' | 'name' | 'hasSeal' | 'sealUpdatedAt'>
+/** The editable text fields. The seal and the signatures are state, not fields. */
+type EditableKey = 'captain' | 'secretary' | 'hallAddress' | 'officeHours' | 'phone' | 'email'
 
 const FIELDS: Array<{
   key: EditableKey
@@ -71,7 +72,6 @@ export default function BarangayOffice({ readOnly }: { readOnly: boolean }) {
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [seal, setSeal] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -86,39 +86,6 @@ export default function BarangayOffice({ readOnly }: { readOnly: boolean }) {
   }, [])
 
   useEffect(() => { void load() }, [load])
-
-  // Fetched as a blob and handed to the DOM as an object URL, because <img src>
-  // cannot carry the bearer token — the same reason the ID portrait is loaded
-  // this way.
-  useEffect(() => {
-    if (!office?.hasSeal) { setSeal(null); return }
-    let url: string | null = null
-    let live = true
-    void api.barangaySeal()
-      .then((blob) => {
-        if (!live || !blob) return
-        url = URL.createObjectURL(blob)
-        setSeal(url)
-      })
-      .catch(() => setSeal(null))
-    return () => {
-      live = false
-      if (url) URL.revokeObjectURL(url)
-    }
-  }, [office?.hasSeal, office?.sealUpdatedAt])
-
-  const withSeal = async (work: () => Promise<unknown>) => {
-    setBusy(true)
-    setError(null)
-    try {
-      await work()
-      await load()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not change the seal.')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const save = async () => {
     setBusy(true)
@@ -175,65 +142,57 @@ export default function BarangayOffice({ readOnly }: { readOnly: boolean }) {
       )}
 
       {/*
-        The seal. It is on this tab rather than beside the certificate queue
-        because it is a fact about the hall, like its address and who holds its
-        two offices — and like those, it is printed on every certificate this
-        barangay releases.
+        The seal and the two signatures. They are on this tab rather than beside
+        the certificate queue because they are facts about the hall, like its
+        address and who holds its two offices — and like those, they are printed
+        on every certificate this barangay releases.
       */}
-      <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-5">
-        <p className="font-display text-[14px] font-bold text-navy-950">Barangay seal</p>
-        <p className="mt-0.5 text-[12.5px] leading-snug text-slate-600">
-          Printed at the head of every certificate this barangay releases, and faintly
-          behind it. PNG or JPEG only — those are the two a certificate can actually be
-          printed with, so anything else is refused rather than accepted and silently left
-          off. A transparent PNG looks best.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-4">
-          <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50">
-            {seal ? (
-              <img src={seal} alt="This barangay's seal" className="max-h-20 max-w-20 object-contain" />
-            ) : (
-              <span className="px-2 text-center text-[11px] text-slate-500">No seal</span>
-            )}
-          </div>
-          {readOnly ? (
-            <p className="text-[12.5px] leading-snug text-slate-600">
-              The barangay administrator uploads this.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <label className="tap-target inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-navy-800 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-navy-900">
-                <Upload size={14} /> {office.hasSeal ? 'Replace seal' : 'Upload seal'}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  className="hidden"
-                  disabled={busy}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    e.target.value = ''
-                    if (file) void withSeal(() => api.uploadBarangaySeal(file))
-                  }}
-                />
-              </label>
-              {office.hasSeal && (
-                <button
-                  onClick={() => void withSeal(() => api.removeBarangaySeal())}
-                  disabled={busy}
-                  className="tap-target inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-medium text-slate-600 disabled:opacity-60"
-                >
-                  <Trash2 size={14} /> Remove
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        {office.sealUpdatedAt && (
-          <p className="mt-3 text-[12px] text-slate-500">
-            Uploaded {new Date(office.sealUpdatedAt).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}.
-            Certificates released before now keep the seal they were printed with.
-          </p>
-        )}
+      <div className="mb-4 space-y-4">
+        <MarkUpload
+          title="Barangay seal"
+          blurb="Printed at the head of every certificate this barangay releases, and faintly behind it. PNG or JPEG only — those are the two a certificate can actually be printed with, so anything else is refused rather than accepted and silently left off. A transparent PNG looks best."
+          present={office.hasSeal ?? false}
+          updatedAt={office.sealUpdatedAt}
+          keepsNote="Certificates released before now keep the seal they were printed with."
+          readOnly={readOnly}
+          readOnlyNote="The barangay administrator uploads this."
+          load={api.barangaySeal}
+          upload={(file) => api.uploadBarangaySeal(file)}
+          remove={() => api.removeBarangaySeal()}
+          onChanged={load}
+        />
+
+        <SignatureCaveat />
+
+        <MarkUpload
+          title="Punong Barangay's signature"
+          shape="wide"
+          blurb={`Printed above ${office.captain ?? 'the captain'}'s name under "Issued by". Scan it on white paper and upload a transparent PNG if you can — a photograph with a grey background prints as a grey box.`}
+          present={office.hasCaptainSignature ?? false}
+          updatedAt={office.captainSignatureUpdatedAt}
+          keepsNote="Certificates released before now keep the signature they were printed with."
+          readOnly={readOnly}
+          readOnlyNote="The barangay administrator uploads this."
+          load={() => api.barangaySignature('captain')}
+          upload={(file) => api.uploadBarangaySignature('captain', file)}
+          remove={() => api.removeBarangaySignature('captain')}
+          onChanged={load}
+        />
+
+        <MarkUpload
+          title="Barangay Secretary's signature"
+          shape="wide"
+          blurb={`Printed above ${office.secretary ?? 'the secretary'}'s name under "Attested by". Leave it empty and the certificate prints the rule and the title, so the paper can still be signed by hand.`}
+          present={office.hasSecretarySignature ?? false}
+          updatedAt={office.secretarySignatureUpdatedAt}
+          keepsNote="Certificates released before now keep the signature they were printed with."
+          readOnly={readOnly}
+          readOnlyNote="The barangay administrator uploads this."
+          load={() => api.barangaySignature('secretary')}
+          upload={(file) => api.uploadBarangaySignature('secretary', file)}
+          remove={() => api.removeBarangaySignature('secretary')}
+          onChanged={load}
+        />
       </div>
 
       <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">

@@ -1478,7 +1478,8 @@ the barangay's own name follows one tier down. The schema strips an unknown key,
 so a request trying to rename the municipality has nothing left to change and is
 refused as empty rather than quietly doing something different.
 
-**The seal is uploaded, because no seed can guess it.** PNG and JPEG only, and
+**The seal is uploaded, because no seed can guess it**, and so is the treasurer's
+signature beside it — see *The e-seal and the e-signature*. PNG and JPEG only, and
 that is narrower than the ID-portrait rule on purpose: this image is drawn into
 a PDF and the PDF writer embeds nothing else, so a HEIC seal would be accepted,
 previewed, and then silently missing from every receipt. Type comes from the
@@ -1571,7 +1572,8 @@ Barangay's name and is attested by the Barangay Secretary, which is why both alr
 the `barangays` row. A missing name leaves the rule and the title, so the paper can still
 be signed by hand rather than printing a title over nothing.
 
-**The barangay uploads its own seal**, in its own Hall tab — PNG and JPEG only, by the
+**The barangay uploads its own seal and its two officials' signatures**, in its own Hall
+tab — see *The e-seal and the e-signature* — PNG and JPEG only, by the
 leading bytes, virus-scanned in memory, 2 MB. Narrower than the ID-portrait rule for the
 same reason the municipal seal is: the PDF writer embeds nothing else, so a HEIC seal would
 be accepted, previewed, and then silently missing from every certificate. The administrator
@@ -1589,6 +1591,76 @@ through `barangay_documents.barangay_id` in the same statement, so another baran
 *not found* rather than refused — and the whole `/barangay-staff` mount still answers 403
 to every municipal account, administrator included. A different tier is not a wider one.
 
+## The e-seal and the e-signature
+
+The seal existed in two places and the signature in none. A municipality had one,
+printed on a receipt; each barangay had one, printed on a certificate. Nothing had a
+signature — every document this app issued came out with a name over a bare rule, or,
+in the case of the municipal released document, with no seal, no signature and nobody
+named on it at all.
+
+**They are one kind of thing and they share one set of rules.** PNG and JPEG only,
+decided by the leading bytes rather than the filename, virus-scanned in memory before
+anything reaches disk, 2 MB. The type set is narrow for the same reason it always was:
+the PDF writer embeds nothing else, so a HEIC signature would be accepted, previewed in
+the console, and then silently missing from every document printed with it. One
+`checkMark` in `server/src/marks.ts` is shared by all four upload routes, and one
+`MarkUpload` component by all six slots in the two consoles — they behave identically
+because they *are* identical.
+
+**A signature here is a picture of one, and every screen that uploads one says so.**
+It makes the paper look the way a counter expects; it makes nothing tamper-evident.
+The verification code is still the only thing that proves a document, so the document
+itself says which is which in its footer, and `SignatureCaveat` says it again above the
+upload button — because the person uploading is exactly the person who might assume
+otherwise.
+
+**Who signs is a fact about an office, not about the catalogue.** `departments` gained
+`head_name` and `head_title`, edited in **Municipality → Office details** beside the
+address and the phone. Per office rather than one signatory for the whole hall, because
+a released document already names the office that released it: the Civil Registrar signs
+a civil registry document and the Treasurer signs a cedula, and one municipal signature
+on both would be wrong on at least one of them. It is the same decision the barangay
+already made by putting its captain and its secretary on the `barangays` row.
+
+**The title is seeded; the name is not.** A title is a fact about the office and
+survives an election; a name is a person who has never held it here. A seeded name would
+be somebody this app invented signing official paper, so a document prints the rule and
+the title with nothing over it until the hall fills one in — which is also what happens
+when an office would rather sign by hand.
+
+**The barangay gets the two signatures it already had names for.** The Punong Barangay's
+and the Secretary's, in the Hall tab beside the seal, the administrator writing and both
+roles reading — the line the rest of that console already draws. There is no third slot:
+`/barangay-staff/office/signature/:who` answers 404 to anything but `captain` and
+`secretary`, and the seal is not reachable through it either.
+
+**The municipal document finally carries both.** It gets the municipality's seal as a
+header mark and a watermark, exactly as the receipt and the certificate do, and a real
+signature block above the verification box. That it had neither was the oldest gap in
+the app: the one document a resident collects from the hall was the only one that looked
+like nothing had issued it.
+
+**Everything is frozen at issue, like the fee and the validity period.** The seal and the
+signature are drawn into the PDF when the document is rendered and the PDF is stored, so
+replacing a signature after an election never reaches back into a document somebody is
+holding — and removing one keeps every document already printed with it. The marks are
+read *before* the transaction opens, because reading them is file I/O and holding a
+transaction across it would turn a slow disk into a lock on the request queue; a mark
+that cannot be read is never a reason to fail a release.
+
+**The audit trail is the whole defence.** An administrator can print any official's
+signature on anything. Nothing in the app can stop that, so every upload and every
+removal is written to `admin_audit` in the same transaction as the change, with the
+actor's name stored beside their id — the same table and the same reasoning as the
+hotlines. The storage key is kept out of it: the trail is read by people.
+
+**Isolation is the same structural rule as everywhere else.** A barangay reaches its own
+row and no other, so another barangay's signature is *not found* rather than refused;
+municipal accounts get 403 from the whole `/barangay-staff` mount, administrator
+included, and barangay accounts get 403 from `/admin`. No resident route serves any of
+them — the preview is a console read, scoped to the account asking.
+
 ## Known simplifications (intentional, flag if scope grows)
 
 - **PhilSys sync** is visual only. A production build would call a real PhilSys
@@ -1602,7 +1674,13 @@ to every municipal account, administrator included. A different tier is not a wi
   made.
 - **Document release** produces a real PDF with a verification code, but it is not
   digitally signed. A production system would sign it so tampering is detectable
-  rather than relying on the code lookup alone.
+  rather than relying on the code lookup alone. **The e-signature does not change
+  this**, and the risk is that it reads as though it does: it is a scanned picture
+  drawn onto the page, so a forged copy carrying the same picture is indistinguishable
+  by eye. The footer on every document says the code is what proves it, and the
+  consoles say the same above the upload button, but a deployment that wants real
+  non-repudiation wants PAdES signing with a certificate the LGU holds — which is a
+  key-custody question rather than a code one.
 - **Attachments** are type-checked by magic number, scanned by clamd when
   `CLAMAV_HOST` is set, and served only as downloads. Scanning is off by default
   in development and **fails closed** when configured — see `server/README.md`.
@@ -1697,6 +1775,18 @@ to every municipal account, administrator included. A different tier is not a wi
   and processed, across all seventeen services; only the barangay side has type-specific
   wording. Giving the municipal renderer the same treatment means the same field on
   `services`, which is a bigger catalogue to author.
+- **An office has one signatory, and a document is signed by whoever that is at release.**
+  There is no second signature, no countersignature and no "signed by X for Y" — a mayor
+  signing a business permit alongside the licensing officer is a real arrangement this
+  does not model. Nothing records that the named official consented to their signature
+  being uploaded, either: the audit trail says who uploaded it, which is not the same
+  thing, and the consent is a conversation the checklist in `DEPLOY.md` asks somebody to
+  have.
+- **Nothing removes a signature when its owner leaves office.** Correcting the name is a
+  field and replacing the picture is an upload, and both are somebody's job to remember —
+  the same standing problem as the barangay captain's name, one tier up. A document
+  already issued keeps what it was printed with, which is correct, so the failure mode is
+  a *new* document going out over the wrong person's signature.
 - **Nothing is paid online at the barangay.** The fee is quoted and shown, and settled at the
   barangay hall on collection. The payment machinery is all municipal; pointing it at a
   barangay means deciding who the money goes to, which is a treasury question rather than a

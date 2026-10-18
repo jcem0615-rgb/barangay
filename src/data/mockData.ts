@@ -395,6 +395,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM (no noon break)',
     phone: '(075) 961-2345',
     email: 'boss@malasiqui.gov.ph',
+    headTitle: 'Business Permits and Licensing Officer',
   },
   {
     id: 'cswdo',
@@ -406,6 +407,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM',
     phone: '(075) 961-2350',
     email: 'cswdo@malasiqui.gov.ph',
+    headTitle: 'Municipal Social Welfare and Development Officer',
   },
   {
     id: 'lcr',
@@ -417,6 +419,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM (no noon break)',
     phone: '(075) 961-2338',
     email: 'lcr@malasiqui.gov.ph',
+    headTitle: 'Municipal Civil Registrar',
   },
   {
     id: 'treasury',
@@ -428,6 +431,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM (no noon break)',
     phone: '(075) 961-2320',
     email: 'treasury@malasiqui.gov.ph',
+    headTitle: 'Municipal Treasurer',
   },
   {
     id: 'obo',
@@ -439,6 +443,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     hours: 'Monday to Friday, 8:00 AM – 5:00 PM',
     phone: '(075) 961-2361',
     email: 'obo@malasiqui.gov.ph',
+    headTitle: 'Municipal Building Official',
   },
   {
     id: 'health',
@@ -450,6 +455,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     hours: 'Monday to Saturday, 7:00 AM – 4:00 PM',
     phone: '(075) 961-2377',
     email: 'health@malasiqui.gov.ph',
+    headTitle: 'Municipal Health Officer',
   },
 ]
 

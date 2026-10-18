@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v25'
+const STORE_KEY = 'elgu-demo-state-v26'
 
 interface DemoIncident {
   id: string
@@ -210,6 +210,14 @@ interface DemoState {
   sealUpdatedAt: string | null
   /** barangay id -> its own seal, as a downscaled data URL. */
   barangaySeals: Record<string, { seal: string; updatedAt: string }>
+  /**
+   * Every uploaded signature, downscaled the same way, keyed by whose it is:
+   * `municipality:treasurer`, `office:<id>`, `barangay:<id>:captain`,
+   * `barangay:<id>:secretary`. One map rather than four, because they are one
+   * kind of thing under one set of rules — which is the point the real server
+   * makes by sharing a single check between them.
+   */
+  signatures: Record<string, { image: string; updatedAt: string }>
   /** One series for the municipality, like every other counter here. */
   receiptCounter: number
   barangayRequests: DemoBarangayRequest[]
@@ -344,6 +352,8 @@ interface DemoHoliday { date: string; name: string; isLocal: boolean }
 
 interface DemoOfficeContact {
   address: string | null; hours: string | null; phone: string | null; email: string | null
+  /** Who signs what the office releases. The title is seeded; the name is not. */
+  headName: string | null; headTitle: string | null
 }
 
 interface DemoAudit {
@@ -471,6 +481,7 @@ function seed(): DemoState {
     holidays: HOLIDAYS.map((h) => ({ date: h.date, name: h.name, isLocal: h.local ?? false })),
     offices: Object.fromEntries(SERVICE_CATEGORIES.map((c) => [c.id, {
       address: c.address ?? null, hours: c.hours ?? null, phone: c.phone ?? null, email: c.email ?? null,
+      headName: null, headTitle: c.headTitle ?? null,
     }])),
     audit: [],
     appointments: [],
@@ -491,6 +502,7 @@ function seed(): DemoState {
     seal: null,
     sealUpdatedAt: null,
     barangaySeals: {},
+    signatures: {},
     receiptCounter: 0,
     barangayRequests: [],
     barangayFees: {},
@@ -1561,6 +1573,12 @@ function documentFor(r: DemoRequest): Blob {
     `Released: ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}`,
     `Fee: PHP ${r.fee.toFixed(2)}${r.paid ? ' (paid)' : ''}`,
     '',
+    // The demo assembles this PDF in the browser and cannot embed an image, so
+    // no seal and no signature are drawn. The real renderer prints both, and
+    // the console still shows which are on file.
+    `Signed by: ${state.offices[r.categoryId]?.headName ?? ''}`,
+    state.offices[r.categoryId]?.headTitle ?? officeName(r.categoryId),
+    '',
     `VERIFICATION CODE: ${r.document?.verificationCode ?? ''}`,
     '',
     'Demo document — generated in your browser, not issued by an LGU.',
@@ -1573,6 +1591,35 @@ export interface DemoResponse {
   blob?: Blob
   fileName?: string
 }
+
+/**
+ * A seal or a signature, demo-side.
+ *
+ * The same narrow type set and the same cap as the real server — decided by the
+ * leading bytes, not the filename — then downscaled, because localStorage will
+ * not take 2 MB and a mark that looks uploaded and vanishes on reload is worse
+ * than one that was refused.
+ */
+async function takeMark(file: File | undefined, what: string, printedOn: string): Promise<string> {
+  if (!file) throw new DemoError(400, 'Choose an image to upload.')
+  if (file.size > 2 * 1024 * 1024) {
+    throw new DemoError(413, 'That file is too large. The limit is 2 MB.')
+  }
+  const kind = sniff(new Uint8Array(await file.slice(0, 12).arrayBuffer()))
+  if (!kind || (kind.mime !== 'image/png' && kind.mime !== 'image/jpeg')) {
+    throw new DemoError(
+      415,
+      `${what} has to be a PNG or JPEG image — those are the two ${printedOn} can be printed with.`
+    )
+  }
+  return shrinkToDataUrl(file, 320)
+}
+
+/** What a console reads back about one signature slot. */
+const signatureState = (slot: string) => ({
+  has: state.signatures[slot] !== undefined,
+  updatedAt: state.signatures[slot]?.updatedAt ?? null,
+})
 
 /** Routes one API call. Mirrors the real server's status codes and messages. */
 export function handleDemoRequest(
@@ -1809,6 +1856,10 @@ async function route(
     const sealState = () => ({
       hasSeal: Boolean(state.barangaySeals[own.id]),
       sealUpdatedAt: state.barangaySeals[own.id]?.updatedAt ?? null,
+      hasCaptainSignature: signatureState(`barangay:${own.id}:captain`).has,
+      captainSignatureUpdatedAt: signatureState(`barangay:${own.id}:captain`).updatedAt,
+      hasSecretarySignature: signatureState(`barangay:${own.id}:secretary`).has,
+      secretarySignatureUpdatedAt: signatureState(`barangay:${own.id}:secretary`).updatedAt,
     })
     const adminOnly = () => {
       if (user.role !== 'barangay_admin') {
@@ -1873,6 +1924,55 @@ async function route(
         return { status: 200, body: { id: own.id, name: own.name, ...next, ...sealState() } }
       }
 
+      // ---- the two officials' signatures ----
+      //
+      // Scoped to this barangay's own id in the key, like every other statement
+      // in this console: there is nowhere to name another barangay's.
+      if (parts[2] === 'signature') {
+        const who = parts[3]
+        if (who !== 'captain' && who !== 'secretary') {
+          throw new DemoError(404, 'Only the captain and the secretary sign a certificate.')
+        }
+        const slot = `barangay:${own.id}:${who}`
+
+        if (method === 'PUT') {
+          adminOnly()
+          const image = await takeMark(
+            file,
+            who === 'captain' ? "The Punong Barangay's signature" : "The Barangay Secretary's signature",
+            'a certificate'
+          )
+          state.signatures[slot] = { image, updatedAt: new Date().toISOString() }
+          state.audit.unshift({
+            id: state.audit.length + 1, actorName: user.fullName,
+            action: `barangay_signature.${who}.update`, target: own.id,
+            before: { held: false }, after: { held: true },
+            createdAt: new Date().toISOString(),
+          })
+          persist()
+          return { status: 200, body: { id: own.id, name: own.name, ...barangayOffice(own.id), ...sealState() } }
+        }
+        if (method === 'GET') {
+          const held = state.signatures[slot]
+          if (!held) throw new DemoError(404, 'Nothing has been uploaded for that yet.')
+          return { status: 200, blob: dataUrlToBlob(held.image, 'image/png') }
+        }
+        if (method === 'DELETE') {
+          adminOnly()
+          if (!state.signatures[slot]) throw new DemoError(404, 'Nothing has been uploaded for that yet.')
+          delete state.signatures[slot]
+          state.audit.unshift({
+            id: state.audit.length + 1, actorName: user.fullName,
+            action: `barangay_signature.${who}.remove`, target: own.id,
+            before: { held: true }, after: { held: false },
+            createdAt: new Date().toISOString(),
+          })
+          persist()
+          return { status: 200, body: { id: own.id, name: own.name, ...barangayOffice(own.id), ...sealState() } }
+        }
+        throw new DemoError(404, 'Not found.')
+      }
+
       // ---- the barangay's own seal ----
       if (parts[2] === 'seal') {
         if (method === 'PUT') {
@@ -1900,7 +2000,7 @@ async function route(
             createdAt: new Date().toISOString(),
           })
           persist()
-          return { status: 200, body: { hasSeal: true } }
+          return { status: 200, body: { id: own.id, name: own.name, ...barangayOffice(own.id), ...sealState() } }
         }
         if (method === 'GET') {
           const held = state.barangaySeals[own.id]
@@ -1918,7 +2018,7 @@ async function route(
             createdAt: new Date().toISOString(),
           })
           persist()
-          return { status: 204 }
+          return { status: 200, body: { id: own.id, name: own.name, ...barangayOffice(own.id), ...sealState() } }
         }
         throw new DemoError(404, 'Not found.')
       }
@@ -4121,6 +4221,8 @@ async function route(
         ...state.municipality,
         hasSeal: state.seal !== null,
         sealUpdatedAt: state.sealUpdatedAt,
+        hasTreasurerSignature: signatureState('municipality:treasurer').has,
+        treasurerSignatureUpdatedAt: signatureState('municipality:treasurer').updatedAt,
       })
 
       if (!parts[2] && method === 'GET') return { status: 200, body: shown() }
@@ -4149,6 +4251,33 @@ async function route(
         audit('municipality.update', MUNICIPALITY.code, before, shown())
         persist()
         return { status: 200, body: shown() }
+      }
+
+      // ---- the treasurer's signature ----
+      if (parts[2] === 'treasurer-signature') {
+        const slot = 'municipality:treasurer'
+        if (method === 'PUT') {
+          const image = await takeMark(file, 'A signature', 'a receipt')
+          const before = shown()
+          state.signatures[slot] = { image, updatedAt: new Date().toISOString() }
+          audit('municipality.signature.update', MUNICIPALITY.code, before, shown())
+          persist()
+          return { status: 200, body: shown() }
+        }
+        if (method === 'GET') {
+          const held = state.signatures[slot]
+          if (!held) throw new DemoError(404, 'No signature has been uploaded.')
+          return { status: 200, blob: dataUrlToBlob(held.image, 'image/png') }
+        }
+        if (method === 'DELETE') {
+          if (!state.signatures[slot]) throw new DemoError(404, 'No signature has been uploaded.')
+          const before = shown()
+          delete state.signatures[slot]
+          audit('municipality.signature.remove', MUNICIPALITY.code, before, shown())
+          persist()
+          return { status: 200, body: shown() }
+        }
+        throw new DemoError(404, 'Not found.')
       }
 
       if (parts[2] === 'seal' && method === 'PUT') {
@@ -4325,10 +4454,46 @@ async function route(
     }
 
     if (parts[1] === 'offices') {
-      const rows = () => SERVICE_CATEGORIES.map((c) => ({
-        id: c.id, name: c.name, officeName: c.officeName, ...state.offices[c.id]!,
-      }))
+      const shownOffice = (id: string) => {
+        const meta = SERVICE_CATEGORIES.find((c) => c.id === id)!
+        const held = signatureState(`office:${id}`)
+        return {
+          id: meta.id, name: meta.name, officeName: meta.officeName, ...state.offices[id]!,
+          hasSignature: held.has, signatureUpdatedAt: held.updatedAt,
+        }
+      }
+      const rows = () => SERVICE_CATEGORIES.map((c) => shownOffice(c.id))
       if (!parts[2] && method === 'GET') return { status: 200, body: rows() }
+
+      // ---- the office head's signature ----
+      if (parts[2] && parts[3] === 'signature') {
+        const office = state.offices[parts[2]]
+        if (!office) throw new DemoError(404, 'Office not found.')
+        const slot = `office:${parts[2]}`
+
+        if (method === 'PUT') {
+          const image = await takeMark(file, 'A signature', 'a released document')
+          const before = shownOffice(parts[2])
+          state.signatures[slot] = { image, updatedAt: new Date().toISOString() }
+          audit('office.signature.update', parts[2], before, shownOffice(parts[2]))
+          persist()
+          return { status: 200, body: shownOffice(parts[2]) }
+        }
+        if (method === 'GET') {
+          const held = state.signatures[slot]
+          if (!held) throw new DemoError(404, 'No signature has been uploaded.')
+          return { status: 200, blob: dataUrlToBlob(held.image, 'image/png') }
+        }
+        if (method === 'DELETE') {
+          if (!state.signatures[slot]) throw new DemoError(404, 'No signature has been uploaded.')
+          const before = shownOffice(parts[2])
+          delete state.signatures[slot]
+          audit('office.signature.remove', parts[2], before, shownOffice(parts[2]))
+          persist()
+          return { status: 200, body: shownOffice(parts[2]) }
+        }
+        throw new DemoError(404, 'Not found.')
+      }
 
       if (parts[2] && method === 'PATCH') {
         const office = state.offices[parts[2]]
@@ -4338,7 +4503,7 @@ async function route(
         // to change and refuses the whole request rather than doing something
         // else quietly.
         const patch: Record<string, string | null> = {}
-        for (const key of ['address', 'hours', 'phone', 'email'] as const) {
+        for (const key of ['address', 'hours', 'phone', 'email', 'headName', 'headTitle'] as const) {
           if (!(key in body)) continue
           const raw = body[key]
           const value = raw === null ? null : String(raw).trim() || null
@@ -4351,9 +4516,9 @@ async function route(
           patch[key] = value
         }
         if (Object.keys(patch).length === 0) throw new DemoError(400, 'Nothing to change.')
-        const before = { id: meta.id, name: meta.name, officeName: meta.officeName, ...office }
+        const before = shownOffice(meta.id)
         Object.assign(office, patch)
-        const after = { id: meta.id, name: meta.name, officeName: meta.officeName, ...office }
+        const after = shownOffice(meta.id)
         audit('office.update', meta.id, before, after)
         persist()
         return { status: 200, body: after }

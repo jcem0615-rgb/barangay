@@ -127,6 +127,16 @@ usually `1` behind a single load balancer or ingress.
       one is invented) and the treasurer's name, then upload the municipal seal as a PNG
       or JPEG. A test payment's receipt has been downloaded and read end to end by
       somebody from the treasury
+- [ ] **Who signs what each office releases is named, and the signature on file is theirs
+      to use.** Open **Municipality → Office details** and set each office's head and title;
+      upload a signature only where its owner has agreed to it being printed. A signature
+      here is a *picture* of one and not a digital signature — it makes a document look the
+      way a counter expects and makes nothing tamper-evident, so the verification code is
+      still what proves the paper. Every upload and removal is in **What changed** with the
+      name of whoever did it; make sure somebody actually reads that
+- [ ] **A released document has been downloaded and read with the seal and the signature
+      on it.** An office with a signature and no name prints a mark over a blank rule,
+      which is worse than printing neither
 - [ ] **Somebody with the authority to say so has decided whether this receipt is an
       Official Receipt.** It is numbered, verifiable and frozen at issue, but an LGU's OR
       is an accountable form: issuing one electronically needs BIR accreditation where it
@@ -154,6 +164,12 @@ usually `1` behind a single load balancer or ingress.
       the Punong Barangay and the Barangay Secretary from that barangay's own row — check
       both names are the people currently holding those offices, because they are printed on
       every certificate it releases and they change at every barangay election
+- [ ] **The two signatures on that certificate are the ones those two officials agreed to
+      use**, and somebody has told them it is being printed. Same tab, same caveat as the
+      municipal side: a picture of a signature is not a digital signature, every upload is
+      recorded against the account that made it, and an election means replacing both. A
+      barangay that would rather sign by hand uploads neither — the certificate then prints
+      the rule and the title, which is what it did before
 - [ ] **Each barangay has read the attestation on every certificate it issues and accepted
       the wording**, in the Certificates tab. The seeded text is placeholder wording, not any
       barangay's own form, and it is what goes out over the Punong Barangay's name. The one
@@ -304,6 +320,9 @@ over. In particular:
       procedure exists that cannot cross them
 - [ ] The receipt details and the seal are this town's — none of the seeded ones apply
       anywhere else, and the TIN least of all
+- [ ] No signature has been carried over from another deployment. A scanned signature is
+      the one uploaded thing that names a specific person; it belongs to the town that
+      obtained it
 
 ## Scaling
 

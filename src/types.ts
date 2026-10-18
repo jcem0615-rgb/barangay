@@ -15,6 +15,15 @@ export interface ServiceCategory {
   hours?: string | null
   phone?: string | null
   email?: string | null
+  /**
+   * Who signs what this office releases.
+   *
+   * The title is a fact about the office and is seeded; the *name* is a person
+   * who has never held it, so nothing seeds one — a document prints the rule
+   * and the title with no name over it until the hall fills in who is in post.
+   * Both are corrected in the Municipality tab.
+   */
+  headTitle?: string | null
 }
 
 export type FieldType = 'text' | 'select' | 'date' | 'textarea' | 'number'

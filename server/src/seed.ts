@@ -61,17 +61,24 @@ async function main() {
   await transaction(async (client) => {
     for (const [index, dept] of SERVICE_CATEGORIES.entries()) {
       await client.query(
+        // `head_title` is seeded because it is a fact about the office; the head's
+        // *name* is not, because nobody has held it here — a released document
+        // prints the rule and the title with no name over it until the hall fills
+        // one in, and a seeded name would be a person this app invented signing
+        // official paper.
         `insert into departments (id, name, office_name, description, icon, sort_order,
-                                  address, hours, phone, email)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                                  address, hours, phone, email, head_title)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          on conflict (id) do update set
            name = excluded.name, office_name = excluded.office_name,
            description = excluded.description, icon = excluded.icon,
            sort_order = excluded.sort_order, address = excluded.address,
-           hours = excluded.hours, phone = excluded.phone, email = excluded.email`,
+           hours = excluded.hours, phone = excluded.phone, email = excluded.email,
+           head_title = coalesce(departments.head_title, excluded.head_title)`,
         [
           dept.id, dept.name, dept.officeName, dept.description, dept.icon, index,
           dept.address ?? null, dept.hours ?? null, dept.phone ?? null, dept.email ?? null,
+          dept.headTitle ?? null,
         ]
       )
     }

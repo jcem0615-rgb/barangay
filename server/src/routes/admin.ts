@@ -1,6 +1,5 @@
 import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
-import multer from 'multer'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
 import { authenticate, hashPassword, requireRole } from '../auth.ts'
@@ -12,8 +11,7 @@ import { clearHolidayCache } from '../schedule.ts'
 import { servedMunicipality } from '../identity.ts'
 import { MUNICIPALITY_SELECT, type MunicipalityRow } from '../receipts.ts'
 import { getFile, putFile, removeFile } from '../storage.ts'
-import { detectType, MAX_SEAL_BYTES, SEAL_DESCRIPTION, SEAL_TYPES } from '../uploads.ts'
-import { scanBuffer } from '../antivirus.ts'
+import { checkMark, markUpload, sendMark } from '../marks.ts'
 import {
   certificateCreateSchema, certificateEditSchema, createCertificateType,
   serializeCertificateType, updateCertificateType, withdrawCertificateType,
@@ -446,17 +444,29 @@ adminRouter.delete('/holidays/:date', async (req, res) => {
   res.status(204).end()
 })
 
-// Contact details only. What an office *is* — its name, its services, its fees —
-// is the service catalogue, and changing that is a change to what the
-// municipality offers, not a correction to how to reach it.
+// How to reach an office, and who holds it. What an office *is* — its name, its
+// services, its fees — is the service catalogue, and changing that is a change
+// to what the municipality offers rather than a correction to how to reach it.
+//
+// The head's name and title are here for the same reason the barangay's captain
+// and secretary sit on the `barangays` row: they are printed on what the office
+// releases, they change when somebody leaves the post, and nobody outside the
+// hall can maintain them.
 const officeBody = z.object({
   address: z.string().trim().max(200).nullable(),
   hours: z.string().trim().max(120).nullable(),
   phone: z.union([phone, z.null()]),
   email: z.union([z.email().max(160), z.null()]),
+  headName: z.union([z.string().trim().min(1).max(120), z.null()]),
+  headTitle: z.union([z.string().trim().min(1).max(120), z.null()]),
 })
 
-const OFFICE_SELECT = `id, name, office_name as "officeName", address, hours, phone, email`
+const OFFICE_SELECT = `
+  id, name, office_name as "officeName", address, hours, phone, email,
+  head_name as "headName", head_title as "headTitle",
+  signature_key is not null as "hasSignature",
+  signature_updated_at as "signatureUpdatedAt"
+`
 
 adminRouter.get('/offices', async (_req, res) => {
   res.json(await query(`select ${OFFICE_SELECT} from departments order by sort_order, name`))
@@ -479,9 +489,14 @@ adminRouter.patch('/offices/:id', async (req, res) => {
     if (existing.rowCount === 0) return null
     const merged = { ...existing.rows[0], ...patch }
     const { rows } = await client.query(
-      `update departments set address = $2, hours = $3, phone = $4, email = $5
+      `update departments
+          set address = $2, hours = $3, phone = $4, email = $5,
+              head_name = $6, head_title = $7
         where id = $1 returning ${OFFICE_SELECT}`,
-      [req.params.id, merged.address, merged.hours, merged.phone, merged.email]
+      [
+        req.params.id, merged.address, merged.hours, merged.phone, merged.email,
+        merged.headName, merged.headTitle,
+      ]
     )
     await recordAudit(client, {
       actorId: actor.id, actorName: actor.fullName,
@@ -493,6 +508,115 @@ adminRouter.patch('/offices/:id', async (req, res) => {
   if (!updated) return res.status(404).json({ error: 'Office not found.' })
   res.json(updated)
 })
+
+// ---------------------------------------------------------------------------
+// The office head's signature
+//
+// Printed above the head's name on every document that office releases. It is
+// a picture, not a cryptographic signature: it makes the paper look the way a
+// counter expects and it makes nothing tamper-evident, which is why the
+// document itself points at the verification code instead and the console says
+// the same thing above the upload button.
+//
+// What keeps it honest is that only the administrator can put one here and
+// every upload and removal is written to `admin_audit` in the same transaction
+// as the change, with who did it. An administrator can print any official's
+// signature on anything; the defence is a record that says who did.
+// ---------------------------------------------------------------------------
+
+adminRouter.put('/offices/:id/signature', markUpload.single('file'), async (req, res) => {
+  const checked = await checkMark(req.file, 'A signature', 'a released document')
+  if (!checked.ok) return res.status(checked.status).json({ error: checked.error })
+
+  // Named once: the upload middleware costs this handler the route's own
+  // parameter typing, which is a type-checker detail and not a fact about ids.
+  const officeId = String(req.params.id)
+  const actor = req.user!
+  const stored = await putFile(checked.bytes)
+
+  const outcome = await transaction(async (client) => {
+    const existing = await client.query(
+      `select ${OFFICE_SELECT}, signature_key from departments where id = $1 for update`,
+      [officeId]
+    )
+    if (existing.rowCount === 0) return null
+    const { rows } = await client.query(
+      `update departments
+          set signature_key = $2, signature_type = $3, signature_updated_at = now()
+        where id = $1 returning ${OFFICE_SELECT}`,
+      [officeId, stored.storageKey, checked.contentType]
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'office.signature.update', target: officeId,
+      before: withoutKey(existing.rows[0]!), after: rows[0]!,
+    })
+    return { previous: existing.rows[0]!.signature_key as string | null, row: rows[0]! }
+  })
+  if (!outcome) {
+    await removeFile(stored.storageKey)
+    return res.status(404).json({ error: 'Office not found.' })
+  }
+
+  // Only once the new one is recorded, so a failed write cannot leave the
+  // office with no signature at all.
+  if (outcome.previous) await removeFile(outcome.previous)
+  res.json(outcome.row)
+})
+
+/** The preview in the console. Admin-only, like everything else on this router. */
+adminRouter.get('/offices/:id/signature', async (req, res) => {
+  const row = await one<{ signature_key: string | null; signature_type: string | null }>(
+    `select signature_key, signature_type from departments where id = $1`,
+    [req.params.id]
+  )
+  if (!row?.signature_key) return res.status(404).json({ error: 'No signature has been uploaded.' })
+
+  let content: Buffer
+  try {
+    content = await getFile(row.signature_key)
+  } catch {
+    return res.status(410).json({ error: 'That image is no longer available.' })
+  }
+  sendMark(res, content, row.signature_type)
+})
+
+adminRouter.delete('/offices/:id/signature', async (req, res) => {
+  const actor = req.user!
+  const outcome = await transaction(async (client) => {
+    const existing = await client.query(
+      `select ${OFFICE_SELECT}, signature_key from departments where id = $1 for update`,
+      [req.params.id]
+    )
+    const key = (existing.rows[0]?.signature_key as string | null) ?? null
+    if (!key) return null
+    const { rows } = await client.query(
+      `update departments
+          set signature_key = null, signature_type = null, signature_updated_at = null
+        where id = $1 returning ${OFFICE_SELECT}`,
+      [req.params.id]
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'office.signature.remove', target: req.params.id,
+      before: withoutKey(existing.rows[0]!), after: rows[0]!,
+    })
+    return { previous: key, row: rows[0]! }
+  })
+  if (!outcome) return res.status(404).json({ error: 'No signature has been uploaded.' })
+
+  // Documents already released keep theirs: the image was drawn into the PDF
+  // when it was rendered, which is the whole reason a document is stored rather
+  // than re-rendered on demand.
+  await removeFile(outcome.previous)
+  res.json(outcome.row)
+})
+
+/** The storage key is an implementation detail; the audit trail is read by people. */
+const withoutKey = (row: Record<string, unknown>) => {
+  const { signature_key: _key, ...rest } = row
+  return rest
+}
 
 // --------------------------------------------- the shared certificate catalogue
 //
@@ -574,7 +698,13 @@ adminRouter.delete('/certificates/:id', async (req, res) => {
 // nobody notices — exactly the reasoning behind the hotlines.
 // ---------------------------------------------------------------------------
 
-const serializeMunicipality = (row: MunicipalityRow & { seal_updated_at: Date | null; code: string }) => ({
+type MunicipalityReadRow = MunicipalityRow & {
+  seal_updated_at: Date | null
+  treasurer_signature_updated_at: Date | null
+  code: string
+}
+
+const serializeMunicipality = (row: MunicipalityReadRow) => ({
   code: row.code,
   name: row.name,
   province: row.province,
@@ -590,6 +720,8 @@ const serializeMunicipality = (row: MunicipalityRow & { seal_updated_at: Date | 
   receiptFooter: row.receipt_footer,
   hasSeal: row.seal_key !== null,
   sealUpdatedAt: row.seal_updated_at?.toISOString() ?? null,
+  hasTreasurerSignature: row.treasurer_signature_key !== null,
+  treasurerSignatureUpdatedAt: row.treasurer_signature_updated_at?.toISOString() ?? null,
 })
 
 /**
@@ -628,7 +760,7 @@ const MUNICIPALITY_COLUMNS = {
 } as const
 
 adminRouter.get('/municipality', async (_req, res) => {
-  const row = await one<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+  const row = await one<MunicipalityReadRow>(
     `select ${MUNICIPALITY_SELECT} from municipality limit 1`
   )
   if (!row) return res.status(404).json({ error: 'This deployment has no municipality row yet.' })
@@ -646,12 +778,12 @@ adminRouter.patch('/municipality', async (req, res) => {
   const actor = req.user!
 
   const updated = await transaction(async (client) => {
-    const existing = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+    const existing = await client.query<MunicipalityReadRow>(
       `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
     )
     if (existing.rowCount === 0) return null
     const assignments = keys.map((key, i) => `${MUNICIPALITY_COLUMNS[key]} = $${i + 1}`)
-    const { rows } = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+    const { rows } = await client.query<MunicipalityReadRow>(
       `update municipality set ${assignments.join(', ')} returning ${MUNICIPALITY_SELECT}`,
       keys.map((key) => patch[key] ?? null)
     )
@@ -680,45 +812,22 @@ adminRouter.patch('/municipality', async (req, res) => {
 // would say so until a receipt came out blank.
 // ---------------------------------------------------------------------------
 
-const sealUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_SEAL_BYTES, files: 1 },
-})
-
-adminRouter.put('/municipality/seal', sealUpload.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Choose an image to upload.' })
-
-  const detected = detectType(req.file.buffer)
-  if (!detected || !SEAL_TYPES.has(detected.contentType)) {
-    return res.status(415).json({
-      error: `A seal has to be a ${SEAL_DESCRIPTION} image — those are the two a receipt can be printed with.`,
-    })
-  }
-
-  // Scanned in memory, so nothing infected reaches disk. Fails closed where the
-  // scanner is configured and unreachable, exactly as attachments do.
-  const scan = await scanBuffer(req.file.buffer)
-  if (scan.status === 'infected') {
-    console.warn(`rejected municipal seal from ${req.user!.id}: ${scan.signature}`)
-    return res.status(422).json({ error: 'That file was rejected by our virus scan.' })
-  }
-  if (scan.status === 'unavailable') {
-    console.error(`virus scan unavailable: ${scan.reason}`)
-    return res.status(503).json({ error: "We can't check files for viruses right now. Please try again shortly." })
-  }
+adminRouter.put('/municipality/seal', markUpload.single('file'), async (req, res) => {
+  const checked = await checkMark(req.file, 'A seal', 'a receipt')
+  if (!checked.ok) return res.status(checked.status).json({ error: checked.error })
 
   const actor = req.user!
-  const stored = await putFile(req.file.buffer)
+  const stored = await putFile(checked.bytes)
 
   const outcome = await transaction(async (client) => {
-    const existing = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+    const existing = await client.query<MunicipalityReadRow>(
       `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
     )
     if (existing.rowCount === 0) return null
-    const { rows } = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+    const { rows } = await client.query<MunicipalityReadRow>(
       `update municipality set seal_key = $1, seal_type = $2, seal_updated_at = now()
        returning ${MUNICIPALITY_SELECT}`,
-      [stored.storageKey, detected.contentType]
+      [stored.storageKey, checked.contentType]
     )
     await recordAudit(client, {
       actorId: actor.id, actorName: actor.fullName,
@@ -752,23 +861,17 @@ adminRouter.get('/municipality/seal', async (_req, res) => {
   } catch {
     return res.status(410).json({ error: 'That image is no longer available.' })
   }
-  // Inline because the console renders it. Safe only because the type came from
-  // the magic bytes and SVG is not among the accepted ones.
-  res.setHeader('Content-Type', row.seal_type ?? 'image/png')
-  res.setHeader('Content-Disposition', 'inline')
-  res.setHeader('X-Content-Type-Options', 'nosniff')
-  res.setHeader('Cache-Control', 'private, no-store')
-  res.send(content)
+  sendMark(res, content, row.seal_type)
 })
 
 adminRouter.delete('/municipality/seal', async (req, res) => {
   const actor = req.user!
   const outcome = await transaction(async (client) => {
-    const existing = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+    const existing = await client.query<MunicipalityReadRow>(
       `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
     )
     if (existing.rowCount === 0 || !existing.rows[0]!.seal_key) return null
-    const { rows } = await client.query<MunicipalityRow & { seal_updated_at: Date | null; code: string }>(
+    const { rows } = await client.query<MunicipalityReadRow>(
       `update municipality set seal_key = null, seal_type = null, seal_updated_at = null
        returning ${MUNICIPALITY_SELECT}`
     )
@@ -785,6 +888,97 @@ adminRouter.delete('/municipality/seal', async (req, res) => {
   // Receipts already issued keep theirs: the image was drawn into the PDF when
   // it was rendered, which is the whole reason a receipt is stored rather than
   // re-rendered on demand.
+  await removeFile(outcome.previous!)
+  res.json(serializeMunicipality(outcome.row))
+})
+
+// ---------------------------------------------------------------------------
+// The treasurer's signature
+//
+// The receipt already named the treasurer and printed a bare rule under the
+// name. This is the mark that goes above it — the same picture, the same rules
+// and the same honesty as an office head's: it is not a digital signature, and
+// a receipt is proved by its verification code rather than by what is drawn on
+// it.
+// ---------------------------------------------------------------------------
+
+adminRouter.put('/municipality/treasurer-signature', markUpload.single('file'), async (req, res) => {
+  const checked = await checkMark(req.file, 'A signature', 'a receipt')
+  if (!checked.ok) return res.status(checked.status).json({ error: checked.error })
+
+  const actor = req.user!
+  const stored = await putFile(checked.bytes)
+
+  const outcome = await transaction(async (client) => {
+    const existing = await client.query<MunicipalityReadRow>(
+      `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
+    )
+    if (existing.rowCount === 0) return null
+    const { rows } = await client.query<MunicipalityReadRow>(
+      `update municipality
+          set treasurer_signature_key = $1, treasurer_signature_type = $2,
+              treasurer_signature_updated_at = now()
+        returning ${MUNICIPALITY_SELECT}`,
+      [stored.storageKey, checked.contentType]
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'municipality.signature.update', target: existing.rows[0]!.code,
+      before: serializeMunicipality(existing.rows[0]!),
+      after: serializeMunicipality(rows[0]!),
+    })
+    return { previous: existing.rows[0]!.treasurer_signature_key, row: rows[0]! }
+  })
+  if (!outcome) {
+    await removeFile(stored.storageKey)
+    return res.status(404).json({ error: 'This deployment has no municipality row yet.' })
+  }
+
+  if (outcome.previous) await removeFile(outcome.previous)
+  res.json(serializeMunicipality(outcome.row))
+})
+
+adminRouter.get('/municipality/treasurer-signature', async (_req, res) => {
+  const row = await one<{
+    treasurer_signature_key: string | null; treasurer_signature_type: string | null
+  }>(`select treasurer_signature_key, treasurer_signature_type from municipality limit 1`)
+  if (!row?.treasurer_signature_key) {
+    return res.status(404).json({ error: 'No signature has been uploaded.' })
+  }
+
+  let content: Buffer
+  try {
+    content = await getFile(row.treasurer_signature_key)
+  } catch {
+    return res.status(410).json({ error: 'That image is no longer available.' })
+  }
+  sendMark(res, content, row.treasurer_signature_type)
+})
+
+adminRouter.delete('/municipality/treasurer-signature', async (req, res) => {
+  const actor = req.user!
+  const outcome = await transaction(async (client) => {
+    const existing = await client.query<MunicipalityReadRow>(
+      `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
+    )
+    if (existing.rowCount === 0 || !existing.rows[0]!.treasurer_signature_key) return null
+    const { rows } = await client.query<MunicipalityReadRow>(
+      `update municipality
+          set treasurer_signature_key = null, treasurer_signature_type = null,
+              treasurer_signature_updated_at = null
+        returning ${MUNICIPALITY_SELECT}`
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'municipality.signature.remove', target: existing.rows[0]!.code,
+      before: serializeMunicipality(existing.rows[0]!),
+      after: serializeMunicipality(rows[0]!),
+    })
+    return { previous: existing.rows[0]!.treasurer_signature_key, row: rows[0]! }
+  })
+  if (!outcome) return res.status(404).json({ error: 'No signature has been uploaded.' })
+
+  // Receipts already issued keep theirs, like the seal.
   await removeFile(outcome.previous!)
   res.json(serializeMunicipality(outcome.row))
 })
