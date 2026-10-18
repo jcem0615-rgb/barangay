@@ -265,6 +265,23 @@ export default function SignIn() {
               an administrator at <span className="font-mono">admin.&lt;barangay&gt;@malasiqui.gov.ph</span>.
               Email, SMS and virus scanning need the real server and do nothing here.
             </p>
+            {/*
+              The seal and the signatures upload and preview here exactly as they
+              do for real, and then do not appear on anything — the demo draws its
+              PDFs by hand in the browser and cannot embed an image. Somebody who
+              uploads one, downloads a certificate and finds it bare would conclude
+              the feature is broken, so the panel says which half is the demo's
+              limit before they try it.
+            */}
+            <p className="mt-2 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
+              <span className="font-semibold text-navy-900">Seals and signatures</span> are
+              uploaded by an administrator &mdash; municipal ones under
+              {' '}<span className="font-medium">Municipality &rarr; Office details</span> and
+              {' '}<span className="font-medium">Official receipt</span>, a barangay&rsquo;s under
+              {' '}<span className="font-medium">The hall</span>. They upload and preview here,
+              but the demo draws its PDFs in the browser and cannot embed an image, so they
+              are missing from the documents it downloads. The real server prints them.
+            </p>
           </div>
         ) : (
           <p className="mt-4 text-center text-[calc(12.5px_*_var(--text-scale))] leading-relaxed text-slate-500">

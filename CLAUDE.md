@@ -1996,6 +1996,14 @@ The demo build lists all of these on its own sign-in screen (`DEMO_ACCOUNTS` in
 account nobody can find is one nobody tries, and the panel is the only place a person
 clicking through the demo would look.
 
+The same panel is also where the demo says what it *cannot* do, which is the other half
+of its job: email, SMS and virus scanning need the real server, and the seal and the
+signatures upload and preview exactly as they do for real and then appear on nothing,
+because the demo draws its PDFs by hand in the browser and cannot embed an image. Say so
+there whenever a feature works in the console and stops at the download — somebody who
+uploads a seal, opens a certificate and finds it bare concludes the feature is broken
+rather than that the demo is.
+
 ```bash
 npm run build     # tsc -b && vite build -> dist/
 npm run preview   # serve the production build locally
