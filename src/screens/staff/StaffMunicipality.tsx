@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle, Building2, CalendarDays, Loader2, Phone, Plus, ReceiptText, Trash2,
-  FileText,
+  FileText, ScanLine,
 } from 'lucide-react'
 import MarkUpload, { SignatureCaveat } from '../../components/MarkUpload'
 import CertificateCatalogue, { type CatalogueDraft } from '../../components/CertificateCatalogue'
 import {
   api, ApiError,
-  type AuditRow, type CertificateType, type Holiday, type Hotline,
+  type AuditRow, type CertificateType, type DocumentCheckRow, type Holiday, type Hotline,
   type MunicipalityDetails, type OfficeContact,
 } from '../../lib/api'
 
@@ -27,7 +27,7 @@ import {
  * who mistypes the fire hotline needs the old number back, not a note that
  * somebody changed something.
  */
-type Tab = 'hotlines' | 'holidays' | 'offices' | 'receipt' | 'certificates' | 'audit'
+type Tab = 'hotlines' | 'holidays' | 'offices' | 'receipt' | 'certificates' | 'checks' | 'audit'
 
 export default function StaffMunicipality() {
   const [tab, setTab] = useState<Tab>('hotlines')
@@ -41,6 +41,7 @@ export default function StaffMunicipality() {
           ['offices', 'Office details', Building2],
           ['receipt', 'Official receipt', ReceiptText],
           ['certificates', 'Barangay certificates', FileText],
+          ['checks', 'Document checks', ScanLine],
           ['audit', 'What changed', AlertTriangle],
         ] as const).map(([key, label, Icon]) => (
           <button
@@ -58,6 +59,7 @@ export default function StaffMunicipality() {
       {tab === 'hotlines' && <Hotlines />}
       {tab === 'holidays' && <Holidays />}
       {tab === 'offices' && <Offices />}
+      {tab === 'checks' && <DocumentChecks />}
       {tab === 'receipt' && <Receipt />}
       {tab === 'certificates' && <SharedCertificates />}
       {tab === 'audit' && <Audit />}
@@ -437,6 +439,89 @@ function OfficeRow({
         />
       </div>
     </li>
+  )
+}
+
+/* ----------------------------------------------------------- document checks */
+
+/**
+ * What has been checked most often lately.
+ *
+ * The QR and the public page catch an altered printout; neither catches a
+ * photocopy, because a copy carries a genuine code and verifies genuinely. The
+ * only trace a copy leaves is the count: a permit is checked once or twice in
+ * its life, when its holder is asked to prove it, so one checked forty times is
+ * either circulating or being tested.
+ *
+ * This is a hint rather than a finding, and the screen says so. A busy permit
+ * and a copied one look identical from here, and an administrator who treats
+ * the top of this list as proof will withdraw somebody's genuine document.
+ *
+ * It names documents, never the people who checked them: nothing records who
+ * asked, and the migration says why.
+ */
+function DocumentChecks() {
+  const [rows, setRows] = useState<DocumentCheckRow[]>([])
+  const [days, setDays] = useState(90)
+  const { loading, error } = useLoader(
+    useCallback(async () => setRows((await api.documentChecks(days)).rows), [days])
+  )
+
+  return (
+    <Panel
+      title="Document checks"
+      blurb="Every verification is counted, and this is what has been checked most. A document is normally checked once or twice — by a bank, an employer or a counter. A high count can mean copies are circulating, and can equally mean one busy permit, so read it as a prompt to look rather than as proof."
+      error={error}
+      loading={loading}
+    >
+      <div className="mb-3 flex gap-2">
+        {[30, 90, 365].map((option) => (
+          <button
+            key={option}
+            onClick={() => setDays(option)}
+            className={`tap-target rounded-xl px-3.5 py-2 text-[12.5px] font-semibold transition ${
+              days === option ? 'bg-navy-800 text-white' : 'border border-slate-200 text-slate-600'
+            }`}
+          >
+            {option === 365 ? 'Past year' : `Past ${option} days`}
+          </button>
+        ))}
+      </div>
+
+      {rows.length === 0 ? (
+        <Empty>Nothing has been checked in this period.</Empty>
+      ) : (
+        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+          {rows.map((row) => (
+            <li key={`${row.kind}-${row.referenceNo}`} className="flex items-start gap-3 px-4 py-3">
+              <span className={`mt-0.5 shrink-0 rounded-lg px-2.5 py-1 font-mono text-[13px] font-bold ${
+                row.checks >= 10 ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {row.checks}
+              </span>
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-semibold text-navy-950">
+                  {row.documentType}
+                  {row.revoked && (
+                    <span className="ml-2 rounded bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700">
+                      Withdrawn
+                    </span>
+                  )}
+                </p>
+                <p className="text-[12px] text-slate-500">
+                  {row.referenceNo} · {row.issuedBy}
+                </p>
+                <p className="text-[11.5px] text-slate-400">
+                  Last checked {new Date(row.lastChecked).toLocaleString('en-PH', {
+                    dateStyle: 'medium', timeStyle: 'short',
+                  })}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   )
 }
 

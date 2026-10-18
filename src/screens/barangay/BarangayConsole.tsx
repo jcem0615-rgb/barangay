@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  BadgeCheck, BookText, Building, FileDown, Home, Landmark, Megaphone, CheckCircle2, Inbox,
+  BadgeCheck, Ban, BookText, Building, FileDown, Home, Landmark, Megaphone, CheckCircle2, Inbox,
   Loader2, LogOut, PhilippinePeso, RefreshCw, UserPlus, Users,
 } from 'lucide-react'
 import { api, ApiError, type BarangayRequest, type CertificateType } from '../../lib/api'
@@ -165,6 +165,11 @@ export default function BarangayConsole() {
 // ------------------------------------------------------------------ requests
 
 function Queue() {
+  // Who may withdraw a released certificate. Hidden here and refused by the
+  // API, in that order of importance — the rule the rest of this console
+  // already follows.
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'barangay_admin'
   const [status, setStatus] = useState('')
   const [rows, setRows] = useState<BarangayRequest[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -254,19 +259,32 @@ function Queue() {
           )}
         </div>
 
-        <RequestPanel request={selected} onChanged={() => void refresh()} />
+        <RequestPanel request={selected} onChanged={() => void refresh()} isAdmin={isAdmin} />
       </div>
     </>
   )
 }
 
-function RequestPanel({ request, onChanged }: { request: BarangayRequest | null; onChanged: () => void }) {
+function RequestPanel({
+  request, onChanged, isAdmin,
+}: {
+  request: BarangayRequest | null
+  onChanged: () => void
+  isAdmin: boolean
+}) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Withdrawing is kept behind its own reason field rather than reusing the
+  // note: a note is a remark for the file, and this is a message the resident
+  // receives saying their certificate is no longer good.
+  const [revoking, setRevoking] = useState(false)
+  const [revokeReason, setRevokeReason] = useState('')
 
   // A note typed against one request must not follow the clerk to the next.
-  useEffect(() => { setNote(''); setError(null) }, [request?.id])
+  useEffect(() => {
+    setNote(''); setError(null); setRevoking(false); setRevokeReason('')
+  }, [request?.id])
 
   if (!request) {
     return (
@@ -360,6 +378,89 @@ function RequestPanel({ request, onChanged }: { request: BarangayRequest | null;
           <FileDown size={14} />
           {busy === 'certificate' ? 'Preparing…' : 'Print the certificate'}
         </button>
+      )}
+
+      {/*
+        Withdrawing one that has been released.
+        
+        Both roles release a certificate, because handing one over is counter
+        work. Saying that something this barangay issued is no longer good is
+        the administrator's — it is the barangay's word being taken back — and
+        the API refuses the officer's regardless.
+        
+        It does not touch the paper: the PDF was frozen at issue and still looks
+        exactly as valid as it did. What changes is the answer the public check
+        gives, which is why the code is what proves a certificate.
+      */}
+      {request.hasCertificate && request.revoked && (
+        <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3">
+          <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-rose-800">
+            <Ban size={14} /> Withdrawn. It no longer passes a check.
+          </p>
+          {request.revokedReason && (
+            <p className="mt-1 text-[12px] leading-snug text-rose-700">{request.revokedReason}</p>
+          )}
+        </div>
+      )}
+
+      {request.hasCertificate && !request.revoked && isAdmin && (
+        revoking ? (
+          <div className="mt-3 rounded-xl border border-rose-200 bg-white p-3.5">
+            <p className="text-[12.5px] font-semibold text-rose-800">Withdraw this certificate</p>
+            <p className="mt-1 text-[12px] leading-snug text-slate-600">
+              It stops passing the public check and the resident is told, with the reason
+              below. This cannot be undone &mdash; if it was a mistake, issue a fresh one.
+            </p>
+            <input
+              value={revokeReason}
+              onChange={(e) => setRevokeReason(e.target.value)}
+              placeholder="Why it is being withdrawn — the resident reads this"
+              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-rose-500"
+            />
+            <div className="mt-2 flex gap-2">
+              <button
+                disabled={busy !== null || revokeReason.trim().length < 3}
+                onClick={async () => {
+                  setBusy('revoke')
+                  setError(null)
+                  try {
+                    await api.revokeBarangayCertificate(request.id, revokeReason.trim())
+                    setRevoking(false)
+                    setRevokeReason('')
+                    onChanged()
+                  } catch (err) {
+                    setError(err instanceof ApiError ? err.message : 'Could not withdraw that.')
+                  } finally {
+                    setBusy(null)
+                  }
+                }}
+                className="flex-1 rounded-lg bg-rose-700 px-3 py-2 text-[12.5px] font-semibold text-white transition active:bg-rose-800 disabled:opacity-40"
+              >
+                {busy === 'revoke' ? 'Withdrawing…' : 'Withdraw it'}
+              </button>
+              <button
+                onClick={() => { setRevoking(false); setRevokeReason('') }}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-[12.5px] font-medium text-slate-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setRevoking(true)}
+            className="mt-3 w-full rounded-lg border border-rose-200 px-3 py-2 text-[12.5px] font-semibold text-rose-700 transition hover:bg-rose-50"
+          >
+            Withdraw this certificate
+          </button>
+        )
+      )}
+
+      {/* An officer sees who does it rather than a button that answers 403. */}
+      {request.hasCertificate && !request.revoked && !isAdmin && (
+        <p className="mt-3 text-[12px] leading-snug text-slate-500">
+          The barangay administrator withdraws a released certificate.
+        </p>
       )}
 
       {moves.length === 0 ? (

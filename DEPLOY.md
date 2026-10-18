@@ -128,6 +128,13 @@ usually `1` behind a single load balancer or ingress.
       and read what it says — including the line about a photocopy verifying too. A counter
       that reads a green tick as "this document is the only one" has been taught the wrong
       thing by the screen rather than by the forger
+- [ ] **Somebody owns reading Municipality → Document checks**, and knows it is a prompt
+      rather than proof. A busy permit and a copied one look identical in that list; an
+      administrator who treats the top of it as evidence will withdraw a genuine document
+      from a resident who did nothing wrong
+- [ ] **The offices know that withdrawing a document cannot be undone** and that there is
+      no reissue route — a mistake means the resident files again, and pays again where
+      there is a fee. Agree who may do it before anybody can
 - [ ] `PAYMENT_PROVIDER` is a real gateway, **not** `mock`, and `PAYMENT_SECRET` comes
       from a secret store
 - [ ] A test payment has been taken end to end, and the treasury's **Payments** tab shows

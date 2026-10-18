@@ -1732,6 +1732,72 @@ carries a dead link *permanently*, because the rendered PDF is stored rather tha
 re-rendered — see the pre-launch checklist in `DEPLOY.md`, where this is the one setting
 that cannot be corrected after the fact.
 
+### Counting the checks, and withdrawing a document
+
+The QR and the page catch an altered printout. Neither touches a copy, and nothing printed
+could. These two are what can.
+
+**Every check is counted, and nothing about the checker is kept.** `document_verifications`
+is one row per verification — the kind, the row it was about, and when. The endpoint is
+public and unauthenticated, so the only identity available would be an address and a user
+agent, and keeping those would turn a verification log into a record of *who looked at
+whose permit*, held for ever, on an endpoint anybody can reach. The count and the times are
+the whole signal a copy produces; the checker is no part of it. A deployment that later
+wants to localise a cluster of checks is making a privacy decision, not adding a column.
+
+**The count is the only trace a photocopy leaves.** A permit is checked once or twice in
+its life, when its holder is asked to prove it. One checked forty times is circulating.
+That is shown on the verify page itself — the person deciding whether to accept the paper
+is the one who can act on it, and it is weak information to a forger, who already knows
+what they printed — and gathered for the administrator in **Municipality → Document
+checks**.
+
+**It is a prompt to look, never a finding, and both screens say so.** A busy permit and a
+copied one are identical from here. The panel orders by count rather than filtering on a
+threshold, because what counts as unusual depends on how much a town issues and a number
+hard-coded here would be wrong for every town but one. An administrator who reads the top
+of that list as proof will withdraw somebody's genuine document.
+
+**Recording the check never fails the check.** A verification that answered correctly and
+could not be logged is still a correct answer, and a clerk at a counter must not be told a
+genuine permit cannot be checked because a write failed. The log is for noticing a pattern
+afterwards, which is a weaker promise than the answer itself.
+
+**Revocation is on the document, not the request.** `documents` and `barangay_documents`
+gained `revoked_at`, `revoked_by` and `revoked_reason`. The request really *was* completed
+— the office did the work and handed something over — so `completed` goes on meaning what
+it always meant, and no queue, filter or report has to learn a new status.
+
+**`valid` stays true on a withdrawn document.** The code really is one this municipality
+issued; saying otherwise would read as "forgery" when the truth is "genuine, and no longer
+good", and a counter acts differently on each. They are reported apart, the way the ID
+check reports unknown, expired and used as three answers rather than one failure. On the
+page the withdrawn verdict is **red** and lapsed stays **amber** — lapsed is a real
+document that needs replacing; withdrawn is one that must not be accepted at all.
+
+**Final, and it needs a reason.** A revocation that can be lifted is a flag rather than a
+revocation, and "withdrawn, then not" is not something a counter can act on — the same
+reasoning that makes `released` and `rejected` final. The reason is required because the
+resident is told in the same transaction as the change, and being told only that something
+was withdrawn is worse than not being told.
+
+**The PDF stays downloadable, and that is the point rather than an oversight.** It was
+frozen at issue and cannot change, so the resident can still see what was withdrawn — and
+the fact that the paper looks exactly as valid as it did yesterday is precisely why the
+code lookup proves a document and the page does not.
+
+**Who may withdraw follows the line each console already draws.** Municipally, the office
+that released it, through the same `loadForStaff` scope as everything else — another
+office gets 404 rather than 403. In a barangay, the administrator: both roles hand a
+certificate over, because that is counter work, but taking the barangay's word back is a
+decision. The officer's console says who does it rather than showing a button that answers
+403.
+
+**A receipt is never withdrawn, and there is no route to try.** It records that money
+arrived, and money that arrived cannot be un-received; revoking one would be the app
+asserting something it knows to be false. A reversed payment is a refund, which this app
+does not do.
+
 ## Known simplifications (intentional, flag if scope grows)
 
 - **PhilSys sync** is visual only. A production build would call a real PhilSys
@@ -1743,15 +1809,19 @@ that cannot be corrected after the fact.
   `PAYMENT_SECRET`; nothing else about the flow changes. **Do not deploy with
   `PAYMENT_PROVIDER=mock`:** it exposes a route that settles a payment without one being
   made.
-- **Nothing counts how often a code is checked.** Verification is a read and leaves no
-  trace, so the one signal that would actually catch a photocopy — the same permit
-  verified forty times across three barangays in a week — is not collected. That is a
-  `document_verifications` row per check and a figure on the verify page, and it is the
-  natural next step after this.
-- **A released document cannot be revoked.** Its status is `completed` for ever, so a
-  permit that was cancelled, superseded or issued in error goes on verifying as genuine.
-  Combined with the point above, this is the whole of what is missing against copying:
-  detecting a copy is worth little if nothing can then be done about it.
+- **A copy is detected, never prevented.** The check count is the only signal, and it is
+  ambiguous by nature: a busy permit and a photocopied one look identical. It also only
+  ever fires *after* copies have been presented several times, so the first few go
+  through. Nothing printed can do better than this.
+- **A withdrawal cannot be undone, and there is no reissue.** Final is the right shape for
+  a counter, but a mistaken withdrawal strands the resident: no route re-releases a
+  completed request, so they must file again — and pay again, where there is a fee. A
+  deployment that withdraws documents often wants a reissue route, which is a new workflow
+  rather than a column.
+- **Nothing warns an office that one of its documents is being checked unusually often.**
+  The figures sit in a tab somebody has to open. A threshold and a notification would be
+  the obvious next step, and the honest reason it is not here is that the right threshold
+  is a per-municipality number nobody has yet.
 - **Document release** produces a real PDF with a verification code, but it is not
   digitally signed. A production system would sign it so tampering is detectable
   rather than relying on the code lookup alone. **The e-signature does not change

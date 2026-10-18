@@ -5,6 +5,7 @@ import { authenticate, canActOnDepartment, requireRole } from '../auth.ts'
 import { REQUEST_SELECT, serializeWithReady, toCentavos, toPesos, withReadyDates, type RequestRow } from '../serialize.ts'
 import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
 import { documentFileName, loadReleaseMarks, makeVerificationCode, renderDocument } from '../documents.ts'
+import { revokeDocument } from '../verification.ts'
 import { sendAttachment, sendEvidence } from '../attachments.ts'
 import {
   deliverNotification, notificationFor, recordNotification, type NotificationInput,
@@ -176,7 +177,22 @@ staffRouter.get('/requests/:id', async (req, res) => {
       where e.request_id = $1 order by e.created_at`,
     [row.id]
   )
-  res.json({ ...(await serializeWithReady(row)), events })
+  // Whether there is a released document, and whether it has since been
+  // withdrawn — the console offers the one button or says the other.
+  const document = await one<{
+    verification_code: string; revoked_at: Date | null; revoked_reason: string | null
+  }>(
+    `select verification_code, revoked_at, revoked_reason
+       from documents where request_id = $1`,
+    [row.id]
+  )
+  res.json({
+    ...(await serializeWithReady(row)),
+    events,
+    documentCode: document?.verification_code ?? null,
+    documentRevoked: document?.revoked_at != null,
+    documentRevokedReason: document?.revoked_reason ?? null,
+  })
 })
 
 /** Treasury sets the amount due and moves the request to For Payment. */
@@ -399,6 +415,81 @@ staffRouter.post('/requests/:id/reject', async (req, res) => {
 
   const withName = await loadForStaff(updated.id, user.departments, user.role === 'admin')
   res.json(await serializeWithReady(withName!))
+})
+
+/**
+ * Withdrawing a document that has already been released.
+ *
+ * A released permit verified as genuine for ever, which is the other half of
+ * the copy problem: noticing that a copy is circulating is worth little if
+ * nothing can be done about it, and the larger case is simpler still — a permit
+ * that was cancelled, superseded or issued in error went on checking out.
+ *
+ * **It is the document that is revoked, not the request.** The request really
+ * was completed: the office did the work and handed something over. What is no
+ * longer good is the paper, so `completed` goes on meaning what it always
+ * meant and no queue, filter or report has to learn a new status.
+ *
+ * **Final, and it needs a reason.** A revocation that can be lifted is a flag
+ * rather than a revocation, and "withdrawn, then not" is not a thing a counter
+ * can act on — the same reasoning that makes `released` and `rejected` final.
+ * The reason is required because the resident is told, and being told only that
+ * something was withdrawn is worse than not being told at all.
+ *
+ * The PDF stays downloadable. It cannot change — it was frozen at issue — so
+ * the resident can still see what was withdrawn, and the fact that the paper
+ * looks exactly as valid as it did yesterday is precisely why the code lookup
+ * is the thing that proves a document rather than the page itself.
+ */
+staffRouter.post('/requests/:id/revoke-document', async (req, res) => {
+  const parsed = rejectSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  const user = req.user!
+
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+
+  const officeName = await officeNameFor(row.department_id)
+  const notice: NotificationInput = {
+    userId: row.resident_id,
+    requestId: row.id,
+    kind: 'document_revoked',
+    ...notificationFor('document_revoked', {
+      serviceName: row.service_name ?? 'request',
+      referenceNo: row.reference_no,
+      officeName,
+      reason: parsed.data.reason,
+    }),
+  }
+
+  const outcome = await transaction(async (client) => {
+    const revoked = await revokeDocument(client, {
+      table: 'documents',
+      requestId: row.id,
+      actorId: user.id,
+      reason: parsed.data.reason,
+    })
+    if (!revoked) return null
+    await client.query(
+      `insert into request_events (request_id, actor_id, event_type, from_step, to_step, note)
+       values ($1, $2, 'document_revoked', $3, $3, $4)`,
+      [row.id, user.id, row.current_step_index, parsed.data.reason]
+    )
+    // In the same transaction as the change, like every other notification
+    // here: a document withdrawn without the resident being told is somebody
+    // discovering it at a counter.
+    await recordNotification(client, notice)
+    return revoked
+  })
+
+  if (!outcome) {
+    return res.status(409).json({
+      error: 'There is no released document on this request, or it has already been withdrawn.',
+    })
+  }
+
+  void deliverNotification(notice)
+  res.json({ revoked: true, verificationCode: outcome.verificationCode })
 })
 
 staffRouter.get('/requests/:id/document', async (req, res) => {

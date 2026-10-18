@@ -69,9 +69,14 @@ const form = await formFiller(API)
 const stamp = Date.now()
 
 const treasury = await login('treasury@malasiqui.gov.ph')
+const admin = await login('admin@malasiqui.gov.ph')
 const barangays = (await j('/barangays')).json
-const home = barangays[0]
+// Poblacion rather than whatever the list returns first: the seed issues a
+// clerk there only, and this suite needs one to check the role line.
+const home = barangays.find((b) => b.id === 'poblacion') ?? barangays[0]
+const elsewhere = barangays.find((b) => b.id !== home.id)
 const brgyAdmin = await login(`admin.${home.id}@malasiqui.gov.ph`)
+const otherAdmin = await login(`admin.${elsewhere.id}@malasiqui.gov.ph`)
 
 const resident = (await j('/auth/register', { method: 'POST', body: {
   email: `verify.${stamp}@example.com`, password: 'tingnan-mo-2026',
@@ -168,6 +173,176 @@ console.log('\n== one code is not another ==')
 check(
   'the ID card\'s own 12-character code is not a document code',
   (await j('/verify/ABCD-EFGH-JKMN')).status === 404
+)
+
+console.log('\n== every check is counted ==')
+
+// A fresh document, so the count starts from nothing this suite can see.
+const counted = await j('/requests', { method: 'POST', token: resident, body: {
+  serviceId: 'cedula', formValues: form('cedula'),
+}})
+await j(`/staff/requests/${counted.json.id}/assess`, { method: 'POST', token: treasury, body: { fee: 55 } })
+await payRequest(API, resident, counted.json.id)
+for (let i = 0; i < 4; i++) {
+  await j(`/staff/requests/${counted.json.id}/advance`, { method: 'POST', token: treasury, body: {} })
+}
+const countedCode = (await j(`/requests/${counted.json.id}`, { token: resident })).json.documentCode
+
+const first = await j(`/verify/${countedCode}`)
+check('the first check says one', first.json.checks === 1, first.json.checks)
+const second = await j(`/verify/${countedCode}`)
+check('the second says two', second.json.checks === 2, second.json.checks)
+check(
+  'and a different document counts separately',
+  (await j(`/verify/${docCode}`)).json.checks !== second.json.checks
+)
+
+const trail = await j('/admin/document-checks?days=30', { token: admin })
+check('the administrator can read what has been checked most', trail.status === 200, trail.status)
+check(
+  'and this document is in it with its count',
+  trail.json.rows.some((r) => r.referenceNo === counted.json.referenceNo && r.checks >= 2)
+)
+check(
+  'the list names documents, never who checked them',
+  trail.json.rows.every((row) =>
+    Object.keys(row).every((key) => [
+      'kind', 'referenceNo', 'documentType', 'issuedBy', 'issuedAt',
+      'checks', 'firstChecked', 'lastChecked', 'revoked',
+    ].includes(key))
+  ),
+  JSON.stringify(Object.keys(trail.json.rows[0] ?? {}))
+)
+check(
+  'a resident cannot read that list',
+  (await j('/admin/document-checks', { token: resident })).status === 403
+)
+check(
+  'nor can ordinary municipal staff',
+  (await j('/admin/document-checks', { token: treasury })).status === 403
+)
+check(
+  'nor a barangay administrator — a different tier is not a wider one',
+  (await j('/admin/document-checks', { token: brgyAdmin })).status === 403
+)
+
+console.log('\n== withdrawing a released document ==')
+
+check(
+  'a resident cannot withdraw their own document',
+  (await j(`/staff/requests/${counted.json.id}/revoke-document`, {
+    method: 'POST', token: resident, body: { reason: 'I would rather it went away' },
+  })).status === 403
+)
+check(
+  'another office cannot withdraw this one',
+  (await j(`/staff/requests/${counted.json.id}/revoke-document`, {
+    method: 'POST', token: await login('lcr@malasiqui.gov.ph'), body: { reason: 'Not mine to withdraw' },
+  })).status === 404
+)
+check(
+  'and a reason is required, like a rejection',
+  (await j(`/staff/requests/${counted.json.id}/revoke-document`, {
+    method: 'POST', token: treasury, body: { reason: '' },
+  })).status === 400
+)
+
+const revoked = await j(`/staff/requests/${counted.json.id}/revoke-document`, {
+  method: 'POST', token: treasury, body: { reason: 'Issued against the wrong assessment.' },
+})
+check('the releasing office can withdraw it', revoked.status === 200, JSON.stringify(revoked.json))
+check(
+  'withdrawing twice is refused rather than silently repeated',
+  (await j(`/staff/requests/${counted.json.id}/revoke-document`, {
+    method: 'POST', token: treasury, body: { reason: 'Again' },
+  })).status === 409
+)
+
+const afterRevoke = await j(`/verify/${countedCode}`)
+check('the check still finds it', afterRevoke.status === 200)
+check(
+  'valid stays true — it really was issued here',
+  afterRevoke.json.valid === true
+)
+check('but it reads as withdrawn', afterRevoke.json.revoked === true)
+check('with the reason the office gave', afterRevoke.json.revokedReason === 'Issued against the wrong assessment.')
+check('and when', typeof afterRevoke.json.revokedAt === 'string')
+
+check(
+  'the request is still completed — the office did the work',
+  (await j(`/requests/${counted.json.id}`, { token: resident })).json.status === 'completed'
+)
+check(
+  'the resident is told, with the reason',
+  (await j('/notifications', { token: resident })).json.notifications
+    .some((n) => n.body?.includes('Issued against the wrong assessment.'))
+)
+check(
+  'and the resident can still download what was withdrawn',
+  (await bin(`/requests/${counted.json.id}/document`, resident)).status === 200
+)
+
+console.log('\n== withdrawing a barangay certificate ==')
+
+const toRevoke = await j('/barangay/requests', { method: 'POST', token: resident, body: {
+  typeId: cat.certificates[0].id, purpose: 'Second one, to withdraw',
+}})
+for (const status of ['processing', 'ready', 'released']) {
+  await j(`/barangay-staff/requests/${toRevoke.json.id}`, {
+    method: 'PATCH', token: brgyAdmin, body: { status },
+  })
+}
+const toRevokeCode = (await j('/barangay/requests', { token: resident })).json
+  .find((r) => r.id === toRevoke.json.id)?.certificateCode
+
+const officer = await login(`officer.${home.id}@malasiqui.gov.ph`)
+check(
+  'the clerk cannot withdraw one — taking the barangay\'s word back is the administrator\'s',
+  (await j(`/barangay-staff/requests/${toRevoke.json.id}/revoke-certificate`, {
+    method: 'POST', token: officer, body: { reason: 'Issued in error' },
+  })).status === 403
+)
+check(
+  'another barangay cannot reach it at all',
+  (await j(`/barangay-staff/requests/${toRevoke.json.id}/revoke-certificate`, {
+    method: 'POST', token: otherAdmin, body: { reason: 'Not mine' },
+  })).status === 404
+)
+check(
+  'a municipal administrator gets 403 from the whole mount',
+  (await j(`/barangay-staff/requests/${toRevoke.json.id}/revoke-certificate`, {
+    method: 'POST', token: admin, body: { reason: 'Not mine either' },
+  })).status === 403
+)
+
+const certRevoked = await j(`/barangay-staff/requests/${toRevoke.json.id}/revoke-certificate`, {
+  method: 'POST', token: brgyAdmin, body: { reason: 'Issued to the wrong household.' },
+})
+check('the barangay administrator can', certRevoked.status === 200, JSON.stringify(certRevoked.json))
+
+const certAfter = await j(`/verify/${toRevokeCode}`)
+check('and the check says withdrawn', certAfter.json.revoked === true)
+check('with the barangay\'s reason', certAfter.json.revokedReason === 'Issued to the wrong household.')
+check(
+  'the resident sees it on their own request',
+  (await j('/barangay/requests', { token: resident })).json
+    .find((r) => r.id === toRevoke.json.id)?.revoked === true
+)
+
+console.log('\n== a receipt is never withdrawn ==')
+
+check(
+  'there is no route to withdraw one, on either side',
+  (await j(`/staff/requests/${requestId}/revoke-receipt`, {
+    method: 'POST', token: treasury, body: { reason: 'x' },
+  })).status === 404 &&
+  (await j(`/requests/${requestId}/revoke-receipt`, {
+    method: 'POST', token: resident, body: { reason: 'x' },
+  })).status === 404
+)
+check(
+  'and a receipt check never reports a revocation',
+  receiptCode ? (await j(`/verify/${receiptCode}`)).json.revoked === undefined : true
 )
 
 console.log(`\n${pass} passed, ${fail} failed`)

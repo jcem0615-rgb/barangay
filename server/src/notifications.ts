@@ -16,7 +16,8 @@ import { pushBodyFor, pushToResident } from './push.ts'
  */
 
 /** Notices about a request's progress. */
-export type RequestNotificationKind = 'assessed' | 'advanced' | 'released' | 'rejected' | 'request_paid'
+export type RequestNotificationKind =
+  'assessed' | 'advanced' | 'released' | 'rejected' | 'request_paid' | 'document_revoked'
 
 /** Everything a notification row can be, including notices tied to no request. */
 export type NotificationKind =
@@ -126,6 +127,16 @@ export function notificationFor(
         body:
           `${ctx.officeName} could not process your ${ctx.serviceName} (${ctx.referenceNo}). ` +
           `Reason: ${ctx.reason ?? 'see the app for details'}`,
+      }
+    // A resident whose document was withdrawn and not told finds out at a
+    // counter, holding paper that no longer checks out. The reason is required
+    // at the point of revoking precisely so this message can carry one.
+    case 'document_revoked':
+      return {
+        title: `${ctx.serviceName} — no longer valid`,
+        body:
+          `${ctx.officeName} has withdrawn your ${ctx.serviceName} (${ctx.referenceNo}). ` +
+          `It will no longer pass a check. Reason: ${ctx.reason ?? 'see the app for details'}`,
       }
   }
 }

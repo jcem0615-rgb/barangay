@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v26'
+const STORE_KEY = 'elgu-demo-state-v27'
 
 interface DemoIncident {
   id: string
@@ -158,7 +158,11 @@ interface DemoRequest {
   dateSubmitted: string
   events: Array<{ eventType: string; note: string | null; createdAt: string; actorName?: string | null }>
   attachments: Array<{ id: string; requirement: string | null; fileName: string; contentType: string; byteSize: number; createdAt: string; data: string }>
-  document?: { fileName: string; verificationCode: string }
+  document?: {
+    fileName: string; verificationCode: string
+    /** Withdrawn after release. Final, and always with a reason. */
+    revokedAt?: string; revokedReason?: string
+  }
 }
 
 interface DemoNotification {
@@ -218,6 +222,14 @@ interface DemoState {
    * makes by sharing a single check between them.
    */
   signatures: Record<string, { image: string; updatedAt: string }>
+  /**
+   * One entry per verification: `<kind>:<code>` -> the times it was checked.
+   *
+   * Who checked is not recorded here either, for the reason the real schema
+   * gives: the endpoint is public, so the only identity available would be an
+   * address, and the count is the whole signal a copy produces.
+   */
+  checks: Record<string, string[]>
   /** One series for the municipality, like every other counter here. */
   receiptCounter: number
   barangayRequests: DemoBarangayRequest[]
@@ -291,7 +303,10 @@ interface DemoBarangayRequest {
    * barangay takes its fee at the hall on collection, so a copy available at
    * `ready` would hand somebody the document without their ever going.
    */
-  certificate: { verificationCode: string; issuedAt: string } | null
+  certificate: {
+    verificationCode: string; issuedAt: string
+    revokedAt?: string; revokedReason?: string
+  } | null
 }
 
 /**
@@ -503,6 +518,7 @@ function seed(): DemoState {
     sealUpdatedAt: null,
     barangaySeals: {},
     signatures: {},
+    checks: {},
     receiptCounter: 0,
     barangayRequests: [],
     barangayFees: {},
@@ -1111,6 +1127,8 @@ const serializeBarangayRequest = (r: DemoBarangayRequest) => ({
   expired: r.validUntil !== null && r.validUntil < officeDay(),
   hasCertificate: r.certificate !== null,
   certificateCode: r.certificate?.verificationCode ?? null,
+  revoked: r.certificate?.revokedAt !== undefined,
+  revokedReason: r.certificate?.revokedReason ?? null,
 })
 
 /**
@@ -1660,12 +1678,23 @@ async function route(
   if (parts[0] === 'verify' && parts[1] && method === 'GET') {
     const code = decodeURIComponent(parts[1]).trim().toUpperCase()
 
+    /**
+     * Records the check and returns the running count, like the server.
+     *
+     * The count is the only trace a photocopy leaves: a document is checked
+     * once or twice in its life, and one checked forty times is circulating.
+     */
+    const counted = (kind: string, body: Record<string, unknown>) => {
+      const slot = `${kind}:${code}`
+      state.checks[slot] = [...(state.checks[slot] ?? []), new Date().toISOString()]
+      persist()
+      return { status: 200, body: { ...body, kind, checks: state.checks[slot]!.length } }
+    }
+
     const request = state.requests.find((r) => r.document?.verificationCode === code)
     if (request) {
-      return {
-        status: 200,
-        body: {
-          valid: true, kind: 'document',
+      return counted('document', {
+          valid: true,
           referenceNo: request.referenceNo,
           documentType: request.serviceName,
           issuedBy: officeName(request.categoryId),
@@ -1674,16 +1703,20 @@ async function route(
           // the real server reads `documents.issued_at`.
           issuedAt: request.events.at(-1)?.createdAt ?? request.dateSubmitted,
           status: request.status,
-        },
-      }
+          // `valid` stays true: the code really is one this municipality
+          // issued. "Genuine and withdrawn" is a different answer from
+          // "forgery", and a counter acts differently on each.
+          revoked: request.document?.revokedAt !== undefined,
+          revokedAt: request.document?.revokedAt,
+          revokedReason: request.document?.revokedReason ?? null,
+      })
     }
 
     const payment = state.payments.find((p) => p.receipt?.verificationCode === code)
     if (payment?.receipt) {
-      return {
-        status: 200,
-        body: {
-          valid: true, kind: 'receipt',
+      // A receipt is never revoked: money that arrived cannot be un-received.
+      return counted('receipt', {
+          valid: true,
           referenceNo: payment.receipt.receiptNo,
           documentType: 'Official Receipt',
           issuedBy: MUNICIPALITY.name,
@@ -1692,18 +1725,15 @@ async function route(
           particulars: payment.receipt.particulars,
           amount: payment.amountCentavos / 100,
           status: 'settled',
-        },
-      }
+      })
     }
 
     const certificate = state.barangayRequests.find(
       (r) => r.certificate?.verificationCode === code
     )
     if (certificate?.certificate) {
-      return {
-        status: 200,
-        body: {
-          valid: true, kind: 'barangay_certificate',
+      return counted('barangay_certificate', {
+          valid: true,
           referenceNo: certificate.referenceNo,
           documentType: certificate.typeName,
           issuedBy: `Barangay ${BARANGAYS.find((b) => b.id === certificate.barangayId)?.name ?? ''}`,
@@ -1716,8 +1746,10 @@ async function route(
             certificate.validUntil !== null &&
             certificate.validUntil < new Date().toLocaleDateString('en-CA'),
           status: certificate.status,
-        },
-      }
+          revoked: certificate.certificate.revokedAt !== undefined,
+          revokedAt: certificate.certificate.revokedAt,
+          revokedReason: certificate.certificate.revokedReason ?? null,
+      })
     }
 
     throw new DemoError(
@@ -2115,6 +2147,38 @@ async function route(
         status: 200,
         blob: barangayCertificateFor(held),
         fileName: `${held.typeName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${held.referenceNo}.pdf`,
+      }
+    }
+
+    /**
+     * Withdrawing a certificate the barangay has already released.
+     *
+     * The administrator's: both roles hand one over, but taking the barangay's
+     * word back is a decision rather than counter work. Scoped to this
+     * barangay in the same lookup, so another's is not found.
+     */
+    if (parts[1] === 'requests' && parts[2] && parts[3] === 'revoke-certificate' && method === 'POST') {
+      adminOnly()
+      if (!body?.reason || String(body.reason).trim().length < 3) {
+        throw new DemoError(400, 'Tell the resident why.')
+      }
+      const held = state.barangayRequests.find(
+        (r) => r.id === parts[2] && r.barangayId === own.id && r.certificate
+      )
+      if (!held?.certificate) throw new DemoError(404, 'No certificate has been released for this request.')
+      if (held.certificate.revokedAt) throw new DemoError(409, 'This certificate has already been withdrawn.')
+
+      held.certificate.revokedAt = new Date().toISOString()
+      held.certificate.revokedReason = String(body.reason).trim()
+      notify(
+        held.residentId, null, 'barangay_request', `${held.referenceNo} — no longer valid`,
+        `Barangay ${own.name} has withdrawn your ${held.typeName}. It will no longer pass a ` +
+          `check. Reason: ${held.certificate.revokedReason}`
+      )
+      persist()
+      return {
+        status: 200,
+        body: { revoked: true, verificationCode: held.certificate.verificationCode },
       }
     }
 
@@ -3263,6 +3327,8 @@ async function route(
           receiptIssuedAt: paid?.receipt?.issuedAt ?? null,
           receiptCode: paid?.receipt?.verificationCode ?? null,
           documentCode: target.document?.verificationCode ?? null,
+          documentRevoked: target.document?.revokedAt !== undefined,
+          documentRevokedReason: target.document?.revokedReason ?? null,
         },
       }
     }
@@ -3778,7 +3844,17 @@ async function route(
       const target = state.requests.find((r) => r.id === parts[2])
       if (!target || !inScope(target)) throw new DemoError(404, 'Request not found.')
 
-      if (!parts[3] && method === 'GET') return { status: 200, body: { ...serialize(target), events: target.events } }
+      if (!parts[3] && method === 'GET') {
+        return {
+          status: 200,
+          body: {
+            ...serialize(target), events: target.events,
+            documentCode: target.document?.verificationCode ?? null,
+            documentRevoked: target.document?.revokedAt !== undefined,
+            documentRevokedReason: target.document?.revokedReason ?? null,
+          },
+        }
+      }
 
       if (parts[3] === 'attachments') {
         if (!parts[4]) return { status: 200, body: target.attachments.map(stripData) }
@@ -3892,6 +3968,28 @@ async function route(
         persist()
         return { status: 200, body: serialize(target) }
       }
+      // Withdrawing a document already released. It is the document that is
+      // revoked, not the request: the office really did complete the work.
+      if (parts[3] === 'revoke-document' && method === 'POST') {
+        if (!body.reason || String(body.reason).trim().length < 3) {
+          throw new DemoError(400, 'Tell the resident why.')
+        }
+        if (!target.document || target.document.revokedAt) {
+          throw new DemoError(409, 'There is no released document on this request, or it has already been withdrawn.')
+        }
+        target.document.revokedAt = new Date().toISOString()
+        target.document.revokedReason = String(body.reason).trim()
+        target.events.push({
+          eventType: 'document_revoked', note: target.document.revokedReason,
+          createdAt: new Date().toISOString(), actorName: user.fullName,
+        })
+        notify(target.residentId, target.id, 'rejected', `${target.serviceName} — no longer valid`,
+          `${officeName(target.categoryId)} has withdrawn your ${target.serviceName} (${target.referenceNo}). ` +
+          `It will no longer pass a check. Reason: ${target.document.revokedReason}`)
+        persist()
+        return { status: 200, body: { revoked: true, verificationCode: target.document.verificationCode } }
+      }
+
       if (parts[3] === 'reject' && method === 'POST') {
         if (target.status === 'completed') throw new DemoError(409, 'This request is already completed.')
         if (!body.reason || String(body.reason).trim().length < 3) throw new DemoError(400, 'Tell the resident why.')
@@ -4277,13 +4375,71 @@ async function route(
   // Same rules as server/src/routes/admin.ts: administrators only, the same
   // validation, and every change written to the audit trail with the old value.
   if (parts[0] === 'admin' &&
-      ['hotlines', 'holidays', 'offices', 'audit', 'certificates', 'municipality'].includes(parts[1] ?? '')) {
+      ['hotlines', 'holidays', 'offices', 'audit', 'certificates', 'municipality', 'document-checks'].includes(parts[1] ?? '')) {
     const actor = need('admin')
     const audit = (action: string, target: string, before?: unknown, after?: unknown) => {
       state.audit.unshift({
         id: state.audit.length + 1, actorName: actor.fullName, action, target,
         before: before ?? null, after: after ?? null, createdAt: new Date().toISOString(),
       })
+    }
+
+    /**
+     * What has been checked most often lately — the one trace a copy leaves.
+     *
+     * Ordered by the count rather than filtered on a threshold, like the real
+     * server: what counts as unusual depends on how much a town issues.
+     */
+    if (parts[1] === 'document-checks' && method === 'GET') {
+      const days = Math.min(Math.max(Number(query.get('days')) || 90, 1), 365)
+      const since = Date.now() - days * 86_400_000
+      const rows = Object.entries(state.checks)
+        .map(([slot, times]) => {
+          const recent = times.filter((t) => new Date(t).getTime() >= since)
+          const [kind, code] = [slot.slice(0, slot.indexOf(':')), slot.slice(slot.indexOf(':') + 1)]
+          return { kind, code, recent }
+        })
+        .filter((row) => row.recent.length > 0)
+        .map((row) => {
+          const request = state.requests.find((r) => r.document?.verificationCode === row.code)
+          const payment = state.payments.find((p) => p.receipt?.verificationCode === row.code)
+          const cert = state.barangayRequests.find((r) => r.certificate?.verificationCode === row.code)
+          const base = {
+            kind: row.kind,
+            checks: row.recent.length,
+            firstChecked: row.recent[0]!,
+            lastChecked: row.recent.at(-1)!,
+          }
+          if (request) {
+            return {
+              ...base, referenceNo: request.referenceNo, documentType: request.serviceName,
+              issuedBy: officeName(request.categoryId),
+              issuedAt: request.events.at(-1)?.createdAt ?? request.dateSubmitted,
+              revoked: request.document?.revokedAt !== undefined,
+            }
+          }
+          if (payment?.receipt) {
+            return {
+              ...base, referenceNo: payment.receipt.receiptNo, documentType: 'Official Receipt',
+              issuedBy: MUNICIPALITY.name, issuedAt: payment.receipt.issuedAt, revoked: false,
+            }
+          }
+          if (cert?.certificate) {
+            return {
+              ...base, referenceNo: cert.referenceNo, documentType: cert.typeName,
+              issuedBy: `Barangay ${BARANGAYS.find((b) => b.id === cert.barangayId)?.name ?? ''}`,
+              issuedAt: cert.certificate.issuedAt,
+              revoked: cert.certificate.revokedAt !== undefined,
+            }
+          }
+          // A check of something that is no longer here is a check of nothing
+          // a reader could act on, so it is left out rather than shown blank.
+          return null
+        })
+        .filter((row) => row !== null)
+        .sort((a, b) => b!.checks - a!.checks || b!.lastChecked.localeCompare(a!.lastChecked))
+        .slice(0, 25)
+      return { status: 200, body: { days, rows } }
     }
 
     // ---- what an official receipt says ----

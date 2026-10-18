@@ -226,12 +226,14 @@ barangayRouter.get('/requests', async (req, res) => {
     purpose: string; fee_centavos: number; status: string
     requested_at: string; updated_at: string; note: string | null; barangay_name: string
     valid_until: string | null; has_certificate: boolean
+    revoked_at: Date | null; revoked_reason: string | null
   }>(
     `select r.id, r.reference_no, r.type_id, t.name as type_name, r.purpose,
             r.fee_centavos, r.status, r.requested_at, r.updated_at, r.note,
             r.valid_until, b.name as barangay_name,
             d.request_id is not null as has_certificate,
-            d.verification_code as certificate_code
+            d.verification_code as certificate_code,
+            d.revoked_at, d.revoked_reason
        from barangay_requests r
        join barangay_certificate_types t on t.id = r.type_id
        join barangays b on b.id = r.barangay_id
@@ -282,6 +284,8 @@ export function serializeBarangayRequest(row: {
   valid_until?: string | Date | null
   has_certificate?: boolean
   certificate_code?: string | null
+  revoked_at?: Date | string | null
+  revoked_reason?: string | null
 }) {
   // A date column comes back as a Date from pg; take the calendar day off it
   // rather than an ISO timestamp, which would shift it in another time zone.
@@ -315,6 +319,12 @@ export function serializeBarangayRequest(row: {
     // paper they are holding — and it saves somebody at a counter from having
     // to open a PDF on a phone to read it out.
     certificateCode: row.certificate_code ?? null,
+    // Withdrawn by the barangay after it was released. Shown to the resident
+    // with the reason, because the paper in their hand still looks exactly as
+    // valid as it did yesterday — that is the whole reason the code is what
+    // proves a certificate rather than the page.
+    revoked: row.revoked_at != null,
+    revokedReason: row.revoked_reason ?? null,
   }
 }
 

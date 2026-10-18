@@ -12,6 +12,7 @@ import { servedMunicipality } from '../identity.ts'
 import { MUNICIPALITY_SELECT, type MunicipalityRow } from '../receipts.ts'
 import { getFile, putFile, removeFile } from '../storage.ts'
 import { checkMark, markUpload, sendMark } from '../marks.ts'
+import { checkedOften } from '../verification.ts'
 import {
   certificateCreateSchema, certificateEditSchema, createCertificateType,
   serializeCertificateType, updateCertificateType, withdrawCertificateType,
@@ -981,6 +982,30 @@ adminRouter.delete('/municipality/treasurer-signature', async (req, res) => {
   // Receipts already issued keep theirs, like the seal.
   await removeFile(outcome.previous!)
   res.json(serializeMunicipality(outcome.row))
+})
+
+/**
+ * What has been checked most lately.
+ *
+ * The one signal a photocopy produces. A permit is checked once or twice in its
+ * life, when its holder is asked to prove it; one checked forty times in a
+ * fortnight is a copy doing the rounds, or a document somebody is testing. The
+ * check itself cannot tell those apart — it answers truthfully every time,
+ * because the code is genuine — so the only place the pattern is visible is
+ * here, over the count.
+ *
+ * Ordered by the count rather than filtered on a threshold: what counts as
+ * unusual depends on how much a municipality issues, and a number hard-coded
+ * here would be wrong for every town but one. An administrator reads the top of
+ * the list against their own sense of normal.
+ *
+ * It names documents, not the people who checked them — nothing records who
+ * asked, and the migration says why.
+ */
+adminRouter.get('/document-checks', async (req, res) => {
+  const days = Math.min(Math.max(Number(req.query.days) || 90, 1), 365)
+  const limit = Math.min(Math.max(Number(req.query.limit) || 25, 1), 100)
+  res.json({ days, rows: await checkedOften(days, limit) })
 })
 
 /** The trail, newest first. Read-only — nothing in the app writes here twice. */

@@ -31,6 +31,9 @@ export interface BarangayRequest {
   hasCertificate?: boolean
   /** The code printed on it, for reading out at a counter. */
   certificateCode?: string | null
+  /** Withdrawn by the barangay after release. Final, and always with a reason. */
+  revoked?: boolean
+  revokedReason?: string | null
 }
 
 /**
@@ -580,7 +583,30 @@ export interface VerifyResult {
   particulars?: string
   amount?: number
   status?: string
+  /**
+   * Withdrawn by the office after it was released. `valid` stays true — the
+   * code really is one this municipality issued, and saying otherwise would
+   * read as "forgery" when the truth is "genuine, and no longer good".
+   */
+  revoked?: boolean
+  revokedAt?: string
+  revokedReason?: string | null
+  /** How many times this code has been checked, this check included. */
+  checks?: number
   error?: string
+}
+
+/** One row of the administrator's "checked most often" list. */
+export interface DocumentCheckRow {
+  kind: 'document' | 'receipt' | 'barangay_certificate'
+  referenceNo: string
+  documentType: string
+  issuedBy: string
+  issuedAt: string
+  checks: number
+  firstChecked: string
+  lastChecked: string
+  revoked: boolean
 }
 
 export interface OfficeContact {
@@ -729,6 +755,9 @@ export const api = {
       receiptCode: string | null
       /** The same, for the released document. Null until it is released. */
       documentCode: string | null
+      /** Withdrawn by the office after release; the reason is always given. */
+      documentRevoked: boolean
+      documentRevokedReason: string | null
     }>(`/requests/${id}`),
 
   submitRequest: (
@@ -806,6 +835,16 @@ export const api = {
     downloadPdf(`/staff/requests/${id}/attachments/${attachmentId}`),
 
   staffDocument: (id: string) => downloadPdf(`/staff/requests/${id}/document`),
+
+  /**
+   * Withdrawing a released document. Final, and the reason reaches the
+   * resident — so the console asks for one before it offers the button.
+   */
+  revokeDocument: (id: string, reason: string) =>
+    request<{ revoked: boolean; verificationCode: string }>(
+      `/staff/requests/${id}/revoke-document`,
+      { method: 'POST', body: JSON.stringify({ reason }) }
+    ),
 
   /**
    * The public document check. No session: whoever is holding the paper already
@@ -962,6 +1001,13 @@ export const api = {
   /** A copy of a certificate this barangay released, for the counter. */
   barangayStaffCertificate: (id: string) =>
     downloadPdf(`/barangay-staff/requests/${id}/certificate`),
+
+  /** Withdrawing one. The administrator's, final, and the reason is told. */
+  revokeBarangayCertificate: (id: string, reason: string) =>
+    request<{ revoked: boolean; verificationCode: string }>(
+      `/barangay-staff/requests/${id}/revoke-certificate`,
+      { method: 'POST', body: JSON.stringify({ reason }) }
+    ),
 
   /** Shared catalogue plus this barangay's own; `own` says which it may edit. */
   // ---- the shared certificate catalogue, the municipality's ----
@@ -1383,6 +1429,10 @@ export const api = {
 
   auditTrail: (limit = 50) => request<AuditRow[]>(`/admin/audit?limit=${limit}`),
 
+  /** What has been checked most often lately — the one signal a copy leaves. */
+  documentChecks: (days = 90) =>
+    request<{ days: number; rows: DocumentCheckRow[] }>(`/admin/document-checks?days=${days}`),
+
   // Appointments: booking a slot at the counter, and what the office sees.
   myAppointments: () => request<Appointment[]>('/appointments'),
 
@@ -1482,7 +1532,13 @@ export const api = {
   },
 
   staffRequest: (id: string) =>
-    request<Application & { events: RequestEvent[] }>(`/staff/requests/${id}`),
+    request<Application & {
+      events: RequestEvent[]
+      /** Null until the office releases the document. */
+      documentCode: string | null
+      documentRevoked: boolean
+      documentRevokedReason: string | null
+    }>(`/staff/requests/${id}`),
 
   assess: (id: string, fee: number, note?: string) =>
     request<Application>(`/staff/requests/${id}/assess`, {

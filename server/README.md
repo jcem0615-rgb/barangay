@@ -380,7 +380,7 @@ npm run test:certificates  # the catalogue: who owns which half, and the fee tra
 npm run test:deployment   # one deployment per municipality: config, roster, and the boot refusal
 npm run test:receipts     # the eOR: issued with the settlement, one series, frozen at issue
 npm run test:signatures   # the e-seal and e-signature: who may upload, scoping, frozen at issue
-npm run test:verify       # the public document check: all three kinds, no session, what it discloses
+npm run test:verify       # the public check: all three kinds, the count it keeps, and withdrawing one
 npm run test:barangay-certificate  # the certificate PDF: only at release, scoped, frozen
 ```
 

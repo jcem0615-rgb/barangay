@@ -574,6 +574,7 @@ export const en = {
   'id.verifiedBlurb': 'Synced with the Philippine Identification System. Show the verification code below at an LGU counter to prove this ID is yours.',
   'id.registeredAddress': 'Registered address',
   'detail.documentCode': 'Verification code:',
+  'detail.documentWithdrawn': 'This document has been withdrawn by the office and no longer passes a check.',
 
   // Checking a document at a counter. Public: whoever holds the paper already
   // has everything on it, and the check is useless if it needs an account.
@@ -607,6 +608,13 @@ export const en = {
   'docCheck.close': 'Close',
   'docCheck.unreachable': 'Could not reach the portal. Check the connection and try again.',
   'docCheck.enterCode': 'Enter the code printed on the document.',
+  'docCheck.revokedTitle': 'Withdrawn — do not accept this',
+  'docCheck.revokedBlurb': 'This was genuinely issued and the office has since withdrawn it. It is no longer valid, whatever the paper says.',
+  'docCheck.revokedReason': 'Reason given',
+  'docCheck.revokedOn': 'Withdrawn on',
+  'docCheck.checksOne': 'Checked once — this check.',
+  'docCheck.checksFew': 'Checked {count} times, including this one.',
+  'docCheck.checksMany': 'Checked {count} times, including this one. A document is normally checked once or twice; this many may mean copies are circulating.',
 } as const
 
 export type StringKey = keyof typeof en
@@ -1152,6 +1160,7 @@ export const fil: Record<StringKey, string> = {
   'id.verifiedBlurb': 'Naka-sync sa Philippine Identification System. Ipakita ang verification code sa ibaba sa counter ng LGU para patunayang sa iyo ang ID na ito.',
   'id.registeredAddress': 'Nakarehistrong tirahan',
   'detail.documentCode': 'Verification code:',
+  'detail.documentWithdrawn': 'Binawi ito ng opisina at hindi na ito papasa sa pagsusuri.',
 
   'docCheck.title': 'Suriin ang dokumento',
   'docCheck.subtitle': 'Tiyakin ang permit, sertipiko o resibo laban sa opisinang naglabas nito.',
@@ -1183,4 +1192,11 @@ export const fil: Record<StringKey, string> = {
   'docCheck.close': 'Isara',
   'docCheck.unreachable': 'Hindi maabot ang portal. Tingnan ang koneksyon at subukang muli.',
   'docCheck.enterCode': 'Ilagay ang code na nakalimbag sa dokumento.',
+  'docCheck.revokedTitle': 'Binawi — huwag itong tanggapin',
+  'docCheck.revokedBlurb': 'Tunay itong inilabas at binawi na ito ng opisina. Wala na itong bisa, kahit ano pa ang nakasulat sa papel.',
+  'docCheck.revokedReason': 'Dahilan',
+  'docCheck.revokedOn': 'Binawi noong',
+  'docCheck.checksOne': 'Isang beses pa lang sinuri \u2014 ngayon.',
+  'docCheck.checksFew': 'Sinuri nang {count} beses, kasama ito.',
+  'docCheck.checksMany': 'Sinuri nang {count} beses, kasama ito. Karaniwang isa o dalawang beses lang sinusuri ang isang dokumento; maaaring may kumakalat na kopya.',
 }

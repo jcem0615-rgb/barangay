@@ -296,8 +296,9 @@ requestsRouter.get('/:id', async (req, res) => {
       `select receipt_no, issued_at, verification_code from receipts where request_id = $1`,
       [row.id]
     ),
-    one<{ verification_code: string }>(
-      `select verification_code from documents where request_id = $1`,
+    one<{ verification_code: string; revoked_at: Date | null; revoked_reason: string | null }>(
+      `select verification_code, revoked_at, revoked_reason
+         from documents where request_id = $1`,
       [row.id]
     ),
   ])
@@ -315,6 +316,11 @@ requestsRouter.get('/:id', async (req, res) => {
     // which left the resident with the one code they could not read out
     // without opening a PDF on a phone.
     documentCode: document?.verification_code ?? null,
+    // Withdrawn after release. The resident is notified when it happens; this
+    // is what the screen reads back afterwards, because the PDF they hold was
+    // frozen at issue and still looks exactly as valid as it did.
+    documentRevoked: document?.revoked_at != null,
+    documentRevokedReason: document?.revoked_reason ?? null,
   })
 })
 

@@ -34,6 +34,8 @@ export default function ApplicationDetail({ id }: { id: string }) {
   const [receipt, setReceipt] = useState<{ no: string; code: string | null } | null>(null)
   /** The code printed on the released document, for reading out at a counter. */
   const [documentCode, setDocumentCode] = useState<string | null>(null)
+  /** Withdrawn by the office after release. The PDF is unchanged; the check is not. */
+  const [revoked, setRevoked] = useState<{ reason: string | null } | null>(null)
   // A rating already given must show as given, or the app asks the same
   // question every time the screen is opened.
   const [rating, setRating] = useState<{ rating: number; comment: string | null } | null>(null)
@@ -54,6 +56,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
         if (!live) return
         if (full.receiptNo) setReceipt({ no: full.receiptNo, code: full.receiptCode })
         setDocumentCode(full.documentCode)
+        setRevoked(full.documentRevoked ? { reason: full.documentRevokedReason } : null)
       })
       // A receipt that will not load is not worth an error banner on a screen
       // whose job is the request itself; the button simply does not appear.
@@ -266,11 +269,29 @@ export default function ApplicationDetail({ id }: { id: string }) {
               rather than opening a PDF on a phone, which is the same reason the
               receipt shows its own.
             */}
-            {documentCode && (
+            {documentCode && !revoked && (
               <p className="mt-2 text-center text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
                 {t('detail.documentCode')}{' '}
                 <span className="font-mono tracking-wide text-navy-800">{documentCode}</span>
               </p>
+            )}
+            {/*
+              Withdrawn. The download stays — the resident should be able to see
+              what was withdrawn, and the PDF was frozen at issue so it looks
+              exactly as valid as it did, which is precisely why the code and
+              not the page is what proves a document.
+            */}
+            {revoked && (
+              <div className="mt-2 rounded-xl bg-rose-50 px-3.5 py-3">
+                <p className="text-[calc(13px_*_var(--text-scale))] font-semibold leading-snug text-rose-800">
+                  {t('detail.documentWithdrawn')}
+                </p>
+                {revoked.reason && (
+                  <p className="mt-1 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-rose-700">
+                    {revoked.reason}
+                  </p>
+                )}
+              </div>
             )}
             {downloadError && (
               <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[calc(13.5px_*_var(--text-scale))] text-rose-700">

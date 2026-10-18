@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Download, Loader2, Paperclip, X } from 'lucide-react'
+import { Ban, Check, Download, Loader2, Paperclip, X } from 'lucide-react'
 import { api, ApiError, type Attachment, type RequestEvent } from '../../lib/api'
 import { saveBlob } from '../../lib/download'
 import StaffPrograms from './StaffPrograms'
 import type { Application } from '../../types'
 import { WORKFLOW_STEPS } from '../../types'
 
-type Detail = Application & { events: RequestEvent[]; residentName?: string }
+type Detail = Application & {
+  events: RequestEvent[]
+  residentName?: string
+  documentCode: string | null
+  documentRevoked: boolean
+  documentRevokedReason: string | null
+}
 
 export default function StaffRequestPanel({
   requestId, onChanged, onClose,
@@ -21,6 +27,11 @@ export default function StaffRequestPanel({
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [feeInput, setFeeInput] = useState('')
   const [note, setNote] = useState('')
+  // Withdrawing a released document is final and tells the resident why, so it
+  // is kept behind its own reason field rather than reusing the history note —
+  // a note is a remark for the file, this is a message somebody receives.
+  const [revokeReason, setRevokeReason] = useState('')
+  const [revoking, setRevoking] = useState(false)
 
   const load = useCallback(async (id: string) => {
     setError(null)
@@ -42,7 +53,9 @@ export default function StaffRequestPanel({
     void load(requestId)
   }, [requestId, load])
 
-  async function act(fn: () => Promise<Application>) {
+  // The return value is never used — every action is followed by a reload, so
+  // what an action resolves to does not have to be the request.
+  async function act(fn: () => Promise<unknown>) {
     setBusy(true)
     setError(null)
     try {
@@ -105,19 +118,89 @@ export default function StaffRequestPanel({
         </div>
 
         {detail.status === 'completed' && (
-          <button
-            onClick={async () => {
-              try {
-                const { blob, fileName } = await api.staffDocument(detail.id)
-                saveBlob(blob, fileName)
-              } catch (err) {
-                setError(err instanceof ApiError ? err.message : 'Could not download the document.')
-              }
-            }}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 py-2.5 text-[13px] font-semibold text-emerald-800 transition hover:bg-emerald-100"
-          >
-            <Download size={15} /> Released document
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={async () => {
+                try {
+                  const { blob, fileName } = await api.staffDocument(detail.id)
+                  saveBlob(blob, fileName)
+                } catch (err) {
+                  setError(err instanceof ApiError ? err.message : 'Could not download the document.')
+                }
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 py-2.5 text-[13px] font-semibold text-emerald-800 transition hover:bg-emerald-100"
+            >
+              <Download size={15} /> Released document
+            </button>
+            {detail.documentCode && (
+              <p className="text-center font-mono text-[11.5px] tracking-wide text-slate-500">
+                {detail.documentCode}
+              </p>
+            )}
+
+            {/*
+              Withdrawing it.
+              
+              The PDF cannot change — it was frozen at issue — so this does not
+              touch the paper the resident holds; it changes the answer the
+              public check gives. Final, because "withdrawn, then not" is not a
+              thing a counter can act on, and the resident is told with the
+              reason typed here.
+            */}
+            {detail.documentRevoked ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5">
+                <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-rose-800">
+                  <Ban size={14} /> Withdrawn. It no longer passes a check.
+                </p>
+                {detail.documentRevokedReason && (
+                  <p className="mt-1 text-[12px] leading-snug text-rose-700">
+                    {detail.documentRevokedReason}
+                  </p>
+                )}
+              </div>
+            ) : revoking ? (
+              <div className="rounded-xl border border-rose-200 bg-white p-3">
+                <p className="text-[12.5px] font-semibold text-rose-800">Withdraw this document</p>
+                <p className="mt-1 text-[12px] leading-snug text-slate-600">
+                  It stops passing the public check and the resident is told, with the
+                  reason below. This cannot be undone &mdash; if it was a mistake, the
+                  office has to issue a fresh one.
+                </p>
+                <input
+                  value={revokeReason}
+                  onChange={(e) => setRevokeReason(e.target.value)}
+                  placeholder="Why it is being withdrawn — the resident reads this"
+                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-rose-500"
+                />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    disabled={busy || revokeReason.trim().length < 3}
+                    onClick={() => void act(async () => {
+                      await api.revokeDocument(detail.id, revokeReason.trim())
+                      setRevoking(false)
+                      setRevokeReason('')
+                    })}
+                    className="flex-1 rounded-lg bg-rose-700 px-3 py-2 text-[12.5px] font-semibold text-white transition active:bg-rose-800 disabled:opacity-40"
+                  >
+                    Withdraw it
+                  </button>
+                  <button
+                    onClick={() => { setRevoking(false); setRevokeReason('') }}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-[12.5px] font-medium text-slate-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setRevoking(true)}
+                className="w-full rounded-lg border border-rose-200 px-3 py-2 text-[12.5px] font-semibold text-rose-700 transition hover:bg-rose-50"
+              >
+                Withdraw this document
+              </button>
+            )}
+          </div>
         )}
 
         <div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Loader2, ScanLine, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Ban, CheckCircle2, Loader2, ScanLine, X, XCircle } from 'lucide-react'
 import { api, ApiError, type VerifyResult } from '../lib/api'
 import { useT } from '../lib/i18n'
 import { useCatalogue } from '../lib/catalogue'
@@ -95,6 +95,7 @@ export default function VerifyDocument({ code, onClose }: { code: string; onClos
         )}
 
         {!busy && result && (result.valid ? <Found result={result} /> : <NotFound />)}
+        {!busy && result?.valid && <Checks count={result.checks} />}
 
         {/* Typing it in, for a creased QR or a document printed before this. */}
         <form
@@ -132,6 +133,40 @@ export default function VerifyDocument({ code, onClose }: { code: string; onClos
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * How often this code has been checked.
+ *
+ * The one thing on this screen that speaks to a *copy*, which the check itself
+ * cannot catch: a photocopy carries a genuine code and verifies genuinely. A
+ * document is normally checked once or twice in its life, when its holder is
+ * asked to prove it — so a high count is the only visible sign that more than
+ * one copy is being presented.
+ *
+ * Shown to whoever is checking, not kept for the console alone: the person
+ * deciding whether to accept the paper is the one who can act on it, and it is
+ * weak information to a forger, who already knows what they printed.
+ *
+ * Deliberately outside the verdict card. It is a hint, not a finding — a busy
+ * permit and a copied one look the same from here, and dressing it as a verdict
+ * would have somebody refuse a genuine document over it.
+ */
+function Checks({ count }: { count: number | undefined }) {
+  const { t } = useT()
+  if (!count) return null
+  const text =
+    count === 1 ? t('docCheck.checksOne')
+      : count <= 5 ? t('docCheck.checksFew', { count: String(count) })
+        : t('docCheck.checksMany', { count: String(count) })
+
+  return (
+    <p className={`mt-3 rounded-xl px-3 py-2.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug ${
+      count > 5 ? 'bg-amber-50 text-amber-900' : 'bg-slate-100 text-slate-600'
+    }`}>
+      {text}
+    </p>
   )
 }
 
@@ -197,8 +232,47 @@ function Found({ result }: { result: VerifyResult }) {
           ],
         ] as Array<[string, string | null]>)
       : []),
-    [t('docCheck.statusLabel'), status],
+    // The request's own status is left off a withdrawn document: "Released"
+    // beside "Withdrawn" reads as a contradiction, and the withdrawal is the
+    // status that decides what the counter does.
+    ...(result.revoked ? [] : ([[t('docCheck.statusLabel'), status]] as Array<[string, string | null]>)),
   ]
+
+  /*
+   * Withdrawn is its own verdict, and it is red rather than amber.
+   *
+   * Lapsed is amber: a real document whose period ran out, and the holder needs
+   * a fresh one. Withdrawn is the office saying this must not be accepted at
+   * all, which is the same thing a counter does about a forgery even though the
+   * document is genuine. Reporting both as one "not valid" would lose the
+   * difference that decides what the clerk says next.
+   */
+  if (result.revoked) {
+    return (
+      <section className="rounded-2xl border-2 border-rose-300 bg-white p-5 shadow-sm">
+        <p className="flex items-center gap-2 font-display text-[calc(16px_*_var(--text-scale))] font-bold text-rose-700">
+          <Ban size={20} /> {t('docCheck.revokedTitle')}
+        </p>
+        <p className="mt-2 text-[calc(13px_*_var(--text-scale))] leading-snug text-slate-600">
+          {t('docCheck.revokedBlurb')}
+        </p>
+        <dl className="mt-4 divide-y divide-slate-100 border-y border-slate-100">
+          {[
+            ...rows,
+            [t('docCheck.revokedOn'), day(result.revokedAt)] as [string, string | null],
+            [t('docCheck.revokedReason'), result.revokedReason ?? null] as [string, string | null],
+          ].filter(([, value]) => value !== null).map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-4 py-2.5">
+              <dt className="shrink-0 text-[calc(12.5px_*_var(--text-scale))] text-slate-500">{label}</dt>
+              <dd className="min-w-0 text-right text-[calc(13.5px_*_var(--text-scale))] font-semibold text-navy-950">
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    )
+  }
 
   return (
     <section className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">

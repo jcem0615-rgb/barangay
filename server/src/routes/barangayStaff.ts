@@ -21,6 +21,7 @@ import {
 } from '../barangayDocuments.ts'
 import { getFile, putFile, removeFile } from '../storage.ts'
 import { checkMark, markUpload, sendMark } from '../marks.ts'
+import { revokeDocument } from '../verification.ts'
 import { blotterRouter } from './blotter.ts'
 import { householdsRouter } from './households.ts'
 import { announcementsStaffRouter } from './announcements.ts'
@@ -349,6 +350,78 @@ barangayStaffRouter.get('/requests/:id/certificate', async (req, res) => {
 })
 
 /**
+ * Withdrawing a certificate the barangay has already released.
+ *
+ * The mirror of the municipal route, with the barangay's own line on who may:
+ * both roles release a certificate, because handing one over is counter work,
+ * but saying that something this barangay issued is no longer good is the
+ * administrator's — it is the barangay's word being taken back.
+ *
+ * Scoped through `barangay_documents.barangay_id` in the same statement as the
+ * update, so another barangay's certificate is not found rather than refused.
+ * Final, and it needs a reason the resident can read, exactly as a rejection
+ * does.
+ */
+barangayStaffRouter.post(
+  '/requests/:id/revoke-certificate',
+  requireRole('barangay_admin'),
+  async (req, res) => {
+    const parsed = revokeSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+
+    const barangay = await ownBarangay(req.user!.id)
+    if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+    const outcome = await transaction(async (client) => {
+      // The scope is in the lookup, so a request belonging to another barangay
+      // simply is not here.
+      const current = await client.query<{
+        id: string; reference_no: string; resident_id: string; type_name: string
+      }>(
+        `select r.id, r.reference_no, r.resident_id, t.name as type_name
+           from barangay_requests r
+           join barangay_certificate_types t on t.id = r.type_id
+           join barangay_documents d on d.request_id = r.id
+          where r.id = $1 and r.barangay_id = $2 and d.barangay_id = $2
+          for update of r`,
+        [req.params.id, barangay.id]
+      )
+      const row = current.rows[0]
+      if (!row) return { error: 'notfound' as const }
+
+      const revoked = await revokeDocument(client, {
+        table: 'barangay_documents',
+        requestId: row.id,
+        actorId: req.user!.id,
+        reason: parsed.data.reason,
+      })
+      if (!revoked) return { error: 'already' as const }
+
+      const notification = {
+        userId: row.resident_id,
+        requestId: null,
+        kind: 'barangay_request' as const,
+        title: `${row.reference_no} — no longer valid`,
+        body:
+          `Barangay ${barangay.name} has withdrawn your ${row.type_name}. It will no longer ` +
+          `pass a check. Reason: ${parsed.data.reason}`,
+      }
+      await recordNotification(client, notification)
+      return { notification, verificationCode: revoked.verificationCode }
+    })
+
+    if ('error' in outcome) {
+      return outcome.error === 'notfound'
+        ? res.status(404).json({ error: 'No certificate has been released for this request.' })
+        : res.status(409).json({ error: 'This certificate has already been withdrawn.' })
+    }
+
+    void deliverNotification(outcome.notification)
+    res.json({ revoked: true, verificationCode: outcome.verificationCode })
+  }
+)
+
+/**
  * Correcting them.
  *
  * **The barangay's name is not in here**, and that is the same rule that stops a
@@ -442,6 +515,11 @@ barangayStaffRouter.patch('/office', requireRole('barangay_admin'), async (req, 
   })
 })
 
+/** A withdrawal says why, like a rejection: the resident is told the reason. */
+const revokeSchema = z.object({
+  reason: z.string().trim().min(3, 'Tell the resident why.').max(500),
+})
+
 const queueSchema = z.object({
   status: z.enum(['pending', 'processing', 'ready', 'released', 'rejected']).optional(),
 })
@@ -457,14 +535,18 @@ barangayStaffRouter.get('/requests', async (req, res) => {
     purpose: string; fee_centavos: number; status: string
     valid_until: string | null
     requested_at: string; updated_at: string; note: string | null; resident_name: string
+    has_certificate: boolean; revoked_at: Date | null; revoked_reason: string | null
   }>(
     `select r.id, r.reference_no, r.type_id, t.name as type_name, r.purpose,
             r.fee_centavos, r.status, r.requested_at, r.updated_at, r.note,
             r.valid_until,
-            u.full_name as resident_name
+            u.full_name as resident_name,
+            d.request_id is not null as has_certificate,
+            d.revoked_at, d.revoked_reason
        from barangay_requests r
        join barangay_certificate_types t on t.id = r.type_id
        join users u on u.id = r.resident_id
+       left join barangay_documents d on d.request_id = r.id
       where r.barangay_id = $1
         and ($2::text is null or r.status = $2::barangay_request_status)
       -- Open ones first, oldest first within them: the queue reads as the order
