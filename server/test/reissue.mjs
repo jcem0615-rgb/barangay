@@ -438,13 +438,32 @@ check(
 const read = await bin('/admin/municipality/signatory-signature', admin)
 check('the console can read it back', read.status === 200 && read.bytes.length > 0)
 
+// All three verbs, not just the two that write. Reading is refused as well:
+// the hall's signatory is the hall's, and a barangay administrator has no more
+// business fetching the mayor's signature file than replacing it. The whole
+// `/admin` mount is behind `requireRole('admin')`, which is what makes this a
+// gate rather than three checks somebody has to remember.
 for (const [who, token] of [
   ['municipal staff', treasury], ['a barangay administrator', brgyAdmin], ['a resident', resident],
 ]) {
   const put = await upload('/admin/municipality/signatory-signature', token, PNG, 'x.png', 'image/png')
+  const got = await bin('/admin/municipality/signatory-signature', token)
   const del = await j('/admin/municipality/signatory-signature', { method: 'DELETE', token })
   check(`${who} cannot upload one`, put.status === 403, put.status)
+  check(`${who} cannot read one`, got.status === 403, got.status)
   check(`${who} cannot remove one`, del.status === 403, del.status)
+}
+
+// And the other way: the hall cannot sign for a barangay either. A different
+// tier is not a wider one.
+for (const who of ['captain', 'secretary']) {
+  const put = await upload(
+    `/barangay-staff/office/signature/${who}`, admin, PNG, 'x.png', 'image/png'
+  )
+  check(
+    `the municipal administrator cannot upload a barangay's ${who} signature`,
+    put.status === 403, put.status
+  )
 }
 
 console.log('\n== it prints on a released document, and is audited ==')
