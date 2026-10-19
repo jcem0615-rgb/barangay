@@ -132,9 +132,15 @@ usually `1` behind a single load balancer or ingress.
       rather than proof. A busy permit and a copied one look identical in that list; an
       administrator who treats the top of it as evidence will withdraw a genuine document
       from a resident who did nothing wrong
-- [ ] **The offices know that withdrawing a document cannot be undone** and that there is
-      no reissue route — a mistake means the resident files again, and pays again where
-      there is a fee. Agree who may do it before anybody can
+- [ ] **The offices know that withdrawing a document cannot be undone**, and that putting
+      a mistake right means issuing a *replacement*: a new document with a new code, while
+      the withdrawn copy goes on failing every check for ever. The resident does not pay
+      again, but they do have to come back for the new paper. Agree who may withdraw
+      before anybody can
+- [ ] **Who signs for the hall has been decided.** Open **Municipality → Office details**:
+      the municipality's own signatory prints on *every* document *every* office releases,
+      beside that office's head. Leave the name blank if the mayor should not appear on all
+      of them — blank prints nothing, which is a setting rather than an unfinished state
 - [ ] `PAYMENT_PROVIDER` is a real gateway, **not** `mock`, and `PAYMENT_SECRET` comes
       from a secret store
 - [ ] A test payment has been taken end to end, and the treasury's **Payments** tab shows

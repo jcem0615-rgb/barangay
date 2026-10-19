@@ -280,10 +280,16 @@ function RequestPanel({
   // receives saying their certificate is no longer good.
   const [revoking, setRevoking] = useState(false)
   const [revokeReason, setRevokeReason] = useState('')
+  // And issuing a replacement for one withdrawn in error, which carries its own
+  // reason for the same purpose: this one is the barangay's record of why.
+  const [reissuing, setReissuing] = useState(false)
+  const [reissueReason, setReissueReason] = useState('')
 
   // A note typed against one request must not follow the clerk to the next.
   useEffect(() => {
-    setNote(''); setError(null); setRevoking(false); setRevokeReason('')
+    setNote(''); setError(null)
+    setRevoking(false); setRevokeReason('')
+    setReissuing(false); setReissueReason('')
   }, [request?.id])
 
   if (!request) {
@@ -403,13 +409,95 @@ function RequestPanel({
         </div>
       )}
 
+      {/*
+        Putting right a withdrawal that should not have happened.
+
+        It does not lift the withdrawal: the withdrawn paper is in somebody's
+        hands and has to go on failing the check. This issues a new certificate
+        with a new code, which is what the resident actually needs — otherwise a
+        barangay's mistake costs them another trip to the hall.
+
+        The administrator's, like the withdrawal it undoes. Both roles hand a
+        certificate over; taking the barangay's word back and then giving it
+        again is a decision.
+      */}
+      {request.hasCertificate && request.revoked && isAdmin && (
+        reissuing ? (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3.5">
+            <p className="text-[12.5px] font-semibold text-navy-800">Issue a replacement</p>
+            <p className="mt-1 text-[12px] leading-snug text-slate-600">
+              A new certificate with a new verification code, sealed and signed as the
+              barangay is today, carrying the same validity date as the one it replaces.
+              The withdrawn copy stays withdrawn &mdash; a check on it will say a
+              replacement exists.
+            </p>
+            <input
+              value={reissueReason}
+              onChange={(e) => setReissueReason(e.target.value)}
+              placeholder="Why it is being replaced — the barangay's record"
+              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-navy-800"
+            />
+            <div className="mt-2 flex gap-2">
+              <button
+                disabled={busy !== null || reissueReason.trim().length < 3}
+                onClick={async () => {
+                  setBusy('reissue')
+                  setError(null)
+                  try {
+                    await api.reissueBarangayCertificate(request.id, reissueReason.trim())
+                    setReissuing(false)
+                    setReissueReason('')
+                    onChanged()
+                  } catch (err) {
+                    setError(
+                      err instanceof ApiError ? err.message : 'Could not issue a replacement.'
+                    )
+                  } finally {
+                    setBusy(null)
+                  }
+                }}
+                className="flex-1 rounded-lg bg-navy-800 px-3 py-2 text-[12.5px] font-semibold text-white transition active:bg-navy-950 disabled:opacity-40"
+              >
+                {busy === 'reissue' ? 'Issuing…' : 'Issue it'}
+              </button>
+              <button
+                onClick={() => { setReissuing(false); setReissueReason('') }}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-[12.5px] font-medium text-slate-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setReissuing(true)}
+            className="mt-3 w-full rounded-lg border border-navy-200 px-3 py-2 text-[12.5px] font-semibold text-navy-800 transition hover:bg-navy-50"
+          >
+            Withdrawn in error? Issue a replacement
+          </button>
+        )
+      )}
+
+      {request.hasCertificate && request.revoked && !isAdmin && (
+        <p className="mt-2 text-[12px] leading-snug text-slate-500">
+          The barangay administrator issues a replacement if this was withdrawn in error.
+        </p>
+      )}
+
+      {request.hasCertificate && !request.revoked && request.reissued && (
+        <p className="mt-3 text-[12px] leading-snug text-slate-500">
+          This is a replacement. The copy it replaced stays withdrawn.
+        </p>
+      )}
+
       {request.hasCertificate && !request.revoked && isAdmin && (
         revoking ? (
           <div className="mt-3 rounded-xl border border-rose-200 bg-white p-3.5">
             <p className="text-[12.5px] font-semibold text-rose-800">Withdraw this certificate</p>
             <p className="mt-1 text-[12px] leading-snug text-slate-600">
               It stops passing the public check and the resident is told, with the reason
-              below. This cannot be undone &mdash; if it was a mistake, issue a fresh one.
+              below. This cannot be undone &mdash; if it was a mistake, issue a replacement
+              afterwards; this copy stays withdrawn either way.
             </p>
             <input
               value={revokeReason}

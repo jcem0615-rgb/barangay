@@ -233,11 +233,18 @@ barangayRouter.get('/requests', async (req, res) => {
             r.valid_until, b.name as barangay_name,
             d.request_id is not null as has_certificate,
             d.verification_code as certificate_code,
-            d.revoked_at, d.revoked_reason
+            d.revoked_at, d.revoked_reason, d.reissue_of
        from barangay_requests r
        join barangay_certificate_types t on t.id = r.type_id
        join barangays b on b.id = r.barangay_id
-       left join barangay_documents d on d.request_id = r.id
+       -- The newest certificate only. A request may hold more than one, since a
+       -- withdrawal is final and a reissue mints a second beside it, and a
+       -- plain join would list the request once per copy.
+       left join lateral (
+         select * from barangay_documents bd
+          where bd.request_id = r.id
+          order by bd.issued_at desc, bd.id desc limit 1
+       ) d on true
       where r.resident_id = $1
       order by r.requested_at desc
       limit 50`,
@@ -254,11 +261,15 @@ barangayRouter.get('/requests', async (req, res) => {
  * document download has.
  */
 barangayRouter.get('/requests/:id/certificate', async (req, res) => {
+  // The newest copy, which after a reissue is the replacement rather than the
+  // withdrawn original — handing back the one that stopped checking out would
+  // be the wrong paper.
   const doc = await one<{ file_name: string; content: Buffer }>(
     `select d.file_name, d.content
        from barangay_documents d
        join barangay_requests r on r.id = d.request_id
-      where d.request_id = $1 and r.resident_id = $2`,
+      where d.request_id = $1 and r.resident_id = $2
+      order by d.issued_at desc, d.id desc limit 1`,
     [req.params.id, req.user!.id]
   )
   if (!doc) {
@@ -286,6 +297,7 @@ export function serializeBarangayRequest(row: {
   certificate_code?: string | null
   revoked_at?: Date | string | null
   revoked_reason?: string | null
+  reissue_of?: string | null
 }) {
   // A date column comes back as a Date from pg; take the calendar day off it
   // rather than an ISO timestamp, which would shift it in another time zone.
@@ -325,6 +337,10 @@ export function serializeBarangayRequest(row: {
     // proves a certificate rather than the page.
     revoked: row.revoked_at != null,
     revokedReason: row.revoked_reason ?? null,
+    // A replacement, issued after a withdrawal. Said rather than left to be
+    // inferred from a download that silently changed: the resident was told
+    // their certificate had been withdrawn, so the screen owes them the rest.
+    reissued: row.reissue_of != null,
   }
 }
 

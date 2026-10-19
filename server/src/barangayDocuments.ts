@@ -162,6 +162,15 @@ export interface BarangayCertificateData {
   captainSignatureType: string | null
   secretarySignature: Buffer | null
   secretarySignatureType: string | null
+  /**
+   * The code of the certificate this one replaces, where it is a reissue.
+   *
+   * Printed on the face for the reason the municipal document gives: the
+   * withdrawn paper was not destroyed, so a resident may be holding both, and a
+   * clerk comparing two certificates for the same reference should be able to
+   * see which is current without scanning either.
+   */
+  supersedes: string | null
 }
 
 export interface IssuedBarangayCertificate {
@@ -183,6 +192,14 @@ export async function issueBarangayCertificate(
     barangayId: string
     issuedBy: string
     data: Omit<BarangayCertificateData, 'verificationCode'>
+    /**
+     * The withdrawn certificate this one replaces, where this is a reissue.
+     *
+     * Its presence is also what tells the insert which collision it is allowed
+     * to have: a release must not mint a second live certificate, while a
+     * reissue is a new row beside a withdrawn one and is the whole point.
+     */
+    reissueOf?: string
   }
 ): Promise<IssuedBarangayCertificate | null> {
   const verificationCode = makeVerificationCode()
@@ -192,15 +209,20 @@ export async function issueBarangayCertificate(
     input.data.referenceNo
   )
 
+  // `on conflict do nothing` against the partial unique index: one *live*
+  // certificate per request, as a database guarantee rather than something the
+  // release path has to remember. A status set to `released` twice cannot mint
+  // two; a reissue beside a withdrawn one does not collide at all.
   const inserted = await client.query<{ id: string }>(
     `insert into barangay_documents
-       (request_id, verification_code, barangay_id, issued_by, file_name, content, byte_size)
-     values ($1, $2, $3, $4, $5, $6, $7)
-     on conflict (request_id) do nothing
+       (request_id, verification_code, barangay_id, issued_by, file_name, content,
+        byte_size, reissue_of)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)
+     on conflict (request_id) where revoked_at is null do nothing
      returning id`,
     [
       input.requestId, verificationCode, input.barangayId, input.issuedBy,
-      fileName, content, content.length,
+      fileName, content, content.length, input.reissueOf ?? null,
     ]
   )
   if (inserted.rowCount === 0) return null
@@ -286,6 +308,13 @@ export function renderBarangayCertificate(data: BarangayCertificateData): Promis
       .text(data.certificateName.toUpperCase(), left, y, { width, align: 'center' })
     doc.fillColor(MUTED).font('Helvetica').fontSize(9.5)
       .text(`Reference No. ${data.referenceNo}`, left, doc.y + 4, { width, align: 'center' })
+    if (data.supersedes) {
+      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(8.5)
+        .text(
+          `REISSUED COPY — replaces withdrawn certificate ${data.supersedes}`,
+          left, doc.y + 3, { width, align: 'center', characterSpacing: 0.4 }
+        )
+    }
     y = doc.y + 24
 
     // ------------------------------------------------------------------- body

@@ -1604,9 +1604,24 @@ decided by the leading bytes rather than the filename, virus-scanned in memory b
 anything reaches disk, 2 MB. The type set is narrow for the same reason it always was:
 the PDF writer embeds nothing else, so a HEIC signature would be accepted, previewed in
 the console, and then silently missing from every document printed with it. One
-`checkMark` in `server/src/marks.ts` is shared by all four upload routes, and one
-`MarkUpload` component by all six slots in the two consoles — they behave identically
+`checkMark` in `server/src/marks.ts` is shared by all five upload routes, and one
+`MarkUpload` component by all seven slots in the two consoles — they behave identically
 because they *are* identical.
+
+**A PNG also has to actually decode, and that rule exists because of a crash rather than
+a theory.** The magic bytes say a file is a PNG; they say nothing about whether its pixel
+data is intact. A damaged `IDAT` — a truncated upload, a flipped byte — passed every check
+there was, was stored, previewed as a broken image in the console, and then **took the
+process down** the first time anything was released with it: pdfkit's decoder inflates the
+pixel data inside a zlib callback and throws from *there*, which is outside any try/catch
+the renderer can put around `doc.image()`. One bad seal meant every release failing until
+somebody found it. So `pngDecodes` (`server/src/images.ts`) does the same inflate up front,
+where it can be caught: the upload is refused while the person is still looking at the file
+they chose, and `drawableMark` asks again at render time so a mark stored before this check
+is simply left off. That second half is the promise the renderers already make everywhere
+else — a mark that cannot be read is never a reason to fail a release. JPEG needs no
+equivalent; pdfkit parses its markers synchronously and throws where the renderer catches
+it.
 
 **Nobody signs anything in this app, and the console says that first.** The official
 signs on paper, once; an administrator uploads the scan, once; the renderer draws that
@@ -1619,7 +1634,7 @@ no sign route on the staff mount, the resident mount or the barangay one.
 
 **Only an administrator uploads one**, and that is a gate rather than a convention: every
 municipal slot sits behind `adminRouter`'s `requireRole('admin')` and every barangay slot
-behind `requireRole('barangay_admin')`. The suite walks all six slots against every
+behind `requireRole('barangay_admin')`. The suite walks every slot against every
 account that is not the administrator for that tier — municipal staff, the office's own
 staff, the other tier's administrator, a barangay clerk, a resident — so a slot added
 later without a gate fails there rather than being found by whoever uses it.
@@ -1638,6 +1653,22 @@ a civil registry document and the Treasurer signs a cedula, and one municipal si
 on both would be wrong on at least one of them. It is the same decision the barangay
 already made by putting its captain and its secretary on the `barangays` row.
 
+**And the hall signs too, beside the office.** The municipality had a seal and no
+signature of its own — each office's head signed what that office released and the
+treasurer signed a receipt, while the mayor, or whoever the hall names, signed nothing.
+`municipality` gained `signatory_name`, `signatory_title` and a signature, edited in
+**Municipality → Office details** above the offices themselves, because that is where it
+prints: a released document now carries the hall's block on the left and the releasing
+office's on the right. That is the arrangement one signatory per office could not express
+— a mayor signing a business permit alongside the licensing officer — and it is a fact
+about the hall rather than about the catalogue, the same kind of fact as its address.
+
+**Leaving the hall's name blank prints nothing at all, and that is a setting rather than
+an unfinished state.** It is one signatory for all seventeen services, so a municipality
+whose mayor should not appear on a birth certificate simply leaves it empty and the
+office's own block is the only one. The title is seeded and the name is not, exactly as
+with the office heads.
+
 **The title is seeded; the name is not.** A title is a fact about the office and
 survives an election; a name is a person who has never held it here. A seeded name would
 be somebody this app invented signing official paper, so a document prints the rule and
@@ -1651,9 +1682,10 @@ roles reading — the line the rest of that console already draws. There is no t
 `secretary`, and the seal is not reachable through it either.
 
 **The municipal document finally carries both.** It gets the municipality's seal as a
-header mark and a watermark, exactly as the receipt and the certificate do, and a real
-signature block above the verification box. That it had neither was the oldest gap in
-the app: the one document a resident collects from the hall was the only one that looked
+header mark and a watermark, exactly as the receipt and the certificate do, and real
+signature blocks above the verification box — the hall's on the left where one is named,
+the releasing office's on the right. That it had none of this was the oldest gap in the
+app: the one document a resident collects from the hall was the only one that looked
 like nothing had issued it.
 
 **Everything is frozen at issue, like the fee and the validity period.** The seal and the
@@ -1813,6 +1845,61 @@ arrived, and money that arrived cannot be un-received; revoking one would be the
 asserting something it knows to be false. A reversed payment is a refund, which this app
 does not do.
 
+### Putting a withdrawal right
+
+Withdrawing is final and stays final. What was missing was any way out for the resident: a
+document withdrawn in error stranded them completely, because nothing re-released a
+completed request — they had to file again and, where there was a fee, pay again for
+something the office had already issued them.
+
+**So a reissue mints a new document rather than reviving the old one.** New verification
+code, newly rendered PDF, the seal and the signatures as they stand today. Un-withdrawing
+was never an option: the withdrawn copy was printed and handed over, so it has to go on
+telling a counter not to accept it — a code that read "withdrawn" yesterday and "valid"
+today is the one answer a clerk cannot act on, and it would make every withdrawal
+provisional.
+
+**Which means a request may now hold more than one document, and the uniqueness that used
+to guarantee one had to go.** What replaces it is narrower and is the thing that actually
+mattered: a partial unique index on the rows that are *not* withdrawn, so one live document
+per request is still a database guarantee rather than something the reissue path has to
+remember — the same shape the one-settled-payment index has. Every read that wants "the
+current document" takes the newest; the withdrawn copies stay reachable through their own
+codes, which is the whole point of keeping them.
+
+**A reissue is reachable only from a withdrawal, and only while nothing has replaced it.**
+Both of those are one condition — *is there a live document on this request* — so one
+locked query answers both, and "already reissued" and "never withdrawn" are refused by the
+same statement. It is deliberately not a reprint button: a resident who lost their copy
+downloads it again, and an office that wants to hand over another prints the one already
+there.
+
+**`reissue_of` is explicit rather than derived from the timestamps.** The public check has
+to tell somebody holding a withdrawn printout whether a replacement exists, and "there is a
+later row" is a weaker statement than "this row was issued to replace that one". So the old
+code goes on answering **withdrawn**, and now adds that a replacement exists — which is the
+difference between "do not accept this" and "do not accept this, ask them for the current
+one". Withdrawn-in-error-and-reissued is the ordinary case, so the counter needs the second
+answer.
+
+**Both papers say which they are, on their face.** The withdrawn copy was not destroyed, so
+a resident may well be holding both, and a clerk comparing two documents for one reference
+should be able to tell them apart without scanning either. The replacement prints
+`REISSUED COPY — replaces withdrawn document <code>` under the reference number.
+
+**Who may reissue follows the same line as who may withdraw.** Municipally, the office that
+released it. In a barangay, the administrator — both roles hand a certificate over, but
+taking the barangay's word back and then giving it again is a decision, and the officer's
+console says who does it rather than showing a button that answers 403. A reason is
+required on both, because the resident is told in the same transaction.
+
+**A barangay replacement carries the same `valid_until` as the one it replaces.** Reissuing
+is correcting a mistake, not renewing: a replacement for a certificate prepared in March is
+that March certificate again, and dating it from today would quietly hand somebody a fresh
+year of validity the barangay never granted.
+
+**A receipt is never reissued either**, for the reason it is never withdrawn.
+
 ## Known simplifications (intentional, flag if scope grows)
 
 - **PhilSys sync** is visual only. A production build would call a real PhilSys
@@ -1828,11 +1915,16 @@ does not do.
   ambiguous by nature: a busy permit and a photocopied one look identical. It also only
   ever fires *after* copies have been presented several times, so the first few go
   through. Nothing printed can do better than this.
-- **A withdrawal cannot be undone, and there is no reissue.** Final is the right shape for
-  a counter, but a mistaken withdrawal strands the resident: no route re-releases a
-  completed request, so they must file again — and pay again, where there is a fee. A
-  deployment that withdraws documents often wants a reissue route, which is a new workflow
-  rather than a column.
+- **A withdrawal still cannot be undone — it is put right by reissuing instead**, which
+  mints a new document rather than reviving the old one. What that does not solve is the
+  copy already in somebody's hands: it goes on reading as withdrawn for ever, correctly,
+  so a resident who was handed the wrong paper has to come back for the replacement. The
+  fee is not charged twice, but the trip is.
+- **A reissue is only reachable from a withdrawal, and there is no plain reprint.** An
+  office that simply wants to hand over another copy downloads the one already there.
+  That is right for a document the app can regenerate and wrong for one that was damaged
+  at the counter and needs a fresh code, which a deployment would reach by withdrawing
+  and reissuing — two steps, and the first one is a notification to the resident.
 - **Nothing warns an office that one of its documents is being checked unusually often.**
   The figures sit in a tab somebody has to open. A threshold and a notification would be
   the obvious next step, and the honest reason it is not here is that the right threshold
@@ -1940,13 +2032,15 @@ does not do.
   and processed, across all seventeen services; only the barangay side has type-specific
   wording. Giving the municipal renderer the same treatment means the same field on
   `services`, which is a bigger catalogue to author.
-- **An office has one signatory, and a document is signed by whoever that is at release.**
-  There is no second signature, no countersignature and no "signed by X for Y" — a mayor
-  signing a business permit alongside the licensing officer is a real arrangement this
-  does not model. Nothing records that the named official consented to their signature
-  being uploaded, either: the audit trail says who uploaded it, which is not the same
-  thing, and the consent is a conversation the checklist in `DEPLOY.md` asks somebody to
-  have.
+- **A municipal document carries at most two signatures: the hall's and the releasing
+  office's.** That covers the mayor signing a business permit alongside the licensing
+  officer, and nothing beyond it — there is no third slot, no countersignature and no
+  "signed by X for Y". The hall's signatory is one person for all seventeen services, so
+  a municipality whose mayor signs permits but not civil registry documents has to leave
+  it blank and sign those by hand. Nothing records that a named official consented to
+  their signature being uploaded, either: the audit trail says who uploaded it, which is
+  not the same thing, and the consent is a conversation the checklist in `DEPLOY.md` asks
+  somebody to have.
 - **Nothing removes a signature when its owner leaves office.** Correcting the name is a
   field and replacing the picture is an upload, and both are somebody's job to remember —
   the same standing problem as the barangay captain's name, one tier up. A document

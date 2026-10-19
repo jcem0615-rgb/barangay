@@ -225,16 +225,55 @@ function BarangayView({
                   somebody the document without their ever going.
                 */}
                 {item.hasCertificate && (
-                  <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2.5">
-                    <p className="text-[calc(12.5px_*_var(--text-scale))] leading-snug text-emerald-900">
-                      {t('brgy.certificateHint')}
-                    </p>
+                  <div
+                    className={`mt-2 rounded-lg px-3 py-2.5 ${
+                      item.revoked ? 'bg-rose-50' : 'bg-emerald-50'
+                    }`}
+                  >
+                    {/*
+                      Withdrawn. The download stays, because the resident should
+                      be able to see what was withdrawn — the PDF was frozen at
+                      issue and looks exactly as valid as it did, which is
+                      precisely why the code rather than the page is what proves
+                      a certificate.
+                    */}
+                    {item.revoked ? (
+                      <>
+                        <p className="text-[calc(12.5px_*_var(--text-scale))] font-semibold leading-snug text-rose-800">
+                          {t('brgy.certificateWithdrawn')}
+                        </p>
+                        {item.revokedReason && (
+                          <p className="mt-1 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-rose-700">
+                            {item.revokedReason}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-[calc(12.5px_*_var(--text-scale))] leading-snug text-emerald-900">
+                        {t('brgy.certificateHint')}
+                      </p>
+                    )}
+                    {/*
+                      A replacement for one the barangay withdrew. Said rather
+                      than left to a download that quietly changed: the resident
+                      was told theirs was no good, so the screen owes them the
+                      rest of it.
+                    */}
+                    {!item.revoked && item.reissued && (
+                      <p className="mt-1.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-emerald-900">
+                        {t('brgy.certificateReplacement')}
+                      </p>
+                    )}
                     {/*
                       The code printed on it, so somebody at a counter can read
                       it out without opening a PDF on a phone.
                     */}
                     {item.certificateCode && (
-                      <p className="mt-1.5 font-mono text-[calc(12.5px_*_var(--text-scale))] tracking-wide text-emerald-800">
+                      <p
+                        className={`mt-1.5 font-mono text-[calc(12.5px_*_var(--text-scale))] tracking-wide ${
+                          item.revoked ? 'text-rose-700' : 'text-emerald-800'
+                        }`}
+                      >
                         {item.certificateCode}
                       </p>
                     )}
@@ -254,7 +293,11 @@ function BarangayView({
                           setDownloading(null)
                         }
                       }}
-                      className="tap-target mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-white py-2.5 text-[calc(14px_*_var(--text-scale))] font-semibold text-emerald-700 transition active:bg-emerald-50 disabled:opacity-70"
+                      className={`tap-target mt-2 flex w-full items-center justify-center gap-2 rounded-xl border bg-white py-2.5 text-[calc(14px_*_var(--text-scale))] font-semibold transition disabled:opacity-70 ${
+                        item.revoked
+                          ? 'border-slate-300 text-slate-600 active:bg-slate-50'
+                          : 'border-emerald-600 text-emerald-700 active:bg-emerald-50'
+                      }`}
                     >
                       <Download size={15} />
                       {downloading === item.id ? t('detail.preparing') : t('brgy.certificate')}

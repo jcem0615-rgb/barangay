@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import PDFDocument from 'pdfkit'
 import { one } from './db.ts'
 import { getFile } from './storage.ts'
+import { pngDecodes } from './images.ts'
 import { documentVerificationUrl, drawQr, QR_BOX_HEIGHT, QR_SIZE } from './qr.ts'
 
 /**
@@ -45,6 +46,33 @@ export interface DocumentData {
   headTitle: string | null
   signature: Buffer | null
   signatureType: string | null
+  /**
+   * Who signs for the municipality itself — the mayor, or whoever the hall
+   * names — beside the releasing office's head.
+   *
+   * A second block rather than a replacement: the sentence on the face names
+   * the office that released the document, so the Civil Registrar signs a
+   * civil registry document and the Treasurer signs a cedula. What this adds is
+   * the arrangement a single signatory could not express, where the mayor signs
+   * a business permit alongside the licensing officer.
+   *
+   * A hall that does not want the mayor on every document leaves the name
+   * blank, which prints nothing at all — the same thing an unfilled office head
+   * does.
+   */
+  signatoryName: string | null
+  signatoryTitle: string | null
+  signatorySignature: Buffer | null
+  signatorySignatureType: string | null
+  /**
+   * The code of the document this one replaces, where it is a reissue.
+   *
+   * Printed on the face, because the withdrawn paper is still out there and two
+   * genuine-looking documents for the same request with different codes is
+   * exactly the confusion a counter cannot resolve by looking. The old code
+   * goes on checking out as withdrawn; this says which one superseded it.
+   */
+  supersedes: string | null
 }
 
 /**
@@ -52,10 +80,21 @@ export interface DocumentData {
  *
  * Shared by all three renderers rather than copied into each, because the rule
  * is a property of the PDF writer and not of any one document.
+ *
+ * A damaged PNG is dropped here as well, and that is the last line rather than
+ * the first: the upload already refuses one, but a mark stored before that
+ * check existed would otherwise take the process down the next time anything
+ * was released with it — `pngDecodes` says why that cannot be caught at the
+ * `doc.image()` call. Left off instead, which is what every renderer here
+ * already promises about a mark it cannot read.
  */
 export function drawableMark(bytes: Buffer | null, contentType: string | null): Buffer | null {
   if (!bytes) return null
   if (contentType !== 'image/png' && contentType !== 'image/jpeg') return null
+  if (contentType === 'image/png' && !pngDecodes(bytes)) {
+    console.error('a stored mark is a PNG that will not decode; printing without it')
+    return null
+  }
   return bytes
 }
 
@@ -116,6 +155,8 @@ export function renderDocument(data: DocumentData): Promise<Buffer> {
     const width = right - left
     const seal = drawableMark(data.seal, data.sealType)
     const signature = drawableMark(data.signature, data.signatureType)
+    const signatorySignature =
+      drawableMark(data.signatorySignature, data.signatorySignatureType)
 
     // The watermark first, so everything else sits over it.
     if (seal) {
@@ -148,6 +189,17 @@ export function renderDocument(data: DocumentData): Promise<Buffer> {
     doc.moveDown(0.4)
     doc.fillColor(MUTED).font('Helvetica').fontSize(9.5)
       .text(`Reference No. ${data.referenceNo}`, { width, align: 'center' })
+    // Said on the face, not only in the verification record. The document this
+    // replaces was withdrawn rather than destroyed, so somebody may well be
+    // holding both — and a clerk comparing two papers for the same reference
+    // needs to see which is the current one without scanning either.
+    if (data.supersedes) {
+      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(8.5)
+        .text(
+          `REISSUED COPY — replaces withdrawn document ${data.supersedes}`,
+          { width, align: 'center', characterSpacing: 0.4 }
+        )
+    }
     doc.moveDown(1.6)
 
     // Body
@@ -190,9 +242,26 @@ export function renderDocument(data: DocumentData): Promise<Buffer> {
     // cedula and on a birth certificate alike would be wrong on one of them.
     // A missing name leaves the rule and the office, so the paper can still be
     // signed by hand rather than printing a title over nothing.
+    //
+    // The municipality's own signatory sits to its left where the hall has
+    // named one, which is the arrangement one signatory per office could not
+    // express: a mayor signs a business permit alongside the licensing officer.
+    // A blank name prints nothing at all rather than a rule over a title, so a
+    // hall that does not want the mayor on every document simply leaves it.
     doc.moveDown(2)
     const sigY = Math.min(doc.y, doc.page.height - 260)
     const sigWidth = width * 0.44
+    if (data.signatoryName) {
+      drawSignature(doc, {
+        x: left,
+        y: sigY,
+        width: sigWidth,
+        name: data.signatoryName,
+        title: data.signatoryTitle ?? 'For the Municipality',
+        image: signatorySignature,
+        align: 'center',
+      })
+    }
     drawSignature(doc, {
       x: left + width - sigWidth,
       y: sigY,
@@ -241,8 +310,8 @@ export function renderDocument(data: DocumentData): Promise<Buffer> {
     // one thing this document must not do.
     doc.fillColor(MUTED).font('Helvetica').fontSize(8)
       .text(
-        signature
-          ? 'Released electronically. The signature is a copy held on file — the verification ' +
+        signature || signatorySignature
+          ? 'Released electronically. The signatures are copies held on file — the verification ' +
             'code is what proves this document.'
           : 'Released electronically. This copy is valid without a manual signature.',
         // High enough that a second line sits inside the bottom margin rather
@@ -266,8 +335,14 @@ export function renderDocument(data: DocumentData): Promise<Buffer> {
  */
 export async function loadReleaseMarks(departmentId: string): Promise<ReleaseMarks> {
   const [town, office] = await Promise.all([
-    one<{ seal_key: string | null; seal_type: string | null }>(
-      `select seal_key, seal_type from municipality limit 1`
+    one<{
+      seal_key: string | null; seal_type: string | null
+      signatory_name: string | null; signatory_title: string | null
+      signatory_signature_key: string | null; signatory_signature_type: string | null
+    }>(
+      `select seal_key, seal_type, signatory_name, signatory_title,
+              signatory_signature_key, signatory_signature_type
+         from municipality limit 1`
     ),
     one<{
       head_name: string | null; head_title: string | null
@@ -288,9 +363,10 @@ export async function loadReleaseMarks(departmentId: string): Promise<ReleaseMar
     }
   }
 
-  const [seal, signature] = await Promise.all([
+  const [seal, signature, signatorySignature] = await Promise.all([
     read(town?.seal_key ?? null),
     read(office?.signature_key ?? null),
+    read(town?.signatory_signature_key ?? null),
   ])
 
   return {
@@ -300,12 +376,19 @@ export async function loadReleaseMarks(departmentId: string): Promise<ReleaseMar
     headTitle: office?.head_title ?? null,
     signature,
     signatureType: signature ? office?.signature_type ?? null : null,
+    signatoryName: town?.signatory_name ?? null,
+    signatoryTitle: town?.signatory_title ?? null,
+    signatorySignature,
+    signatorySignatureType:
+      signatorySignature ? town?.signatory_signature_type ?? null : null,
   }
 }
 
 export type ReleaseMarks = Pick<
   DocumentData,
-  'seal' | 'sealType' | 'headName' | 'headTitle' | 'signature' | 'signatureType'
+  | 'seal' | 'sealType'
+  | 'headName' | 'headTitle' | 'signature' | 'signatureType'
+  | 'signatoryName' | 'signatoryTitle' | 'signatorySignature' | 'signatorySignatureType'
 >
 
 /** e.g. cedula-MTO-2026-00012.pdf */

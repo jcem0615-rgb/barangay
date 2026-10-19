@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v27'
+const STORE_KEY = 'elgu-demo-state-v28'
 
 interface DemoIncident {
   id: string
@@ -91,6 +91,9 @@ interface DemoMunicipality {
   receiptPrefix: string
   receiptFormLabel: string | null
   receiptFooter: string | null
+  /** Who signs for the hall itself, printed beside the releasing office's head. */
+  signatoryName: string | null
+  signatoryTitle: string
 }
 
 interface DemoUser {
@@ -144,6 +147,16 @@ interface DemoRequest {
   id: string
   referenceNo: string
   residentId: string
+  /**
+   * Who filed it, where that is not one of the demo's sign-in accounts.
+   *
+   * The seeded year of closed requests belongs to residents who have no
+   * account — deliberately, so the demo resident's own list stays short enough
+   * to read while the Reports tab has something to report on. Without a name
+   * carried here every one of those rows said "—" in the queue and left the
+   * document check blank where it should say who holds the paper.
+   */
+  residentName?: string
   serviceId: string
   serviceName: string
   categoryId: string
@@ -162,7 +175,20 @@ interface DemoRequest {
     fileName: string; verificationCode: string
     /** Withdrawn after release. Final, and always with a reason. */
     revokedAt?: string; revokedReason?: string
+    /** The code this one replaces, where it was issued after a withdrawal. */
+    reissueOf?: string
   }
+  /**
+   * The withdrawn copies a reissue left behind.
+   *
+   * They have to stay reachable: each was printed and handed over, and its code
+   * must go on answering "withdrawn" — now saying a replacement exists. Keeping
+   * them in their own list rather than overwriting `document` is the same shape
+   * the real tables have, where a reissue inserts a row beside the old one.
+   */
+  supersededDocuments?: Array<{
+    verificationCode: string; revokedAt: string; revokedReason: string
+  }>
 }
 
 interface DemoNotification {
@@ -306,7 +332,13 @@ interface DemoBarangayRequest {
   certificate: {
     verificationCode: string; issuedAt: string
     revokedAt?: string; revokedReason?: string
+    /** The code this one replaces, where it followed a withdrawal. */
+    reissueOf?: string
   } | null
+  /** The withdrawn copies a reissue left behind — see `DemoRequest`. */
+  supersededCertificates?: Array<{
+    verificationCode: string; issuedAt: string; revokedAt: string; revokedReason: string
+  }>
 }
 
 /**
@@ -513,6 +545,10 @@ function seed(): DemoState {
       receiptPrefix: MUNICIPALITY.receiptPrefix,
       receiptFormLabel: MUNICIPALITY.receiptFormLabel || null,
       receiptFooter: MUNICIPALITY.receiptFooter || null,
+      // The title is seeded and the name is not, like the real seed: a title is
+      // a fact about the office, a name is a person who has never held it here.
+      signatoryName: null,
+      signatoryTitle: 'Municipal Mayor',
     },
     seal: null,
     sealUpdatedAt: null,
@@ -768,6 +804,18 @@ function seed(): DemoState {
  * catalogue's promised processing time — because a report where every office
  * is perfect demonstrates nothing.
  */
+/**
+ * Names for the seeded year of closed requests.
+ *
+ * Invented, like every other figure in the demo seed, and only ever shown
+ * inside it — they exist so a queue of historical requests reads as a queue
+ * rather than as a column of dashes.
+ */
+const HISTORY_NAMES = [
+  'Teresita V. Aquino', 'Rodolfo C. Bautista', 'Imelda P. Castro', 'Noel G. Dizon',
+  'Lourdes M. Estrada', 'Arturo B. Fajardo', 'Cristina R. Galang', 'Benjamin T. Hizon',
+]
+
 function seedHistory(state: DemoState, resident: DemoUser, now: number) {
   const DAY = 86_400_000
   // serviceId, weeks ago, days the resident took to pay, days the office then took
@@ -790,15 +838,27 @@ function seedHistory(state: DemoState, resident: DemoUser, now: number) {
     const released = paid + DAY * officeDays
     const r = makeRequest(state, resident, service, sampleValues(service), submitted)
     r.residentId = `demo-history-${r.id}`
+    r.residentName = HISTORY_NAMES[state.requests.length % HISTORY_NAMES.length]!
     r.status = 'completed'
     r.currentStepIndex = WORKFLOW_STEPS.length - 1
     r.paid = true
     r.paymentMethod = 'Over the counter'
     r.paidAt = new Date(paid).toISOString()
+    // A completed request always has a released document, exactly as on the
+    // server where it is written in the same transaction. Without one the
+    // console offered "Withdraw this document" on every seeded row and then
+    // refused it, which reads as the feature being broken rather than as the
+    // seed being thin.
+    const code = demoVerificationCode()
+    const slug = service.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    r.document = { fileName: `${slug}-${r.referenceNo}.pdf`, verificationCode: code }
     r.events.push(
       { eventType: 'assessed', note: null, createdAt: new Date(submitted).toISOString(), actorName: 'Counter staff' },
       { eventType: 'paid', note: null, createdAt: new Date(paid).toISOString(), actorName: 'Resident' },
-      { eventType: 'released', note: null, createdAt: new Date(released).toISOString(), actorName: 'Counter staff' },
+      {
+        eventType: 'released', note: `Document released (code ${code})`,
+        createdAt: new Date(released).toISOString(), actorName: 'Counter staff',
+      },
     )
     state.requests.push(r)
   }
@@ -807,6 +867,7 @@ function seedHistory(state: DemoState, resident: DemoUser, now: number) {
   const bossService = SERVICES.find((s) => s.id === 'boss-application')!
   const refused = makeRequest(state, resident, bossService, sampleValues(bossService), now - DAY * 40)
   refused.residentId = `demo-history-${refused.id}`
+  refused.residentName = HISTORY_NAMES[0]!
   refused.status = 'rejected'
   refused.rejectionReason = 'Barangay clearance had expired.'
   refused.events.push({
@@ -1089,6 +1150,22 @@ const barangayOffice = (barangayId: string): DemoBarangayOffice => {
   }
 }
 
+/**
+ * A verification code in the same shape the server mints: Crockford base32, no
+ * I/L/O/U, four groups of four so it can be read off paper down a phone.
+ */
+// A function declaration rather than a `const`, because the seed calls it: the
+// state is built at module evaluation, above this line, and an arrow assigned
+// to a const would still be in its temporal dead zone when it got there.
+function demoVerificationCode(): string {
+  return Array.from({ length: 4 }, () =>
+    Array.from(
+      { length: 4 },
+      () => '0123456789ABCDEFGHJKMNPQRSTVWXYZ'[Math.floor(Math.random() * 32)]
+    ).join('')
+  ).join('-')
+}
+
 const serializeAnnouncement = (a: DemoAnnouncement) => ({
   id: a.id, kind: a.kind, title: a.title, body: a.body, urgent: a.urgent,
   expiresAt: a.expiresAt, archivedAt: a.archivedAt,
@@ -1129,6 +1206,9 @@ const serializeBarangayRequest = (r: DemoBarangayRequest) => ({
   certificateCode: r.certificate?.verificationCode ?? null,
   revoked: r.certificate?.revokedAt !== undefined,
   revokedReason: r.certificate?.revokedReason ?? null,
+  // A replacement for one withdrawn in error. The resident was told theirs was
+  // no good, so the screen owes them the rest of the story.
+  reissued: r.certificate?.reissueOf !== undefined,
 })
 
 /**
@@ -1194,6 +1274,11 @@ function barangayCertificateFor(r: DemoBarangayRequest): Blob {
     '',
     r.typeName.toUpperCase(),
     `Reference No. ${r.referenceNo}`,
+    // Said on the face, because the withdrawn copy was handed over and two
+    // certificates for one reference have to be told apart by looking.
+    r.certificate?.reissueOf
+      ? `REISSUED COPY — replaces withdrawn certificate ${r.certificate.reissueOf}`
+      : '',
     '',
     'TO WHOM IT MAY CONCERN:',
     ...attestationLines(r, barangay?.name ?? ''),
@@ -1482,7 +1567,7 @@ const serialize = (r: DemoRequest) => ({
   fee: r.fee, paid: r.paid, paymentMethod: r.paymentMethod, formValues: r.formValues,
   rejectionReason: r.rejectionReason, dateSubmitted: r.dateSubmitted,
   updatedAt: r.dateSubmitted,
-  residentName: state.users.find((u) => u.id === r.residentId)?.fullName,
+  residentName: state.users.find((u) => u.id === r.residentId)?.fullName ?? r.residentName,
   ...readyFor(r, holidayDays(state)),
 })
 
@@ -1586,6 +1671,9 @@ function documentFor(r: DemoRequest): Blob {
     '',
     r.serviceName.toUpperCase(),
     `Reference No. ${r.referenceNo}`,
+    r.document?.reissueOf
+      ? `REISSUED COPY — replaces withdrawn document ${r.document.reissueOf}`
+      : '',
     '',
     `Issued to: ${resident?.fullName ?? ''}`,
     `Released: ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}`,
@@ -1594,6 +1682,11 @@ function documentFor(r: DemoRequest): Blob {
     // The demo assembles this PDF in the browser and cannot embed an image, so
     // no seal and no signature are drawn. The real renderer prints both, and
     // the console still shows which are on file.
+    // The municipality's own signatory, where the hall has named one, and the
+    // releasing office's head. Both print on the real document side by side.
+    state.municipality.signatoryName
+      ? `For the municipality: ${state.municipality.signatoryName} — ${state.municipality.signatoryTitle}`
+      : '',
     `Signed by: ${state.offices[r.categoryId]?.headName ?? ''}`,
     state.offices[r.categoryId]?.headTitle ?? officeName(r.categoryId),
     '',
@@ -1698,7 +1791,9 @@ async function route(
           referenceNo: request.referenceNo,
           documentType: request.serviceName,
           issuedBy: officeName(request.categoryId),
-          issuedTo: state.users.find((u) => u.id === request.residentId)?.fullName ?? '',
+          issuedTo:
+            state.users.find((u) => u.id === request.residentId)?.fullName ??
+            request.residentName ?? '',
           // The demo keeps no release timestamp, so the last event stands in —
           // the real server reads `documents.issued_at`.
           issuedAt: request.events.at(-1)?.createdAt ?? request.dateSubmitted,
@@ -1709,6 +1804,38 @@ async function route(
           revoked: request.document?.revokedAt !== undefined,
           revokedAt: request.document?.revokedAt,
           revokedReason: request.document?.revokedReason ?? null,
+          // Whether this copy is itself the replacement for a withdrawn one.
+          reissued: request.document?.reissueOf !== undefined,
+      })
+    }
+
+    /**
+     * A copy a reissue superseded.
+     *
+     * Still answered, and still answered as withdrawn — that paper is in
+     * somebody's hands and has to go on telling a counter not to accept it.
+     * What it gains is `replaced`, which is the difference between "this is no
+     * good" and "this is no good, ask them for the current one".
+     */
+    const superseded = state.requests.find((r) =>
+      r.supersededDocuments?.some((d) => d.verificationCode === code)
+    )
+    if (superseded) {
+      const old = superseded.supersededDocuments!.find((d) => d.verificationCode === code)!
+      return counted('document', {
+        valid: true,
+        referenceNo: superseded.referenceNo,
+        documentType: superseded.serviceName,
+        issuedBy: officeName(superseded.categoryId),
+        issuedTo:
+          state.users.find((u) => u.id === superseded.residentId)?.fullName ??
+          superseded.residentName ?? '',
+        issuedAt: superseded.events.at(-1)?.createdAt ?? superseded.dateSubmitted,
+        status: superseded.status,
+        revoked: true,
+        revokedAt: old.revokedAt,
+        revokedReason: old.revokedReason || null,
+        replaced: true,
       })
     }
 
@@ -1749,6 +1876,32 @@ async function route(
           revoked: certificate.certificate.revokedAt !== undefined,
           revokedAt: certificate.certificate.revokedAt,
           revokedReason: certificate.certificate.revokedReason ?? null,
+          reissued: certificate.certificate.reissueOf !== undefined,
+      })
+    }
+
+    // A certificate a reissue superseded — see the municipal case above.
+    const oldCertificate = state.barangayRequests.find((r) =>
+      r.supersededCertificates?.some((d) => d.verificationCode === code)
+    )
+    if (oldCertificate) {
+      const old = oldCertificate.supersededCertificates!.find((d) => d.verificationCode === code)!
+      return counted('barangay_certificate', {
+        valid: true,
+        referenceNo: oldCertificate.referenceNo,
+        documentType: oldCertificate.typeName,
+        issuedBy: `Barangay ${BARANGAYS.find((b) => b.id === oldCertificate.barangayId)?.name ?? ''}`,
+        issuedTo: state.users.find((u) => u.id === oldCertificate.residentId)?.fullName ?? '',
+        issuedAt: old.issuedAt,
+        validUntil: oldCertificate.validUntil,
+        expired:
+          oldCertificate.validUntil !== null &&
+          oldCertificate.validUntil < new Date().toLocaleDateString('en-CA'),
+        status: oldCertificate.status,
+        revoked: true,
+        revokedAt: old.revokedAt,
+        revokedReason: old.revokedReason || null,
+        replaced: true,
       })
     }
 
@@ -2180,6 +2333,59 @@ async function route(
         status: 200,
         body: { revoked: true, verificationCode: held.certificate.verificationCode },
       }
+    }
+
+    /**
+     * The replacement for a certificate withdrawn in error.
+     *
+     * The administrator's, like the withdrawal it follows, and it does not lift
+     * it: the withdrawn copy keeps its own code and goes on answering
+     * "withdrawn", now saying a replacement exists. The new one carries the
+     * same validity date — reissuing is correcting a mistake, not renewing.
+     */
+    if (parts[1] === 'requests' && parts[2] && parts[3] === 'reissue-certificate' && method === 'POST') {
+      adminOnly()
+      if (!body?.reason || String(body.reason).trim().length < 3) {
+        throw new DemoError(400, 'Say why it is being replaced.')
+      }
+      const held = state.barangayRequests.find(
+        (r) => r.id === parts[2] && r.barangayId === own.id
+      )
+      if (!held) throw new DemoError(404, 'Request not found.')
+      if (!held.certificate) {
+        throw new DemoError(404, 'No certificate has been released for this request.')
+      }
+      if (!held.certificate.revokedAt) {
+        throw new DemoError(
+          409,
+          'This request already has a certificate that has not been withdrawn. A replacement ' +
+            'is only issued for one that was withdrawn in error.'
+        )
+      }
+      const withdrawn = { ...held.certificate, revokedAt: held.certificate.revokedAt }
+      held.supersededCertificates = [
+        ...(held.supersededCertificates ?? []),
+        {
+          verificationCode: withdrawn.verificationCode,
+          issuedAt: withdrawn.issuedAt,
+          revokedAt: withdrawn.revokedAt,
+          revokedReason: withdrawn.revokedReason ?? '',
+        },
+      ]
+      const fresh = demoVerificationCode()
+      held.certificate = {
+        verificationCode: fresh,
+        issuedAt: new Date().toISOString(),
+        reissueOf: withdrawn.verificationCode,
+      }
+      held.updatedAt = new Date().toISOString()
+      notify(
+        held.residentId, null, 'barangay_request', `${held.referenceNo} — replacement issued`,
+        `Barangay ${own.name} has issued a replacement for your ${held.typeName}. Download ` +
+          `the new copy in the app and use that one; the withdrawn copy will not pass a check.`
+      )
+      persist()
+      return { status: 200, body: { verificationCode: fresh } }
     }
 
     if (parts[1] === 'requests' && !parts[2]) {
@@ -3329,6 +3535,7 @@ async function route(
           documentCode: target.document?.verificationCode ?? null,
           documentRevoked: target.document?.revokedAt !== undefined,
           documentRevokedReason: target.document?.revokedReason ?? null,
+          documentReissued: target.document?.reissueOf !== undefined,
         },
       }
     }
@@ -3852,6 +4059,7 @@ async function route(
             documentCode: target.document?.verificationCode ?? null,
             documentRevoked: target.document?.revokedAt !== undefined,
             documentRevokedReason: target.document?.revokedReason ?? null,
+            documentReissued: target.document?.reissueOf !== undefined,
           },
         }
       }
@@ -3953,9 +4161,7 @@ async function route(
         target.status = isFinal ? 'completed' : 'in_progress'
         target.events.push({ eventType: isFinal ? 'completed' : 'advanced', note: body?.note ?? null, createdAt: new Date().toISOString(), actorName: user.fullName })
         if (isFinal && !target.document) {
-          const code = Array.from({ length: 4 }, () =>
-            Array.from({ length: 4 }, () => '0123456789ABCDEFGHJKMNPQRSTVWXYZ'[Math.floor(Math.random() * 32)]).join('')
-          ).join('-')
+          const code = demoVerificationCode()
           const slug = target.serviceName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
           target.document = { fileName: `${slug}-${target.referenceNo}.pdf`, verificationCode: code }
           target.events.push({ eventType: 'released', note: `Document released (code ${code})`, createdAt: new Date().toISOString(), actorName: user.fullName })
@@ -3988,6 +4194,65 @@ async function route(
           `It will no longer pass a check. Reason: ${target.document.revokedReason}`)
         persist()
         return { status: 200, body: { revoked: true, verificationCode: target.document.verificationCode } }
+      }
+
+      /**
+       * Issuing a replacement for one withdrawn in error.
+       *
+       * It does not lift the withdrawal: the withdrawn copy moves into the
+       * superseded list and its code goes on answering "withdrawn", now saying
+       * a replacement exists. What the resident gets is a new document with a
+       * new code — which is the whole point, since otherwise an office's
+       * mistake costs them filing and paying again.
+       */
+      if (parts[3] === 'reissue-document' && method === 'POST') {
+        if (!body.reason || String(body.reason).trim().length < 3) {
+          throw new DemoError(400, 'Tell the resident why.')
+        }
+        if (!target.document) {
+          throw new DemoError(409, 'No document has been released on this request.')
+        }
+        if (!target.document.revokedAt) {
+          throw new DemoError(
+            409,
+            'This request already has a document that has not been withdrawn. A replacement ' +
+              'is only issued for one that was withdrawn in error.'
+          )
+        }
+        const withdrawn = { ...target.document, revokedAt: target.document.revokedAt }
+        target.supersededDocuments = [
+          ...(target.supersededDocuments ?? []),
+          {
+            verificationCode: withdrawn.verificationCode,
+            revokedAt: withdrawn.revokedAt,
+            revokedReason: withdrawn.revokedReason ?? '',
+          },
+        ]
+        const fresh = demoVerificationCode()
+        target.document = {
+          fileName: withdrawn.fileName,
+          verificationCode: fresh,
+          reissueOf: withdrawn.verificationCode,
+        }
+        target.events.push({
+          eventType: 'document_reissued',
+          note:
+            `Replacement issued (code ${fresh}, replacing ${withdrawn.verificationCode}). ` +
+            String(body.reason).trim(),
+          createdAt: new Date().toISOString(), actorName: user.fullName,
+        })
+        notify(
+          target.residentId, target.id, 'released',
+          `${target.serviceName} — replacement issued`,
+          `${officeName(target.categoryId)} has issued a replacement for your ` +
+            `${target.serviceName} (${target.referenceNo}). Download the new copy in the app ` +
+            `and use that one; the withdrawn copy will not pass a check.`
+        )
+        persist()
+        return {
+          status: 200,
+          body: { verificationCode: fresh, replaced: withdrawn.verificationCode },
+        }
       }
 
       if (parts[3] === 'reject' && method === 'POST') {
@@ -4455,6 +4720,8 @@ async function route(
         sealUpdatedAt: state.sealUpdatedAt,
         hasTreasurerSignature: signatureState('municipality:treasurer').has,
         treasurerSignatureUpdatedAt: signatureState('municipality:treasurer').updatedAt,
+        hasSignatorySignature: signatureState('municipality:signatory').has,
+        signatorySignatureUpdatedAt: signatureState('municipality:signatory').updatedAt,
       })
 
       if (!parts[2] && method === 'GET') return { status: 200, body: shown() }
@@ -4463,6 +4730,7 @@ async function route(
         const allowed = [
           'address', 'phone', 'email', 'website', 'tin', 'treasurerName',
           'treasurerTitle', 'receiptPrefix', 'receiptFormLabel', 'receiptFooter',
+          'signatoryName', 'signatoryTitle',
         ] as const
         const patch: Partial<DemoMunicipality> = {}
         for (const key of allowed) {
@@ -4478,11 +4746,39 @@ async function route(
           }
         }
         if (patch.treasurerTitle === null) patch.treasurerTitle = 'Municipal Treasurer'
+        if (patch.signatoryTitle === null) patch.signatoryTitle = 'Municipal Mayor'
         const before = shown()
         state.municipality = { ...state.municipality, ...patch } as DemoMunicipality
         audit('municipality.update', MUNICIPALITY.code, before, shown())
         persist()
         return { status: 200, body: shown() }
+      }
+
+      // ---- the municipality's own signature, printed on released documents ----
+      if (parts[2] === 'signatory-signature') {
+        const slot = 'municipality:signatory'
+        if (method === 'PUT') {
+          const image = await takeMark(file, 'A signature', 'released documents')
+          const before = shown()
+          state.signatures[slot] = { image, updatedAt: new Date().toISOString() }
+          audit('municipality.signatory.update', MUNICIPALITY.code, before, shown())
+          persist()
+          return { status: 200, body: shown() }
+        }
+        if (method === 'GET') {
+          const held = state.signatures[slot]
+          if (!held) throw new DemoError(404, 'No signature has been uploaded.')
+          return { status: 200, blob: dataUrlToBlob(held.image, 'image/png') }
+        }
+        if (method === 'DELETE') {
+          if (!state.signatures[slot]) throw new DemoError(404, 'No signature has been uploaded.')
+          const before = shown()
+          delete state.signatures[slot]
+          audit('municipality.signatory.remove', MUNICIPALITY.code, before, shown())
+          persist()
+          return { status: 200, body: shown() }
+        }
+        throw new DemoError(404, 'Not found.')
       }
 
       // ---- the treasurer's signature ----

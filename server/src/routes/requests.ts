@@ -296,9 +296,17 @@ requestsRouter.get('/:id', async (req, res) => {
       `select receipt_no, issued_at, verification_code from receipts where request_id = $1`,
       [row.id]
     ),
-    one<{ verification_code: string; revoked_at: Date | null; revoked_reason: string | null }>(
-      `select verification_code, revoked_at, revoked_reason
-         from documents where request_id = $1`,
+    // The newest copy: a request may hold more than one, since a withdrawal is
+    // final and a reissue mints a second document beside it. The newest is the
+    // only one that would be accepted anywhere, so it is the one the resident's
+    // screen reads.
+    one<{
+      verification_code: string; revoked_at: Date | null; revoked_reason: string | null
+      reissue_of: string | null
+    }>(
+      `select verification_code, revoked_at, revoked_reason, reissue_of
+         from documents where request_id = $1
+        order by issued_at desc, id desc limit 1`,
       [row.id]
     ),
   ])
@@ -321,6 +329,10 @@ requestsRouter.get('/:id', async (req, res) => {
     // frozen at issue and still looks exactly as valid as it did.
     documentRevoked: document?.revoked_at != null,
     documentRevokedReason: document?.revoked_reason ?? null,
+    // A replacement issued after a withdrawal. Worth saying rather than
+    // quietly swapping the download: the resident was told their document had
+    // been withdrawn, and the screen has to account for what they now hold.
+    documentReissued: document?.reissue_of != null,
   })
 })
 
@@ -344,11 +356,15 @@ requestsRouter.post('/:id/pay', async (_req, res) => {
 
 /** The released document, downloadable only by the resident who filed it. */
 requestsRouter.get('/:id/document', async (req, res) => {
+  // The newest copy, which after a reissue is the replacement. The withdrawn
+  // one is not offered: it was superseded, and handing it back would be handing
+  // the resident the paper that stopped checking out.
   const doc = await one<{ file_name: string; content: Buffer }>(
     `select d.file_name, d.content
        from documents d
        join requests r on r.id = d.request_id
-      where d.request_id = $1 and r.resident_id = $2`,
+      where d.request_id = $1 and r.resident_id = $2
+      order by d.issued_at desc, d.id desc limit 1`,
     [req.params.id, req.user!.id]
   )
   if (!doc) return res.status(404).json({ error: 'No document is available for this request.' })

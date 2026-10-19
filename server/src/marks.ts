@@ -1,6 +1,7 @@
 import multer from 'multer'
 import { detectType, MAX_SEAL_BYTES, SEAL_DESCRIPTION, SEAL_TYPES } from './uploads.ts'
 import { scanBuffer } from './antivirus.ts'
+import { pngDecodes } from './images.ts'
 
 /**
  * A seal or a signature: the two pictures an official document is printed with.
@@ -41,6 +42,20 @@ export async function checkMark(
       ok: false,
       status: 415,
       error: `${what} has to be a ${SEAL_DESCRIPTION} image — those are the two ${printedOn} can be printed with.`,
+    }
+  }
+
+  // A PNG whose pixel data is damaged passes every check above and then kills
+  // the renderer — see `pngDecodes`. Refused here, where the person who chose
+  // the file is still looking at it, rather than discovered by the first
+  // resident whose release fails.
+  if (detected.contentType === 'image/png' && !pngDecodes(file.buffer)) {
+    return {
+      ok: false,
+      status: 422,
+      error:
+        `${what} looks like a damaged PNG — it cannot be read, so it would be missing from ` +
+        `every ${printedOn}. Try exporting or scanning it again.`,
     }
   }
 

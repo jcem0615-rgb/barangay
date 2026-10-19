@@ -335,8 +335,16 @@ function Holidays() {
 
 function Offices() {
   const [rows, setRows] = useState<OfficeContact[]>([])
+  const [town, setTown] = useState<MunicipalityDetails | null>(null)
   const { loading, error, run, reload } = useLoader(
-    useCallback(async () => setRows(await api.listOffices()), [])
+    useCallback(async () => {
+      const [offices, details] = await Promise.all([
+        api.listOffices(),
+        api.municipalityDetails(),
+      ])
+      setRows(offices)
+      setTown(details)
+    }, [])
   )
 
   return (
@@ -347,6 +355,13 @@ function Offices() {
       loading={loading}
     >
       <SignatureCaveat />
+      {town && (
+        <MunicipalSignatory
+          row={town}
+          onSave={(patch) => run(async () => { await api.updateMunicipality(patch); await reload() })}
+          onChanged={reload}
+        />
+      )}
       <ul className="space-y-3">
         {rows.map((row) => (
           <OfficeRow
@@ -358,6 +373,104 @@ function Offices() {
         ))}
       </ul>
     </Panel>
+  )
+}
+
+/**
+ * Who signs for the hall itself.
+ *
+ * Above the offices rather than inside one, because that is where it prints: a
+ * released document carries this signature on the left and the releasing
+ * office's head on the right. The hall had a seal and no signature of its own,
+ * which left the one document a resident collects from the municipal hall
+ * going out over a single office's name.
+ *
+ * Leaving the name blank prints nothing at all, and that is a real choice
+ * rather than an unfinished state — a hall that does not want the mayor's
+ * signature on all seventeen services' documents simply leaves it empty, and
+ * the office head's block is then the only one.
+ */
+function MunicipalSignatory({
+  row, onSave, onChanged,
+}: {
+  row: MunicipalityDetails
+  onSave: (patch: Partial<MunicipalityDetails>) => Promise<boolean>
+  onChanged: () => Promise<void>
+}) {
+  const [edit, setEdit] = useState(row)
+  useEffect(() => setEdit(row), [row])
+  const dirty =
+    (edit.signatoryName ?? '') !== (row.signatoryName ?? '') ||
+    edit.signatoryTitle !== row.signatoryTitle
+
+  return (
+    <div className="mb-3 rounded-xl border border-navy-200 bg-navy-50/50 p-4">
+      <p className="font-display text-[14px] font-bold text-navy-950">
+        {row.name} &mdash; who signs for the municipality
+      </p>
+      <p className="mt-1 text-[12.5px] leading-snug text-slate-600">
+        Printed on every document the offices release, beside the office that released it.
+        Leave the name blank and nothing is printed &mdash; which is the right setting if the
+        hall would rather each office signed on its own.
+      </p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <Field label="Who signs (name)">
+          <Input
+            value={edit.signatoryName ?? ''}
+            onChange={(v) => setEdit({ ...edit, signatoryName: v || null })}
+            placeholder="Nobody is named yet"
+          />
+        </Field>
+        <Field label="Their title">
+          <Input
+            value={edit.signatoryTitle}
+            onChange={(v) => setEdit({ ...edit, signatoryTitle: v })}
+            placeholder="Municipal Mayor"
+          />
+          <span className="text-[11.5px] leading-snug text-slate-500">
+            A title survives an election; the name does not. Both are printed as typed.
+          </span>
+        </Field>
+      </div>
+      {dirty && (
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={() => void onSave({
+              signatoryName: edit.signatoryName,
+              signatoryTitle: edit.signatoryTitle,
+            })}
+            className="rounded-xl bg-navy-800 px-4 py-2 text-[13px] font-semibold text-white active:bg-navy-900"
+          >
+            Save changes
+          </button>
+          <button
+            onClick={() => setEdit(row)}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-medium text-slate-600"
+          >
+            Discard
+          </button>
+        </div>
+      )}
+
+      <div className="mt-3">
+        <MarkUpload
+          title="Signature"
+          shape="wide"
+          blurb={
+            row.signatoryName
+              ? `Scan the signature ${row.signatoryName} made on paper and upload it here. It is then printed above their name on every document any office releases. Leave it empty and the document prints the rule and the title, so the paper can still be signed by hand.`
+              : 'Printed on every document the offices release, above whoever is named above. Name somebody first — a signature with no name under it is not worth much at a counter.'
+          }
+          present={row.hasSignatorySignature}
+          updatedAt={row.signatorySignatureUpdatedAt}
+          keepsNote="Documents released before now keep the signature they were printed with."
+          load={api.signatorySignature}
+          upload={(file) => api.uploadSignatorySignature(file)}
+          remove={() => api.removeSignatorySignature()}
+          onChanged={onChanged}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -569,11 +682,13 @@ const ACTIONS: Record<string, string> = {
   'holiday.update': 'Corrected a non-working day',
   'holiday.delete': 'Removed a non-working day',
   'office.update': 'Updated office details',
-  'municipality.update': 'Changed what the official receipt says',
+  'municipality.update': "Changed the municipality's printed details",
   'municipality.seal.update': 'Uploaded a new municipal seal',
   'municipality.seal.remove': 'Removed the municipal seal',
   'municipality.signature.update': "Uploaded a new treasurer's signature",
   'municipality.signature.remove': "Removed the treasurer's signature",
+  'municipality.signatory.update': "Uploaded a new municipal signatory's signature",
+  'municipality.signatory.remove': "Removed the municipal signatory's signature",
   'office.signature.update': "Uploaded a new office head's signature",
   'office.signature.remove': "Removed an office head's signature",
 }
@@ -587,6 +702,7 @@ const READABLE = [
   'website', 'tin', 'treasurerName', 'treasurerTitle', 'receiptPrefix',
   'receiptFormLabel', 'receiptFooter', 'hasSeal', 'hasTreasurerSignature',
   'headName', 'headTitle', 'hasSignature',
+  'signatoryName', 'signatoryTitle', 'hasSignatorySignature',
 ] as const
 
 const show = (value: unknown) =>

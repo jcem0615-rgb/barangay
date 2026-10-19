@@ -197,7 +197,12 @@ check(
   (await j(`/verify/${docCode}`)).json.checks !== second.json.checks
 )
 
-const trail = await j('/admin/document-checks?days=30', { token: admin })
+// The whole list rather than the default top 25: the panel is ordered by
+// count, and a database that has been through this suite before — or through
+// the reissue one, which checks a code half a dozen times — has documents above
+// this one. What is being asserted is that the row is *there*, not where it
+// ranks.
+const trail = await j('/admin/document-checks?days=30&limit=100', { token: admin })
 check('the administrator can read what has been checked most', trail.status === 200, trail.status)
 check(
   'and this document is in it with its count',

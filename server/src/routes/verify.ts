@@ -39,8 +39,15 @@ async function answer(
  * same way the ID check reports unknown, expired and used as three answers
  * rather than one failure.
  */
-const revocation = (row: { revoked_at: Date | null; revoked_reason: string | null }) =>
-  row.revoked_at === null
+const revocation = (row: {
+  revoked_at: Date | null; revoked_reason: string | null
+  replaced: boolean; reissue_of: string | null
+}) => ({
+  // Whether this copy is itself a replacement for one that was withdrawn.
+  // Said on a valid answer too: a clerk who has been handed a reissue should
+  // know why there are two papers for this reference in circulation.
+  reissued: row.reissue_of !== null,
+  ...(row.revoked_at === null
     ? { revoked: false }
     : {
         revoked: true,
@@ -48,7 +55,14 @@ const revocation = (row: { revoked_at: Date | null; revoked_reason: string | nul
         // The reason is required at the point of revoking, so a resident or a
         // counter is never told only that something was withdrawn.
         revokedReason: row.revoked_reason,
-      }
+        // And whether the office has since issued a replacement, which is the
+        // difference between "this document is no good" and "this document is
+        // no good, ask them for the current one". Withdrawing in error and
+        // reissuing is the ordinary case, so the person at the counter needs
+        // the second answer rather than the first.
+        replaced: row.replaced,
+      }),
+})
 
 verifyRouter.get('/:code', async (req, res) => {
   const code = req.params.code.trim().toUpperCase()
@@ -58,10 +72,12 @@ verifyRouter.get('/:code', async (req, res) => {
     reference_no: string; service_name: string; office_name: string
     resident_name: string; issued_at: Date; status: string
     revoked_at: Date | null; revoked_reason: string | null
+    reissue_of: string | null; replaced: boolean
   }>(
     `select d.id, r.reference_no, s.name as service_name, dep.office_name,
             u.full_name as resident_name, d.issued_at, r.status,
-            d.revoked_at, d.revoked_reason
+            d.revoked_at, d.revoked_reason, d.reissue_of,
+            exists (select 1 from documents n where n.reissue_of = d.id) as replaced
        from documents d
        join requests r on r.id = d.request_id
        join services s on s.id = r.service_id
@@ -111,10 +127,14 @@ verifyRouter.get('/:code', async (req, res) => {
       resident_name: string; issued_at: Date; valid_until: Date | string | null
       status: string
       revoked_at: Date | null; revoked_reason: string | null
+      reissue_of: string | null; replaced: boolean
     }>(
       `select d.id, r.reference_no, t.name as type_name, b.name as barangay_name,
               u.full_name as resident_name, d.issued_at, r.valid_until, r.status,
-              d.revoked_at, d.revoked_reason
+              d.revoked_at, d.revoked_reason, d.reissue_of,
+              exists (
+                select 1 from barangay_documents n where n.reissue_of = d.id
+              ) as replaced
          from barangay_documents d
          join barangay_requests r on r.id = d.request_id
          join barangay_certificate_types t on t.id = r.type_id

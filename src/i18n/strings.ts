@@ -522,6 +522,8 @@ export const en = {
   'brgy.status.released': 'Released',
   'brgy.certificate': 'Download the certificate',
   'brgy.certificateHint': 'Your copy to show or print. It carries a verification code any office can check.',
+  'brgy.certificateWithdrawn': 'Your barangay has withdrawn this certificate. It no longer passes a check, whatever the paper says.',
+  'brgy.certificateReplacement': 'This is the replacement your barangay issued. Use this copy \u2014 the withdrawn one has a different code.',
   'brgy.certificateError': 'Could not download the certificate.',
   'brgy.status.rejected': 'Not issued',
   'brgy.fee': 'Fee',
@@ -575,6 +577,7 @@ export const en = {
   'id.registeredAddress': 'Registered address',
   'detail.documentCode': 'Verification code:',
   'detail.documentWithdrawn': 'This document has been withdrawn by the office and no longer passes a check.',
+  'detail.documentReplacement': 'This is the replacement the office issued. Use this copy — the withdrawn one has a different code and will not pass a check.',
 
   // Checking a document at a counter. Public: whoever holds the paper already
   // has everything on it, and the check is useless if it needs an account.
@@ -612,6 +615,8 @@ export const en = {
   'docCheck.revokedBlurb': 'This was genuinely issued and the office has since withdrawn it. It is no longer valid, whatever the paper says.',
   'docCheck.revokedReason': 'Reason given',
   'docCheck.revokedOn': 'Withdrawn on',
+  'docCheck.replaced': 'The office has since issued a replacement. Ask the holder for the current copy — it carries a different code.',
+  'docCheck.isReplacement': 'This is a replacement for a copy that was withdrawn. The withdrawn one has a different code and must not be accepted.',
   'docCheck.checksOne': 'Checked once — this check.',
   'docCheck.checksFew': 'Checked {count} times, including this one.',
   'docCheck.checksMany': 'Checked {count} times, including this one. A document is normally checked once or twice; this many may mean copies are circulating.',
@@ -1111,6 +1116,8 @@ export const fil: Record<StringKey, string> = {
   'brgy.status.released': 'Naibigay na',
   'brgy.certificate': 'I-download ang sertipiko',
   'brgy.certificateHint': 'Ito ang kopyang maaari mong ipakita o i-print. May verification code itong masusuri ng opisina.',
+  'brgy.certificateWithdrawn': 'Binawi ng barangay ang sertipikong ito. Wala na itong bisa, kahit ano pa ang nakasulat sa papel.',
+  'brgy.certificateReplacement': 'Ito ang kapalit na inilabas ng barangay. Gamitin ang kopyang ito \u2014 iba ang code ng binawi.',
   'brgy.certificateError': 'Hindi na-download ang sertipiko.',
   'brgy.status.rejected': 'Hindi inilabas',
   'brgy.fee': 'Bayad',
@@ -1161,6 +1168,7 @@ export const fil: Record<StringKey, string> = {
   'id.registeredAddress': 'Nakarehistrong tirahan',
   'detail.documentCode': 'Verification code:',
   'detail.documentWithdrawn': 'Binawi ito ng opisina at hindi na ito papasa sa pagsusuri.',
+  'detail.documentReplacement': 'Ito ang kapalit na inilabas ng opisina. Gamitin ang kopyang ito \u2014 iba ang code ng binawi at hindi iyon papasa sa pagsusuri.',
 
   'docCheck.title': 'Suriin ang dokumento',
   'docCheck.subtitle': 'Tiyakin ang permit, sertipiko o resibo laban sa opisinang naglabas nito.',
@@ -1196,6 +1204,8 @@ export const fil: Record<StringKey, string> = {
   'docCheck.revokedBlurb': 'Tunay itong inilabas at binawi na ito ng opisina. Wala na itong bisa, kahit ano pa ang nakasulat sa papel.',
   'docCheck.revokedReason': 'Dahilan',
   'docCheck.revokedOn': 'Binawi noong',
+  'docCheck.replaced': 'May inilabas nang kapalit ang opisina. Hingin sa may hawak ang kasalukuyang kopya \u2014 iba ang code nito.',
+  'docCheck.isReplacement': 'Kapalit ito ng kopyang binawi. Iba ang code ng binawi at hindi iyon dapat tanggapin.',
   'docCheck.checksOne': 'Isang beses pa lang sinuri \u2014 ngayon.',
   'docCheck.checksFew': 'Sinuri nang {count} beses, kasama ito.',
   'docCheck.checksMany': 'Sinuri nang {count} beses, kasama ito. Karaniwang isa o dalawang beses lang sinusuri ang isang dokumento; maaaring may kumakalat na kopya.',

@@ -283,7 +283,8 @@ export default function SignIn() {
               verification QR appear on the documents it downloads. The real server prints all
               three. The code itself is on them, and typing it into{' '}
               <span className="font-mono">/?doc=</span> checks it here exactly as it would for
-              real &mdash; counting the check, and showing a withdrawn document as withdrawn.
+              real &mdash; counting the check, showing a withdrawn document as withdrawn, and
+              saying when a replacement has been issued for it.
             </p>
           </div>
         ) : (

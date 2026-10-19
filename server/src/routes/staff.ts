@@ -5,7 +5,7 @@ import { authenticate, canActOnDepartment, requireRole } from '../auth.ts'
 import { REQUEST_SELECT, serializeWithReady, toCentavos, toPesos, withReadyDates, type RequestRow } from '../serialize.ts'
 import { STEP_ASSESSMENT, STEP_PAYMENT, STEP_RELEASE, WORKFLOW_STEPS } from '../workflow.ts'
 import { documentFileName, loadReleaseMarks, makeVerificationCode, renderDocument } from '../documents.ts'
-import { revokeDocument } from '../verification.ts'
+import { loadReplaceable, revokeDocument } from '../verification.ts'
 import { sendAttachment, sendEvidence } from '../attachments.ts'
 import {
   deliverNotification, notificationFor, recordNotification, type NotificationInput,
@@ -179,11 +179,18 @@ staffRouter.get('/requests/:id', async (req, res) => {
   )
   // Whether there is a released document, and whether it has since been
   // withdrawn — the console offers the one button or says the other.
+  //
+  // The newest, because a request may hold more than one: a withdrawal is final
+  // and a reissue mints a second document beside it. The newest is the only one
+  // a counter would accept, so it is the one the console reads back; the
+  // withdrawn copies stay reachable through their own codes.
   const document = await one<{
     verification_code: string; revoked_at: Date | null; revoked_reason: string | null
+    reissue_of: string | null
   }>(
-    `select verification_code, revoked_at, revoked_reason
-       from documents where request_id = $1`,
+    `select verification_code, revoked_at, revoked_reason, reissue_of
+       from documents where request_id = $1
+      order by issued_at desc, id desc limit 1`,
     [row.id]
   )
   res.json({
@@ -192,6 +199,9 @@ staffRouter.get('/requests/:id', async (req, res) => {
     documentCode: document?.verification_code ?? null,
     documentRevoked: document?.revoked_at != null,
     documentRevokedReason: document?.revoked_reason ?? null,
+    // Whether this copy is itself a replacement, so the console does not read
+    // as though the office released it once.
+    documentReissued: document?.reissue_of != null,
   })
 })
 
@@ -311,6 +321,8 @@ staffRouter.post('/requests/:id/advance', async (req, res) => {
       submittedAt: row.submitted_at,
       issuedAt: new Date(),
       verificationCode: code,
+      // A first release replaces nothing.
+      supersedes: null,
     })
     released = {
       code,
@@ -347,11 +359,14 @@ staffRouter.post('/requests/:id/advance', async (req, res) => {
       ]
     )
     if (released) {
-      // One document per request: re-completing cannot mint a second one.
+      // One *live* document per request, against the partial unique index:
+      // re-completing cannot mint a second one. A reissue is a new row beside a
+      // withdrawn one and does not collide, which is why the index is partial
+      // rather than the plain uniqueness this used to rely on.
       await client.query(
         `insert into documents (request_id, verification_code, file_name, content, byte_size, issued_by)
          values ($1, $2, $3, $4, $5, $6)
-         on conflict (request_id) do nothing`,
+         on conflict (request_id) where revoked_at is null do nothing`,
         [row.id, released.code, released.fileName, released.content, released.content.length, user.id]
       )
       await client.query(
@@ -492,13 +507,145 @@ staffRouter.post('/requests/:id/revoke-document', async (req, res) => {
   res.json({ revoked: true, verificationCode: outcome.verificationCode })
 })
 
+/**
+ * Putting right a withdrawal that should not have happened.
+ *
+ * Withdrawing is final, and it stays final — that is not a limitation being
+ * worked around here. The withdrawn copy was printed and handed over, so it has
+ * to go on telling a counter not to accept it; a code that read "withdrawn"
+ * yesterday and "valid" today is the one answer a clerk cannot act on, and it
+ * would make every withdrawal provisional.
+ *
+ * **So a reissue mints a new document rather than reviving the old one.** New
+ * verification code, newly rendered PDF, the seal and the signatures as they
+ * stand today. The withdrawn copy keeps its own code and keeps reading as
+ * withdrawn — and the public check now says a replacement exists, so somebody
+ * holding the old paper is told to ask for the current one rather than merely
+ * that theirs is no good.
+ *
+ * Without this a mistaken withdrawal stranded the resident completely: nothing
+ * re-released a completed request, so they had to file again and pay again
+ * where there was a fee, for a document the office had already issued them.
+ *
+ * Reachable only from a withdrawal, and only while nothing has replaced it —
+ * one condition, which `loadReplaceable` answers. It is not a reprint button: a
+ * resident who merely lost their copy downloads it again, and an office that
+ * wants to hand over another prints the one that is already there.
+ *
+ * Same scope as releasing and withdrawing, so another office's request is not
+ * found rather than refused, and a reason is required for the reason a
+ * rejection needs one — the resident is told in the same transaction, and being
+ * told only that something was reissued is worse than not being told.
+ */
+staffRouter.post('/requests/:id/reissue-document', async (req, res) => {
+  const parsed = rejectSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+  const user = req.user!
+
+  const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
+  if (!row) return res.status(404).json({ error: 'Request not found.' })
+
+  const context = await one<{
+    office_name: string; municipality: string | null; address: string | null
+  }>(
+    `select d.office_name, rp.municipality, rp.address
+       from requests r
+       join departments d on d.id = r.department_id
+       left join resident_profiles rp on rp.user_id = r.resident_id
+      where r.id = $1`,
+    [row.id]
+  )
+  const officeName = await officeNameFor(row.department_id)
+  // Read before the transaction, like the release path's, and for the same
+  // reason: reading an image off the object store is file I/O and holding a
+  // transaction across it would turn a slow disk into a lock on the queue.
+  // These are today's marks, not the ones the withdrawn copy was printed with —
+  // this is a new document, issued now.
+  const marks = await loadReleaseMarks(row.department_id)
+
+  const notice: NotificationInput = {
+    userId: row.resident_id,
+    requestId: row.id,
+    kind: 'document_reissued',
+    ...notificationFor('document_reissued', {
+      serviceName: row.service_name ?? 'request',
+      referenceNo: row.reference_no,
+      officeName,
+    }),
+  }
+
+  const outcome = await transaction(async (client) => {
+    const replaceable = await loadReplaceable(client, 'documents', row.id)
+    if ('blocked' in replaceable) return replaceable
+
+    const code = makeVerificationCode()
+    const content = await renderDocument({
+      ...marks,
+      referenceNo: row.reference_no,
+      serviceName: row.service_name ?? 'Municipal Document',
+      officeName: context?.office_name ?? 'Municipal Office',
+      municipality: context?.municipality ?? 'Municipality of Malasiqui',
+      residentName: row.resident_name ?? '',
+      residentAddress: context?.address ?? null,
+      formValues: row.form_values,
+      feePesos: row.fee_centavos / 100,
+      paid: row.paid,
+      submittedAt: row.submitted_at,
+      issuedAt: new Date(),
+      verificationCode: code,
+      // Named on the face of the replacement, because the withdrawn copy is
+      // still in somebody's hands and two papers for one reference have to be
+      // told apart without scanning either.
+      supersedes: replaceable.verificationCode,
+    })
+    await client.query(
+      `insert into documents
+         (request_id, verification_code, file_name, content, byte_size, issued_by, reissue_of)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        row.id, code,
+        documentFileName(row.service_name ?? 'document', row.reference_no),
+        content, content.length, user.id, replaceable.id,
+      ]
+    )
+    await client.query(
+      `insert into request_events (request_id, actor_id, event_type, from_step, to_step, note)
+       values ($1, $2, 'document_reissued', $3, $3, $4)`,
+      [
+        row.id, user.id, row.current_step_index,
+        `Replacement issued (code ${code}, replacing ${replaceable.verificationCode}). ` +
+          parsed.data.reason,
+      ]
+    )
+    await recordNotification(client, notice)
+    return { code, replaced: replaceable.verificationCode }
+  })
+
+  if ('blocked' in outcome) {
+    return res.status(409).json({
+      error:
+        outcome.blocked === 'none'
+          ? 'No document has been released on this request.'
+          : 'This request already has a document that has not been withdrawn. A replacement ' +
+            'is only issued for one that was withdrawn in error.',
+    })
+  }
+
+  void deliverNotification(notice)
+  res.json({ verificationCode: outcome.code, replaced: outcome.replaced })
+})
+
 staffRouter.get('/requests/:id/document', async (req, res) => {
   const user = req.user!
   const row = await loadForStaff(req.params.id, user.departments, user.role === 'admin')
   if (!row) return res.status(404).json({ error: 'Request not found.' })
 
+  // The newest copy, which after a reissue is the replacement rather than the
+  // withdrawn original. Both remain in the table; this is the one an office
+  // would hand over again.
   const doc = await one<{ file_name: string; content: Buffer }>(
-    `select file_name, content from documents where request_id = $1`,
+    `select file_name, content from documents where request_id = $1
+      order by issued_at desc, id desc limit 1`,
     [row.id]
   )
   if (!doc) return res.status(404).json({ error: 'No document has been released yet.' })

@@ -67,13 +67,23 @@ export interface MunicipalityRow {
   seal_type: string | null
   treasurer_signature_key: string | null
   treasurer_signature_type: string | null
+  // Who signs for the hall itself — the mayor, or whoever it names. Nothing on
+  // a receipt uses this (the treasurer signs that); it is carried here because
+  // the single-row municipality table is where facts about the hall live, and
+  // one select over it serves both the receipt and the Municipality tab.
+  signatory_name: string | null
+  signatory_title: string
+  signatory_signature_key: string | null
+  signatory_signature_type: string | null
 }
 
 export const MUNICIPALITY_SELECT = `
   code, name, province, address, phone, email, website, tin,
   treasurer_name, treasurer_title, receipt_prefix, receipt_form_label,
   receipt_footer, seal_key, seal_type, seal_updated_at,
-  treasurer_signature_key, treasurer_signature_type, treasurer_signature_updated_at
+  treasurer_signature_key, treasurer_signature_type, treasurer_signature_updated_at,
+  signatory_name, signatory_title,
+  signatory_signature_key, signatory_signature_type, signatory_signature_updated_at
 `
 
 /**

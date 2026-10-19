@@ -256,6 +256,18 @@ function Found({ result }: { result: VerifyResult }) {
         <p className="mt-2 text-[calc(13px_*_var(--text-scale))] leading-snug text-slate-600">
           {t('docCheck.revokedBlurb')}
         </p>
+        {/*
+          Whether a replacement exists, which is the difference between "do not
+          accept this" and "do not accept this, ask them for the current one".
+          Withdrawing in error and reissuing is the ordinary case, so the person
+          at the counter needs the second answer rather than the first.
+        */}
+        {result.replaced && (
+          <p className="mt-2 flex items-start gap-2 rounded-xl bg-navy-50 px-3 py-2.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-navy-900">
+            <AlertTriangle size={15} className="mt-px shrink-0" />
+            {t('docCheck.replaced')}
+          </p>
+        )}
         <dl className="mt-4 divide-y divide-slate-100 border-y border-slate-100">
           {[
             ...rows,
@@ -307,6 +319,19 @@ function Found({ result }: { result: VerifyResult }) {
               year: 'numeric', month: 'long', day: 'numeric',
             }),
           })}
+        </p>
+      )}
+
+      {/*
+        A replacement for one that was withdrawn. Said plainly, because two
+        papers for the same reference may both be in circulation and only this
+        one is good — a clerk who was shown the other one needs to know which
+        they are now holding.
+      */}
+      {result.reissued && (
+        <p className="mt-3 flex items-start gap-2 rounded-xl bg-navy-50 px-3 py-2.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-navy-900">
+          <AlertTriangle size={15} className="mt-px shrink-0" />
+          {t('docCheck.isReplacement')}
         </p>
       )}
 

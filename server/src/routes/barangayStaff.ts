@@ -21,7 +21,7 @@ import {
 } from '../barangayDocuments.ts'
 import { getFile, putFile, removeFile } from '../storage.ts'
 import { checkMark, markUpload, sendMark } from '../marks.ts'
-import { revokeDocument } from '../verification.ts'
+import { loadReplaceable, revokeDocument } from '../verification.ts'
 import { blotterRouter } from './blotter.ts'
 import { householdsRouter } from './households.ts'
 import { announcementsStaffRouter } from './announcements.ts'
@@ -337,9 +337,12 @@ barangayStaffRouter.get('/requests/:id/certificate', async (req, res) => {
   const barangay = await ownBarangay(req.user!.id)
   if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
 
+  // The newest copy, which after a reissue is the replacement rather than the
+  // withdrawn original.
   const doc = await one<{ file_name: string; content: Buffer }>(
     `select file_name, content from barangay_documents
-      where request_id = $1 and barangay_id = $2`,
+      where request_id = $1 and barangay_id = $2
+      order by issued_at desc, id desc limit 1`,
     [req.params.id, barangay.id]
   )
   if (!doc) return res.status(404).json({ error: 'No certificate has been released for this request.' })
@@ -381,7 +384,10 @@ barangayStaffRouter.post(
         `select r.id, r.reference_no, r.resident_id, t.name as type_name
            from barangay_requests r
            join barangay_certificate_types t on t.id = r.type_id
-           join barangay_documents d on d.request_id = r.id
+           -- The live copy: a withdrawn one has already been withdrawn, and
+           -- joining every copy would match a request that was reissued once.
+           join barangay_documents d
+             on d.request_id = r.id and d.revoked_at is null
           where r.id = $1 and r.barangay_id = $2 and d.barangay_id = $2
           for update of r`,
         [req.params.id, barangay.id]
@@ -418,6 +424,139 @@ barangayStaffRouter.post(
 
     void deliverNotification(outcome.notification)
     res.json({ revoked: true, verificationCode: outcome.verificationCode })
+  }
+)
+
+/**
+ * Putting right a withdrawal that should not have happened.
+ *
+ * The mirror of the municipal route, and the same shape: withdrawing stays
+ * final, because the withdrawn certificate was handed over and has to go on
+ * telling a counter not to accept it. A reissue mints a *new* certificate — new
+ * code, newly rendered PDF, the seal and the two signatures as they stand today
+ * — and the old code keeps reading as withdrawn, now saying that a replacement
+ * exists.
+ *
+ * It is not a reprint: a resident who lost their copy downloads it again, and
+ * the counter can print the one already there. This is only reachable from a
+ * withdrawal, and only while nothing has replaced it.
+ *
+ * The administrator's, like the withdrawal it undoes. Both roles hand a
+ * certificate over because that is counter work; taking the barangay's word
+ * back and then giving it again is a decision.
+ *
+ * The date it carries is the request's own `valid_until`, stamped when the
+ * secretary marked it ready. A replacement for a certificate issued in March is
+ * that March certificate again, not a fresh year of validity — reissuing is
+ * correcting a mistake, not renewing.
+ */
+barangayStaffRouter.post(
+  '/requests/:id/reissue-certificate',
+  requireRole('barangay_admin'),
+  async (req, res) => {
+    const parsed = revokeSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: z.prettifyError(parsed.error) })
+
+    const barangay = await ownBarangay(req.user!.id)
+    if (!barangay) return res.status(409).json({ error: 'This account is not attached to a barangay.' })
+
+    // Read before the transaction, for the reason the release path gives:
+    // reading images off the object store is file I/O and must not hold a
+    // transaction open across the barangay's queue.
+    const sealSource = await loadBarangaySeal(barangay.id)
+    const town = await servedMunicipality()
+
+    const outcome = await transaction(async (client) => {
+      const current = await client.query<{
+        id: string; reference_no: string; resident_id: string; type_id: string
+        purpose: string; valid_until: Date | string | null
+        type_name: string; attestation: string | null
+        resident_name: string; resident_address: string | null
+      }>(
+        `select r.id, r.reference_no, r.resident_id, r.type_id, r.purpose,
+                r.valid_until, t.name as type_name, t.attestation,
+                u.full_name as resident_name, rp.address as resident_address
+           from barangay_requests r
+           join barangay_certificate_types t on t.id = r.type_id
+           join users u on u.id = r.resident_id
+           left join resident_profiles rp on rp.user_id = r.resident_id
+          where r.id = $1 and r.barangay_id = $2
+          for update of r`,
+        [req.params.id, barangay.id]
+      )
+      const row = current.rows[0]
+      if (!row) return { error: 'notfound' as const }
+
+      const replaceable = await loadReplaceable(client, 'barangay_documents', row.id)
+      if ('blocked' in replaceable) return { error: replaceable.blocked }
+
+      const validUntil =
+        row.valid_until instanceof Date
+          ? row.valid_until.toLocaleDateString('en-CA')
+          : (row.valid_until ?? null)
+
+      const issued = await issueBarangayCertificate(client, {
+        requestId: row.id,
+        barangayId: barangay.id,
+        issuedBy: req.user!.id,
+        reissueOf: replaceable.id,
+        data: {
+          referenceNo: row.reference_no,
+          certificateName: row.type_name,
+          attestation: row.attestation,
+          purpose: row.purpose,
+          residentName: row.resident_name,
+          residentAddress: row.resident_address,
+          barangayName: barangay.name,
+          municipality: town.name,
+          province: town.province,
+          hallAddress: barangay.hall_address,
+          phone: barangay.phone,
+          email: barangay.email,
+          captain: barangay.captain,
+          secretary: barangay.secretary,
+          issuedAt: new Date(),
+          validUntil,
+          // Named on the face of the replacement: the withdrawn copy is still
+          // in somebody's hands, and two certificates for one reference have to
+          // be told apart without scanning either.
+          supersedes: replaceable.verificationCode,
+          ...sealSource,
+        },
+      })
+      // The partial index is what this could collide on, and `loadReplaceable`
+      // has just established under lock that there is no live copy.
+      if (!issued) return { error: 'live' as const }
+
+      const notification = {
+        userId: row.resident_id,
+        requestId: null,
+        kind: 'barangay_request' as const,
+        title: `${row.reference_no} — replacement issued`,
+        body:
+          `Barangay ${barangay.name} has issued a replacement for your ${row.type_name}. ` +
+          `Download the new copy in the app and use that one; the withdrawn copy will not ` +
+          `pass a check.`,
+      }
+      await recordNotification(client, notification)
+      return { notification, verificationCode: issued.verificationCode }
+    })
+
+    if ('error' in outcome) {
+      if (outcome.error === 'notfound') {
+        return res.status(404).json({ error: 'Request not found.' })
+      }
+      return res.status(409).json({
+        error:
+          outcome.error === 'none'
+            ? 'No certificate has been released for this request.'
+            : 'This request already has a certificate that has not been withdrawn. A ' +
+              'replacement is only issued for one that was withdrawn in error.',
+      })
+    }
+
+    void deliverNotification(outcome.notification)
+    res.json({ verificationCode: outcome.verificationCode })
   }
 )
 
@@ -536,17 +675,25 @@ barangayStaffRouter.get('/requests', async (req, res) => {
     valid_until: string | null
     requested_at: string; updated_at: string; note: string | null; resident_name: string
     has_certificate: boolean; revoked_at: Date | null; revoked_reason: string | null
+    reissue_of: string | null
   }>(
     `select r.id, r.reference_no, r.type_id, t.name as type_name, r.purpose,
             r.fee_centavos, r.status, r.requested_at, r.updated_at, r.note,
             r.valid_until,
             u.full_name as resident_name,
             d.request_id is not null as has_certificate,
-            d.revoked_at, d.revoked_reason
+            d.revoked_at, d.revoked_reason, d.reissue_of
        from barangay_requests r
        join barangay_certificate_types t on t.id = r.type_id
        join users u on u.id = r.resident_id
-       left join barangay_documents d on d.request_id = r.id
+       -- The newest certificate only. A request may hold more than one, since a
+       -- withdrawal is final and a reissue mints a second beside it, and a
+       -- plain join would list the request once per copy.
+       left join lateral (
+         select * from barangay_documents bd
+          where bd.request_id = r.id
+          order by bd.issued_at desc, bd.id desc limit 1
+       ) d on true
       where r.barangay_id = $1
         and ($2::text is null or r.status = $2::barangay_request_status)
       -- Open ones first, oldest first within them: the queue reads as the order
@@ -706,6 +853,8 @@ barangayStaffRouter.patch('/requests/:id', async (req, res) => {
           secretary: barangay.secretary,
           issuedAt: new Date(),
           validUntil,
+          // A first release replaces nothing.
+          supersedes: null,
           ...sealSource,
         },
       })

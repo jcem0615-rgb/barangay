@@ -36,6 +36,14 @@ export default function ApplicationDetail({ id }: { id: string }) {
   const [documentCode, setDocumentCode] = useState<string | null>(null)
   /** Withdrawn by the office after release. The PDF is unchanged; the check is not. */
   const [revoked, setRevoked] = useState<{ reason: string | null } | null>(null)
+  /**
+   * Whether this copy is the replacement for one the office withdrew.
+   *
+   * Worth saying rather than letting the download quietly change: the resident
+   * was told their document had been withdrawn, so a screen that simply shows a
+   * code again leaves them holding two papers with no idea which is which.
+   */
+  const [reissued, setReissued] = useState(false)
   // A rating already given must show as given, or the app asks the same
   // question every time the screen is opened.
   const [rating, setRating] = useState<{ rating: number; comment: string | null } | null>(null)
@@ -57,6 +65,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
         if (full.receiptNo) setReceipt({ no: full.receiptNo, code: full.receiptCode })
         setDocumentCode(full.documentCode)
         setRevoked(full.documentRevoked ? { reason: full.documentRevokedReason } : null)
+        setReissued(full.documentReissued === true)
       })
       // A receipt that will not load is not worth an error banner on a screen
       // whose job is the request itself; the button simply does not appear.
@@ -273,6 +282,11 @@ export default function ApplicationDetail({ id }: { id: string }) {
               <p className="mt-2 text-center text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
                 {t('detail.documentCode')}{' '}
                 <span className="font-mono tracking-wide text-navy-800">{documentCode}</span>
+              </p>
+            )}
+            {reissued && !revoked && (
+              <p className="mt-2 rounded-xl bg-navy-50 px-3.5 py-3 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-navy-900">
+                {t('detail.documentReplacement')}
               </p>
             )}
             {/*

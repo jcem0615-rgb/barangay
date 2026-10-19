@@ -17,7 +17,8 @@ import { pushBodyFor, pushToResident } from './push.ts'
 
 /** Notices about a request's progress. */
 export type RequestNotificationKind =
-  'assessed' | 'advanced' | 'released' | 'rejected' | 'request_paid' | 'document_revoked'
+  | 'assessed' | 'advanced' | 'released' | 'rejected' | 'request_paid'
+  | 'document_revoked' | 'document_reissued'
 
 /** Everything a notification row can be, including notices tied to no request. */
 export type NotificationKind =
@@ -137,6 +138,17 @@ export function notificationFor(
         body:
           `${ctx.officeName} has withdrawn your ${ctx.serviceName} (${ctx.referenceNo}). ` +
           `It will no longer pass a check. Reason: ${ctx.reason ?? 'see the app for details'}`,
+      }
+    // A replacement, after a withdrawal. The resident is holding paper that
+    // stopped checking out, so the message has to say that a new copy exists
+    // and that the old one is still no good — a reissue does not revive it.
+    case 'document_reissued':
+      return {
+        title: `${ctx.serviceName} — replacement issued`,
+        body:
+          `${ctx.officeName} has issued a replacement for your ${ctx.serviceName} ` +
+          `(${ctx.referenceNo}). Download the new copy in the app and use that one; the ` +
+          `withdrawn copy will not pass a check.`,
       }
   }
 }

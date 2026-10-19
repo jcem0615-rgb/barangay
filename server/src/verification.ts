@@ -125,6 +125,11 @@ export interface RevocationInput {
  * Revocation is final: there is no route back. A document that goes on
  * verifying after it was withdrawn is the whole problem this solves, and one
  * that can be un-withdrawn is a flag rather than a revocation.
+ *
+ * A withdrawal made in error is put right by *reissuing* rather than by
+ * lifting this — see `loadReplaceable`. The withdrawn paper is still in
+ * somebody's hands, so it has to go on reading as withdrawn; what the resident
+ * gets is a new document with a new code.
  */
 export async function revokeDocument(
   client: PoolClient, input: RevocationInput
@@ -138,4 +143,44 @@ export async function revokeDocument(
   )
   if (rows.length === 0) return null
   return { verificationCode: rows[0]!.verification_code }
+}
+
+/**
+ * The withdrawn document a reissue would replace.
+ *
+ * **A reissue does not undo the revocation**, and that is the whole shape of
+ * it. The withdrawn copy was printed, handed over and is still out there, so it
+ * must go on telling a counter not to accept it — "withdrawn, then not" is the
+ * one answer a clerk cannot act on. What a reissue does instead is mint a new
+ * document: a new code, a newly rendered PDF, the seal and the signatures as
+ * they stand today.
+ *
+ * Which means a reissue is reachable only from a withdrawal, and only while
+ * nothing has already replaced it. Both of those are the same condition — *is
+ * there a live document on this request* — so one query answers both and
+ * `live` covers "it was never withdrawn" and "it has already been reissued"
+ * alike. The partial unique index is what makes that condition trustworthy.
+ *
+ * Rows are locked, so two clerks pressing reissue at once produce one new
+ * document rather than two.
+ */
+export async function loadReplaceable(
+  client: PoolClient,
+  table: 'documents' | 'barangay_documents',
+  requestId: string
+): Promise<{ id: string; verificationCode: string } | { blocked: 'none' | 'live' }> {
+  const { rows } = await client.query<{
+    id: string; verification_code: string; revoked_at: Date | null
+  }>(
+    `select id, verification_code, revoked_at
+       from ${table === 'documents' ? 'documents' : 'barangay_documents'}
+      where request_id = $1
+      order by issued_at desc, id desc
+        for update`,
+    [requestId]
+  )
+  if (rows.length === 0) return { blocked: 'none' }
+  if (rows.some((r) => r.revoked_at === null)) return { blocked: 'live' }
+  const latest = rows[0]!
+  return { id: latest.id, verificationCode: latest.verification_code }
 }

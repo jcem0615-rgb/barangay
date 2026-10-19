@@ -702,6 +702,7 @@ adminRouter.delete('/certificates/:id', async (req, res) => {
 type MunicipalityReadRow = MunicipalityRow & {
   seal_updated_at: Date | null
   treasurer_signature_updated_at: Date | null
+  signatory_signature_updated_at: Date | null
   code: string
 }
 
@@ -723,6 +724,13 @@ const serializeMunicipality = (row: MunicipalityReadRow) => ({
   sealUpdatedAt: row.seal_updated_at?.toISOString() ?? null,
   hasTreasurerSignature: row.treasurer_signature_key !== null,
   treasurerSignatureUpdatedAt: row.treasurer_signature_updated_at?.toISOString() ?? null,
+  // Who signs for the hall itself, printed on a released document beside the
+  // office that released it. Blank by default and printed as nothing at all,
+  // which is also how a hall declines to put the mayor on every document.
+  signatoryName: row.signatory_name,
+  signatoryTitle: row.signatory_title,
+  hasSignatorySignature: row.signatory_signature_key !== null,
+  signatorySignatureUpdatedAt: row.signatory_signature_updated_at?.toISOString() ?? null,
 })
 
 /**
@@ -751,6 +759,13 @@ const municipalityBody = z.object({
   // nothing: a form number this app invented would be worse than none.
   receiptFormLabel: z.string().trim().max(120).nullable(),
   receiptFooter: z.string().trim().max(400).nullable(),
+  // The hall's own signatory. The name is nullable — a blank one prints
+  // nothing, which is what a document gets until somebody fills it in and what
+  // a hall that signs by hand leaves it as. The title is not, for the reason
+  // the office heads give: a title is a fact about the office and survives an
+  // election, so there is always one to print.
+  signatoryName: z.string().trim().max(120).nullable(),
+  signatoryTitle: z.string().trim().min(2).max(120),
 })
 
 const MUNICIPALITY_COLUMNS = {
@@ -758,6 +773,7 @@ const MUNICIPALITY_COLUMNS = {
   treasurerName: 'treasurer_name', treasurerTitle: 'treasurer_title',
   receiptPrefix: 'receipt_prefix', receiptFormLabel: 'receipt_form_label',
   receiptFooter: 'receipt_footer',
+  signatoryName: 'signatory_name', signatoryTitle: 'signatory_title',
 } as const
 
 adminRouter.get('/municipality', async (_req, res) => {
@@ -980,6 +996,108 @@ adminRouter.delete('/municipality/treasurer-signature', async (req, res) => {
   if (!outcome) return res.status(404).json({ error: 'No signature has been uploaded.' })
 
   // Receipts already issued keep theirs, like the seal.
+  await removeFile(outcome.previous!)
+  res.json(serializeMunicipality(outcome.row))
+})
+
+// ---------------------------------------------------------------------------
+// The municipality's own signature
+//
+// The hall had a seal and no signature. Each office's head signs what that
+// office releases and the treasurer signs a receipt; the municipality itself —
+// the mayor, or whoever it names — signed nothing, which left the one document
+// a resident collects from the hall carrying a single office's name.
+//
+// A second block on a released document rather than a replacement for the
+// office head's: the face of the document names the office that released it, so
+// the Civil Registrar signs a civil registry document and the Treasurer signs a
+// cedula. What this adds is the arrangement one signatory per office could not
+// express, where the mayor signs a business permit alongside the licensing
+// officer.
+//
+// Same rules as every other mark here — PNG or JPEG by the leading bytes,
+// scanned in memory, 2 MB, audited in the same transaction as the change, and
+// a picture of a signature rather than a digital one.
+// ---------------------------------------------------------------------------
+
+adminRouter.put('/municipality/signatory-signature', markUpload.single('file'), async (req, res) => {
+  const checked = await checkMark(req.file, 'A signature', 'released documents')
+  if (!checked.ok) return res.status(checked.status).json({ error: checked.error })
+
+  const actor = req.user!
+  const stored = await putFile(checked.bytes)
+
+  const outcome = await transaction(async (client) => {
+    const existing = await client.query<MunicipalityReadRow>(
+      `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
+    )
+    if (existing.rowCount === 0) return null
+    const { rows } = await client.query<MunicipalityReadRow>(
+      `update municipality
+          set signatory_signature_key = $1, signatory_signature_type = $2,
+              signatory_signature_updated_at = now()
+        returning ${MUNICIPALITY_SELECT}`,
+      [stored.storageKey, checked.contentType]
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'municipality.signatory.update', target: existing.rows[0]!.code,
+      before: serializeMunicipality(existing.rows[0]!),
+      after: serializeMunicipality(rows[0]!),
+    })
+    return { previous: existing.rows[0]!.signatory_signature_key, row: rows[0]! }
+  })
+  if (!outcome) {
+    await removeFile(stored.storageKey)
+    return res.status(404).json({ error: 'This deployment has no municipality row yet.' })
+  }
+
+  if (outcome.previous) await removeFile(outcome.previous)
+  res.json(serializeMunicipality(outcome.row))
+})
+
+adminRouter.get('/municipality/signatory-signature', async (_req, res) => {
+  const row = await one<{
+    signatory_signature_key: string | null; signatory_signature_type: string | null
+  }>(`select signatory_signature_key, signatory_signature_type from municipality limit 1`)
+  if (!row?.signatory_signature_key) {
+    return res.status(404).json({ error: 'No signature has been uploaded.' })
+  }
+
+  let content: Buffer
+  try {
+    content = await getFile(row.signatory_signature_key)
+  } catch {
+    return res.status(410).json({ error: 'That image is no longer available.' })
+  }
+  sendMark(res, content, row.signatory_signature_type)
+})
+
+adminRouter.delete('/municipality/signatory-signature', async (req, res) => {
+  const actor = req.user!
+  const outcome = await transaction(async (client) => {
+    const existing = await client.query<MunicipalityReadRow>(
+      `select ${MUNICIPALITY_SELECT} from municipality limit 1 for update`
+    )
+    if (existing.rowCount === 0 || !existing.rows[0]!.signatory_signature_key) return null
+    const { rows } = await client.query<MunicipalityReadRow>(
+      `update municipality
+          set signatory_signature_key = null, signatory_signature_type = null,
+              signatory_signature_updated_at = null
+        returning ${MUNICIPALITY_SELECT}`
+    )
+    await recordAudit(client, {
+      actorId: actor.id, actorName: actor.fullName,
+      action: 'municipality.signatory.remove', target: existing.rows[0]!.code,
+      before: serializeMunicipality(existing.rows[0]!),
+      after: serializeMunicipality(rows[0]!),
+    })
+    return { previous: existing.rows[0]!.signatory_signature_key, row: rows[0]! }
+  })
+  if (!outcome) return res.status(404).json({ error: 'No signature has been uploaded.' })
+
+  // Documents already released keep theirs, like the seal and the office
+  // heads': the PDF was frozen at issue, which is the whole point of storing it.
   await removeFile(outcome.previous!)
   res.json(serializeMunicipality(outcome.row))
 })

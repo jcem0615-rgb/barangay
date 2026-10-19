@@ -49,8 +49,12 @@ const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64'
 )
+// Valid, and different from the one above — replacing a mark has to be
+// observable. It has to decode, not merely start with the PNG magic: a damaged
+// one is refused at the upload now, because pdfkit's decoder throws from a
+// zlib callback and would take the process down at the next release.
 const SECOND_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYPgPAAEDAQAIicLsAAAAAElFTkSuQmCC',
   'base64'
 )
 const NOT_AN_IMAGE = Buffer.from('%PDF-1.4\n% a perfectly good PDF, and not a seal\n')

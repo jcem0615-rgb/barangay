@@ -6,12 +6,27 @@ import StaffPrograms from './StaffPrograms'
 import type { Application } from '../../types'
 import { WORKFLOW_STEPS } from '../../types'
 
+/**
+ * The history line, as a clerk reads it.
+ *
+ * Event types are stored as the server names them, and the two added with
+ * revocation have an underscore in the middle — `capitalize` alone rendered
+ * them as "Document_revoked", which reads like a column name rather than
+ * something that happened. Anything unmapped falls back to its own words.
+ */
+const EVENT_LABELS: Record<string, string> = {
+  document_revoked: 'Document withdrawn',
+  document_reissued: 'Replacement issued',
+}
+const eventLabel = (type: string) => EVENT_LABELS[type] ?? type.replace(/_/g, ' ')
+
 type Detail = Application & {
   events: RequestEvent[]
   residentName?: string
   documentCode: string | null
   documentRevoked: boolean
   documentRevokedReason: string | null
+  documentReissued: boolean
 }
 
 export default function StaffRequestPanel({
@@ -32,6 +47,10 @@ export default function StaffRequestPanel({
   // a note is a remark for the file, this is a message somebody receives.
   const [revokeReason, setRevokeReason] = useState('')
   const [revoking, setRevoking] = useState(false)
+  // Issuing a replacement for one withdrawn in error. Its own reason field for
+  // the same reason the withdrawal has one: the resident is told.
+  const [reissueReason, setReissueReason] = useState('')
+  const [reissuing, setReissuing] = useState(false)
 
   const load = useCallback(async (id: string) => {
     setError(null)
@@ -137,6 +156,11 @@ export default function StaffRequestPanel({
                 {detail.documentCode}
               </p>
             )}
+            {detail.documentReissued && !detail.documentRevoked && (
+              <p className="text-center text-[11.5px] text-slate-500">
+                This is a replacement. The copy it replaced stays withdrawn.
+              </p>
+            )}
 
             {/*
               Withdrawing it.
@@ -148,23 +172,79 @@ export default function StaffRequestPanel({
               reason typed here.
             */}
             {detail.documentRevoked ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5">
-                <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-rose-800">
-                  <Ban size={14} /> Withdrawn. It no longer passes a check.
-                </p>
-                {detail.documentRevokedReason && (
-                  <p className="mt-1 text-[12px] leading-snug text-rose-700">
-                    {detail.documentRevokedReason}
+              <>
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5">
+                  <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-rose-800">
+                    <Ban size={14} /> Withdrawn. It no longer passes a check.
                   </p>
+                  {detail.documentRevokedReason && (
+                    <p className="mt-1 text-[12px] leading-snug text-rose-700">
+                      {detail.documentRevokedReason}
+                    </p>
+                  )}
+                </div>
+
+                {/*
+                  Putting right a withdrawal that should not have happened.
+
+                  It does not lift the withdrawal — that paper is in somebody's
+                  hands and has to go on failing the check. What this does is
+                  issue a new document with a new code, which is what the
+                  resident actually needs, and saves them filing and paying
+                  again for something the office already gave them.
+                */}
+                {reissuing ? (
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-[12.5px] font-semibold text-navy-800">
+                      Issue a replacement
+                    </p>
+                    <p className="mt-1 text-[12px] leading-snug text-slate-600">
+                      A new document with a new verification code, signed and sealed as
+                      the office is today. The withdrawn copy stays withdrawn &mdash; the
+                      check will tell whoever scans it that a replacement exists.
+                    </p>
+                    <input
+                      value={reissueReason}
+                      onChange={(e) => setReissueReason(e.target.value)}
+                      placeholder="Why it is being replaced — the office's record"
+                      className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-navy-800"
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        disabled={busy || reissueReason.trim().length < 3}
+                        onClick={() => void act(async () => {
+                          await api.reissueDocument(detail.id, reissueReason.trim())
+                          setReissuing(false)
+                          setReissueReason('')
+                        })}
+                        className="flex-1 rounded-lg bg-navy-800 px-3 py-2 text-[12.5px] font-semibold text-white transition active:bg-navy-950 disabled:opacity-40"
+                      >
+                        Issue it
+                      </button>
+                      <button
+                        onClick={() => { setReissuing(false); setReissueReason('') }}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-[12.5px] font-medium text-slate-600"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setReissuing(true)}
+                    className="w-full rounded-lg border border-navy-200 px-3 py-2 text-[12.5px] font-semibold text-navy-800 transition hover:bg-navy-50"
+                  >
+                    Withdrawn in error? Issue a replacement
+                  </button>
                 )}
-              </div>
+              </>
             ) : revoking ? (
               <div className="rounded-xl border border-rose-200 bg-white p-3">
                 <p className="text-[12.5px] font-semibold text-rose-800">Withdraw this document</p>
                 <p className="mt-1 text-[12px] leading-snug text-slate-600">
                   It stops passing the public check and the resident is told, with the
                   reason below. This cannot be undone &mdash; if it was a mistake, the
-                  office has to issue a fresh one.
+                  office issues a replacement, and this copy stays withdrawn either way.
                 </p>
                 <input
                   value={revokeReason}
@@ -317,7 +397,7 @@ export default function StaffRequestPanel({
           <ol className="space-y-2.5">
             {detail.events.map((e, i) => (
               <li key={i} className="border-l-2 border-slate-200 pl-3">
-                <p className="text-[12.5px] font-medium capitalize text-navy-950">{e.eventType}</p>
+                <p className="text-[12.5px] font-medium capitalize text-navy-950">{eventLabel(e.eventType)}</p>
                 <p className="text-[11.5px] text-slate-400">
                   {new Date(e.createdAt).toLocaleString('en-PH', {
                     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',

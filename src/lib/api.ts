@@ -34,6 +34,12 @@ export interface BarangayRequest {
   /** Withdrawn by the barangay after release. Final, and always with a reason. */
   revoked?: boolean
   revokedReason?: string | null
+  /**
+   * True where this copy is a replacement for one withdrawn in error. The
+   * withdrawal is never lifted, so the resident was told their certificate was
+   * no good and the screen owes them the rest of the story.
+   */
+  reissued?: boolean
 }
 
 /**
@@ -302,6 +308,15 @@ export interface MunicipalityDetails {
   sealUpdatedAt: string | null
   hasTreasurerSignature: boolean
   treasurerSignatureUpdatedAt: string | null
+  /**
+   * Who signs for the hall itself — printed on a released document beside the
+   * office that released it. A blank name prints nothing at all, which is also
+   * how a hall declines to put the mayor on every document it issues.
+   */
+  signatoryName: string | null
+  signatoryTitle: string
+  hasSignatorySignature: boolean
+  signatorySignatureUpdatedAt: string | null
 }
 
 export interface ReportRow {
@@ -591,6 +606,15 @@ export interface VerifyResult {
   revoked?: boolean
   revokedAt?: string
   revokedReason?: string | null
+  /**
+   * Whether the office has since issued a replacement. The difference between
+   * "this is no good" and "this is no good, ask them for the current one" —
+   * withdrawn-in-error-and-reissued is the ordinary case, so a counter needs
+   * the second answer.
+   */
+  replaced?: boolean
+  /** Whether this copy is itself the replacement for a withdrawn one. */
+  reissued?: boolean
   /** How many times this code has been checked, this check included. */
   checks?: number
   error?: string
@@ -758,6 +782,8 @@ export const api = {
       /** Withdrawn by the office after release; the reason is always given. */
       documentRevoked: boolean
       documentRevokedReason: string | null
+      /** True where this copy replaces one the office withdrew. */
+      documentReissued: boolean
     }>(`/requests/${id}`),
 
   submitRequest: (
@@ -843,6 +869,19 @@ export const api = {
   revokeDocument: (id: string, reason: string) =>
     request<{ revoked: boolean; verificationCode: string }>(
       `/staff/requests/${id}/revoke-document`,
+      { method: 'POST', body: JSON.stringify({ reason }) }
+    ),
+
+  /**
+   * Issuing a replacement for a document withdrawn in error.
+   *
+   * It does not lift the withdrawal: a new document is minted with a new code,
+   * and the withdrawn copy goes on reading as withdrawn — now saying that a
+   * replacement exists. Only reachable on a withdrawn document.
+   */
+  reissueDocument: (id: string, reason: string) =>
+    request<{ verificationCode: string; replaced: string }>(
+      `/staff/requests/${id}/reissue-document`,
       { method: 'POST', body: JSON.stringify({ reason }) }
     ),
 
@@ -1006,6 +1045,13 @@ export const api = {
   revokeBarangayCertificate: (id: string, reason: string) =>
     request<{ revoked: boolean; verificationCode: string }>(
       `/barangay-staff/requests/${id}/revoke-certificate`,
+      { method: 'POST', body: JSON.stringify({ reason }) }
+    ),
+
+  /** The replacement for a certificate withdrawn in error. The administrator's. */
+  reissueBarangayCertificate: (id: string, reason: string) =>
+    request<{ verificationCode: string }>(
+      `/barangay-staff/requests/${id}/reissue-certificate`,
       { method: 'POST', body: JSON.stringify({ reason }) }
     ),
 
@@ -1427,6 +1473,18 @@ export const api = {
   removeTreasurerSignature: () =>
     request<MunicipalityDetails>('/admin/municipality/treasurer-signature', { method: 'DELETE' }),
 
+  /**
+   * The municipality's own signature, printed on a released document beside
+   * the releasing office's head.
+   */
+  signatorySignature: () => fetchBlob('/admin/municipality/signatory-signature'),
+
+  uploadSignatorySignature: (file: File) =>
+    uploadFile<MunicipalityDetails>('/admin/municipality/signatory-signature', file, undefined, 'PUT'),
+
+  removeSignatorySignature: () =>
+    request<MunicipalityDetails>('/admin/municipality/signatory-signature', { method: 'DELETE' }),
+
   auditTrail: (limit = 50) => request<AuditRow[]>(`/admin/audit?limit=${limit}`),
 
   /** What has been checked most often lately — the one signal a copy leaves. */
@@ -1538,6 +1596,7 @@ export const api = {
       documentCode: string | null
       documentRevoked: boolean
       documentRevokedReason: string | null
+      documentReissued: boolean
     }>(`/staff/requests/${id}`),
 
   assess: (id: string, fee: number, note?: string) =>
