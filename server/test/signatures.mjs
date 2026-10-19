@@ -344,5 +344,84 @@ check(
   (await j('/admin/offices/lcr', { method: 'PATCH', token: lcr, body: { headName: 'Me' } })).status === 403
 )
 
+console.log('\n== every slot, every role that is not an administrator ==')
+
+/*
+ * The whole of "signatures are uploaded by administrators" in one matrix.
+ *
+ * The individual checks above read better one at a time, but they cover the
+ * slots somebody thought of. This walks all four against every account that is
+ * not the administrator for that tier, so a slot added later without a gate
+ * fails here rather than being found by whoever uses it.
+ */
+const SLOTS = [
+  ['the municipal seal', '/admin/municipality/seal'],
+  ["the treasurer's signature", '/admin/municipality/treasurer-signature'],
+  ["an office head's signature", '/admin/offices/lcr/signature'],
+]
+const MUNICIPAL_OUTSIDERS = [
+  ['municipal staff', treasury],
+  ['the LCR\'s own staff', lcr],
+  ['a barangay administrator', brgyAdmin],
+  ['a barangay officer', brgyOfficer],
+  ['a resident', resident],
+]
+for (const [what, path] of SLOTS) {
+  for (const [who, token] of MUNICIPAL_OUTSIDERS) {
+    const put = await send(path, token, PNG, 'x.png')
+    const del = await j(path, { method: 'DELETE', token })
+    check(
+      `${who} cannot upload or remove ${what}`,
+      put.status === 403 && del.status === 403,
+      `${put.status}/${del.status}`
+    )
+  }
+}
+
+const BARANGAY_SLOTS = [
+  ['the barangay seal', '/barangay-staff/office/seal'],
+  ["the captain's signature", '/barangay-staff/office/signature/captain'],
+  ["the secretary's signature", '/barangay-staff/office/signature/secretary'],
+]
+for (const [what, path] of BARANGAY_SLOTS) {
+  for (const [who, token] of [['the barangay clerk', brgyOfficer], ['a resident', resident], ['the municipal administrator', admin]]) {
+    const put = await send(path, token, PNG, 'x.png')
+    const del = await j(path, { method: 'DELETE', token })
+    check(
+      `${who} cannot upload or remove ${what}`,
+      put.status === 403 && del.status === 403,
+      `${put.status}/${del.status}`
+    )
+  }
+}
+
+console.log('\n== nothing is signed in the app ==')
+
+/*
+ * The signature is a scan uploaded once and printed on everything afterwards.
+ * There is no signing step in any workflow and no route that would let the
+ * named official — or anybody else — sign a particular document, which is what
+ * the word "e-signature" invites somebody to look for.
+ */
+// Each role is asked on the mount it can actually reach: a staff token gets 403
+// from `/requests` at the mount, which would say nothing about whether a route
+// is there.
+for (const [who, token] of [['an administrator', admin], ['the releasing office', treasury]]) {
+  check(
+    `${who} has no route to sign a document`,
+    (await j(`/staff/requests/${requestId}/sign`, { method: 'POST', token, body: {} })).status === 404
+  )
+}
+check(
+  'and neither has the resident holding it',
+  (await j(`/requests/${requestId}/sign`, { method: 'POST', token: resident, body: {} })).status === 404
+)
+check(
+  'and none to sign a barangay certificate either',
+  (await j(`/barangay-staff/requests/${certReq.json.id}/sign`, {
+    method: 'POST', token: brgyAdmin, body: {},
+  })).status === 404
+)
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)

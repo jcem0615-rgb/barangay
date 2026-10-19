@@ -426,7 +426,7 @@ function OfficeRow({
           shape="wide"
           blurb={
             row.headName
-              ? `Printed above ${row.headName}'s name on every document this office releases. Leave it empty and the document prints the rule and the title, so the paper can still be signed by hand.`
+              ? `Scan the signature ${row.headName} made on paper and upload it here. It is then printed above their name on every document this office releases. Leave it empty and the document prints the rule and the title, so the paper can still be signed by hand.`
               : 'Printed on every document this office releases, above whoever is named above. Name somebody first — a signature with no name under it is not worth much on a counter.'
           }
           present={row.hasSignature}

@@ -182,7 +182,7 @@ export default function BarangayOffice({ readOnly }: { readOnly: boolean }) {
         <MarkUpload
           title="Barangay Secretary's signature"
           shape="wide"
-          blurb={`Printed above ${office.secretary ?? 'the secretary'}'s name under "Attested by". Leave it empty and the certificate prints the rule and the title, so the paper can still be signed by hand.`}
+          blurb={`Scan the signature ${office.secretary ?? 'the secretary'} made on paper. It is printed above their name under "Attested by". Leave it empty and the certificate prints the rule and the title, so the paper can still be signed by hand.`}
           present={office.hasSecretarySignature ?? false}
           updatedAt={office.secretarySignatureUpdatedAt}
           keepsNote="Certificates released before now keep the signature they were printed with."

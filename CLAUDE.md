@@ -1608,12 +1608,27 @@ the console, and then silently missing from every document printed with it. One
 `MarkUpload` component by all six slots in the two consoles — they behave identically
 because they *are* identical.
 
-**A signature here is a picture of one, and every screen that uploads one says so.**
-It makes the paper look the way a counter expects; it makes nothing tamper-evident.
-The verification code is still the only thing that proves a document, so the document
-itself says which is which in its footer, and `SignatureCaveat` says it again above the
-upload button — because the person uploading is exactly the person who might assume
-otherwise.
+**Nobody signs anything in this app, and the console says that first.** The official
+signs on paper, once; an administrator uploads the scan, once; the renderer draws that
+same picture on every document afterwards. There is no signing step in any workflow, no
+pad to sign on, and no route that would let the named official — or anybody else — sign
+a particular document. That is the whole design, and it is worth stating rather than
+leaving to be inferred from the absence of a button, because "e-signature" is precisely
+the word that makes somebody go looking for one. `server/test/signatures.mjs` asserts it:
+no sign route on the staff mount, the resident mount or the barangay one.
+
+**Only an administrator uploads one**, and that is a gate rather than a convention: every
+municipal slot sits behind `adminRouter`'s `requireRole('admin')` and every barangay slot
+behind `requireRole('barangay_admin')`. The suite walks all six slots against every
+account that is not the administrator for that tier — municipal staff, the office's own
+staff, the other tier's administrator, a barangay clerk, a resident — so a slot added
+later without a gate fails there rather than being found by whoever uses it.
+
+**And a signature here is a picture of one, which is a different warning.** It makes the
+paper look the way a counter expects; it makes nothing tamper-evident. The verification
+code is still the only thing that proves a document, so the document itself says which is
+which in its footer, and `SignatureCaveat` says it again above the upload button —
+because the person uploading is exactly the person who might assume otherwise.
 
 **Who signs is a fact about an office, not about the catalogue.** `departments` gained
 `head_name` and `head_title`, edited in **Municipality → Office details** beside the

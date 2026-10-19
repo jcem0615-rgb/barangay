@@ -148,18 +148,39 @@ export default function MarkUpload({
 /**
  * The line that goes above every signature upload in both consoles.
  *
- * It is the same sentence everywhere on purpose. A picture of a signature makes
- * the paper look the way a counter expects and makes nothing tamper-evident,
- * and somebody uploading one is exactly the person who might assume otherwise.
+ * It is the same sentence everywhere on purpose, and it says two different
+ * things that are each easy to get wrong.
+ *
+ * **Nobody signs anything in this app.** The official signs on paper, once; an
+ * administrator uploads the scan, once; the renderer draws that same picture on
+ * every document afterwards. There is no signing step in any workflow, no pad
+ * to sign on, and no route that would let the named official — or anybody else
+ * — sign a particular document. Somebody reading "e-signature" would reasonably
+ * expect otherwise, which is why the screen says it rather than leaving it to
+ * be inferred from the absence of a button.
+ *
+ * **And it is a picture, not a digital signature.** It makes the paper look the
+ * way a counter expects and makes nothing tamper-evident, and the person
+ * uploading one is exactly the person who might assume it does more.
  */
 export function SignatureCaveat() {
   return (
-    <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-[12.5px] leading-snug text-amber-900">
-      A signature here is a <strong>picture</strong> of one, not a digital signature. It makes
-      the document look the way a counter expects; it does not make a forged copy
-      detectable — the verification code printed beside it is what proves the document.
-      Only upload a signature its owner has agreed to, and know that every upload and
-      removal is recorded with your name against it.
-    </p>
+    <div className="mb-4 space-y-2 rounded-xl bg-amber-50 px-4 py-3 text-[12.5px] leading-snug text-amber-900">
+      <p>
+        <strong>Nothing is signed in this app.</strong> The official signs on paper and an
+        administrator uploads the scan here; it is then printed on every document that
+        office releases. There is no signing step anywhere, and nobody — the official
+        included — signs a document one at a time.
+      </p>
+      <p>
+        That also means what you upload is a <strong>picture</strong> of a signature, not a
+        digital one: it does not make a forged copy detectable, and the verification code
+        printed beside it is what proves the document.
+      </p>
+      <p>
+        Upload only a signature its owner has agreed to be used this way. Every upload and
+        removal is recorded with your name against it.
+      </p>
+    </div>
   )
 }
