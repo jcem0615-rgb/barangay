@@ -1,4 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
+} from 'react'
 import { en, fil, type StringKey } from '../i18n/strings'
 
 export type Language = 'en' | 'fil'
@@ -23,12 +25,31 @@ function initialLanguage(): Language {
   return preferred.startsWith('fil') || preferred.startsWith('tl') ? 'fil' : 'en'
 }
 
+/**
+ * The BCP 47 tag for `toLocaleDateString` and friends.
+ *
+ * It lives here because it was being derived in each screen that needed it —
+ * `language === 'fil' ? 'fil-PH' : 'en-PH'`, written out three times and
+ * forgotten in a dozen others, which is why dates kept coming out as "October"
+ * in the middle of a Filipino screen. One place to read it from is the whole
+ * fix; the alternative is remembering, and nobody does.
+ */
+const LOCALES: Record<Language, string> = { en: 'en-PH', fil: 'fil-PH' }
+
 interface I18nValue {
   language: Language
   setLanguage: (next: Language) => void
+  /** Pass this to any `toLocale*String` so dates follow the chosen language. */
+  locale: string
   /** Looks up a string, substituting {name} placeholders. */
   t: (key: StringKey, vars?: Record<string, string | number>) => string
 }
+
+/**
+ * The lookup function's type, for plain helpers that format a string outside a
+ * component and so have to be handed `t` rather than call `useT` themselves.
+ */
+export type Translate = I18nValue['t']
 
 const I18nContext = createContext<I18nValue | null>(null)
 
@@ -42,8 +63,22 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     } catch {
       // A refused write only costs the preference on the next visit.
     }
-    document.documentElement.lang = next === 'fil' ? 'fil' : 'en'
   }, [])
+
+  /**
+   * `<html lang>` follows the language, from the first render onwards.
+   *
+   * This used to be set inside `setLanguage`, which meant it was only ever
+   * right for somebody who *tapped the switch* in that session. A resident
+   * returning with Filipino stored, or arriving on a Filipino phone, got a
+   * Filipino interface inside `lang="en"` — so a screen reader pronounced it
+   * with English rules and the browser offered to translate the page out of a
+   * language it was not in. Deriving it from the state rather than from one
+   * code path is what makes it true on load as well as on change.
+   */
+  useEffect(() => {
+    document.documentElement.lang = language
+  }, [language])
 
   const t = useCallback(
     (key: StringKey, vars?: Record<string, string | number>) => {
@@ -57,7 +92,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     [language]
   )
 
-  const value = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t])
+  const value = useMemo(
+    () => ({ language, setLanguage, locale: LOCALES[language], t }),
+    [language, setLanguage, t]
+  )
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 

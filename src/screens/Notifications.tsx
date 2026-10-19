@@ -4,16 +4,24 @@ import TopBar from '../components/TopBar'
 import { api, type Notification } from '../lib/api'
 import { useNav } from '../lib/nav'
 import { useAppData } from '../lib/appData'
-import { useT } from '../lib/i18n'
+import { useT, type Translate } from '../lib/i18n'
 
-function timeAgo(iso: string): string {
+/**
+ * "just now", "5m ago", or a date once it is older than a day.
+ *
+ * Takes `t` and `locale` rather than reaching for them, because it is a plain
+ * function: the words used to be English literals here, so every notification
+ * on a Filipino screen ended in an English phrase, and the fallback date came
+ * out with English month names.
+ */
+function timeAgo(iso: string, t: Translate, locale: string): string {
   const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000)
-  if (seconds < 60) return 'just now'
+  if (seconds < 60) return t('time.justNow')
   const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 60) return t('time.minutes', { count: minutes })
   const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+  if (hours < 24) return t('time.hours', { count: hours })
+  return new Date(iso).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
 }
 
 const TONE: Record<Notification['kind'], string> = {
@@ -33,7 +41,7 @@ const LABEL: Record<Notification['kind'], 'notif.kindAssessed' | 'notif.kindAdva
 export default function Notifications() {
   const { push } = useNav()
   const { refresh } = useAppData()
-  const { t } = useT()
+  const { t, locale } = useT()
   const [items, setItems] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -109,8 +117,10 @@ export default function Notifications() {
               <span className={`rounded-full px-2 py-0.5 text-[calc(11.5px_*_var(--text-scale))] font-semibold ${TONE[item.kind]}`}>
                 {t(LABEL[item.kind])}
               </span>
-              {!item.readAt && <span className="h-1.5 w-1.5 rounded-full bg-navy-800" aria-label="Unread" />}
-              <span className="ml-auto text-[calc(12px_*_var(--text-scale))] text-slate-500">{timeAgo(item.createdAt)}</span>
+              {!item.readAt && <span className="h-1.5 w-1.5 rounded-full bg-navy-800" aria-label={t('a11y.unread')} />}
+              <span className="ml-auto text-[calc(12px_*_var(--text-scale))] text-slate-500">
+                {timeAgo(item.createdAt, t, locale)}
+              </span>
             </div>
             <p className="mt-1.5 font-display text-[calc(14.5px_*_var(--text-scale))] font-bold text-navy-950">{item.title}</p>
             <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] leading-snug text-slate-600">{item.body}</p>

@@ -18,14 +18,14 @@ import { formatPeso } from '../lib/money'
 import { WORKFLOW_STEPS } from '../types'
 import { useT } from '../lib/i18n'
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+function formatDate(iso: string, locale: string) {
+  return new Date(iso).toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 export default function ApplicationDetail({ id }: { id: string }) {
   const { applications } = useAppData()
   const { findCategory, findService } = useCatalogue()
-  const { t } = useT()
+  const { t, locale } = useT()
   const [downloading, setDownloading] = useState(false)
   const [receiptDownloading, setReceiptDownloading] = useState(false)
   // Fetched rather than taken off the list: a receipt number is one left join
@@ -97,7 +97,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
         <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4">
           <div>
             <p className="text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
-              {app.status === 'draft' ? t('detail.lastEdited') : t('detail.submittedOn')} {formatDate(app.dateSubmitted)}
+              {app.status === 'draft' ? t('detail.lastEdited') : t('detail.submittedOn')} {formatDate(app.dateSubmitted, locale)}
             </p>
             <p className="mt-0.5 text-[calc(13px_*_var(--text-scale))] font-medium text-slate-500">
               {service ? formatProcessingTime(service.processingDaysMin, service.processingDaysMax, t) : ''}

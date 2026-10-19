@@ -87,7 +87,7 @@ export default function Appointments() {
 }
 
 function Card({ row, onCancelled }: { row: Appointment; onCancelled: () => Promise<void> }) {
-  const { t } = useT()
+  const { t, locale } = useT()
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,7 +107,7 @@ function Card({ row, onCancelled }: { row: Appointment; onCancelled: () => Promi
 
       <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <p className="text-[calc(14px_*_var(--text-scale))] font-semibold text-navy-950">
-          {longDate(row.scheduledOn)} · {row.startTime}
+          {longDate(row.scheduledOn, locale)} · {row.startTime}
         </p>
       </div>
 

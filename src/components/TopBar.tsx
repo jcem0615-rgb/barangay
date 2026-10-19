@@ -1,5 +1,6 @@
 import { ChevronLeft } from 'lucide-react'
 import { useNav } from '../lib/nav'
+import { useT } from '../lib/i18n'
 import type { ReactNode } from 'react'
 
 interface TopBarProps {
@@ -11,6 +12,7 @@ interface TopBarProps {
 
 export default function TopBar({ title, subtitle, transparent, right }: TopBarProps) {
   const { canGoBack, pop } = useNav()
+  const { t } = useT()
 
   return (
     <header
@@ -21,7 +23,7 @@ export default function TopBar({ title, subtitle, transparent, right }: TopBarPr
       {canGoBack ? (
         <button
           onClick={pop}
-          aria-label="Go back"
+          aria-label={t('a11y.goBack')}
           className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-full text-navy-900 active:bg-slate-100"
         >
           <ChevronLeft size={22} />

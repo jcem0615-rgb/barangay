@@ -25,7 +25,7 @@ import { useT } from '../lib/i18n'
  * way it always has.
  */
 export default function BarangayHub() {
-  const { t, language } = useT()
+  const { t, locale } = useT()
   const [mine, setMine] = useState<Awaited<ReturnType<typeof api.myBarangay>> | null>(null)
   const [options, setOptions] = useState<Array<{ id: string; name: string }>>([])
   const [requests, setRequests] = useState<BarangayRequest[]>([])
@@ -57,8 +57,6 @@ export default function BarangayHub() {
       setError(err instanceof ApiError ? err.message : t('brgy.loadFailed'))
     }
   }
-
-  const locale = language === 'fil' ? 'fil-PH' : 'en-PH'
 
   return (
     <div className="animate-tap-in pb-24">

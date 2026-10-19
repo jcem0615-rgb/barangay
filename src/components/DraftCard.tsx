@@ -1,7 +1,7 @@
 import { ChevronRight, FileEdit } from 'lucide-react'
 import type { DraftRecord } from '../lib/api'
 import { useCatalogue } from '../lib/catalogue'
-import { useT } from '../lib/i18n'
+import { useT, type Translate } from '../lib/i18n'
 
 /**
  * A draft is not a request: it has no reference number, no status and no office
@@ -10,7 +10,7 @@ import { useT } from '../lib/i18n'
  */
 export default function DraftCard({ draft, onTap }: { draft: DraftRecord; onTap: () => void }) {
   const { findCategory, findService } = useCatalogue()
-  const { t } = useT()
+  const { t, locale } = useT()
 
   const category = draft.categoryId ? findCategory(draft.categoryId) : undefined
   const name = draft.serviceName ?? findService(draft.serviceId)?.name ?? draft.serviceId
@@ -32,7 +32,7 @@ export default function DraftCard({ draft, onTap }: { draft: DraftRecord; onTap:
             {name}
           </p>
           <p className="mt-0.5 text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
-            {t('draft.lastEdited', { when: formatWhen(draft.updatedAt) })}
+            {t('draft.lastEdited', { when: formatWhen(draft.updatedAt, t, locale) })}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[calc(11.5px_*_var(--text-scale))] font-semibold text-slate-600">
@@ -53,11 +53,17 @@ export default function DraftCard({ draft, onTap }: { draft: DraftRecord; onTap:
   )
 }
 
-/** Recent drafts read better as "today" than as a date the resident must decode. */
-function formatWhen(iso: string): string {
+/**
+ * Recent drafts read better as a time than as a date the resident must decode.
+ *
+ * Handed `t` and `locale` for the reason the notification list's helper is:
+ * "yesterday" was an English literal and the dates carried English month names
+ * whatever language the resident had chosen.
+ */
+function formatWhen(iso: string, t: Translate, locale: string): string {
   const then = new Date(iso)
   const days = Math.floor((Date.now() - then.getTime()) / 86_400_000)
-  if (days <= 0) return then.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })
-  if (days === 1) return 'yesterday'
-  return then.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+  if (days <= 0) return then.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
+  if (days === 1) return t('time.yesterday')
+  return then.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
 }

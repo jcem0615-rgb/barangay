@@ -9,6 +9,10 @@ const OPTIONS: Array<{ id: Language; label: string }> = [
 /**
  * Both labels are written in their own language, so someone who reads only one
  * of them can still find the right button.
+ *
+ * Each therefore carries its own `lang`: without it a screen reader announces
+ * both with the pronunciation rules of whichever language the page is in, so
+ * the one word a resident is listening for is the one it says wrong.
  */
 export default function LanguageToggle({ compact = false }: { compact?: boolean }) {
   const { language, setLanguage, t } = useT()
@@ -31,6 +35,7 @@ export default function LanguageToggle({ compact = false }: { compact?: boolean 
             type="button"
             onClick={() => setLanguage(option.id)}
             aria-pressed={language === option.id}
+            lang={option.id}
             className={`tap-target flex-1 rounded-lg py-2 text-[calc(13.5px_*_var(--text-scale))] font-semibold transition ${
               language === option.id ? 'bg-white text-navy-950 shadow-sm' : 'text-slate-500'
             }`}

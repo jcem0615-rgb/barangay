@@ -598,6 +598,38 @@ word in a Filipino screen. `src/lib/i18n.tsx` provides `I18nProvider` and `useT(
 from `navigator.language` (`fil`/`tl` -> Filipino). `LanguageToggle` sits in Profile and,
 in a compact variant, on the sign-in screen so residents can switch before logging in.
 
+**What the toggle has to switch is more than the dictionary, and three kinds of
+string kept escaping it.** A date formatted with a hard-coded `'en-PH'` printed
+"October" in the middle of a Filipino screen; an English literal rendered
+straight out of a component — "just now", "yesterday", "Go back" — never passed
+through `t()` at all; and a key whose Filipino was a copy of its English read as
+translated and was not. None of the three is visible to the compiler, and all
+three are invisible to anyone testing in English, which is everyone writing the
+code. So:
+
+- **`locale` comes off the context**, beside `t`. It was being derived in each
+  screen that needed it (`language === 'fil' ? 'fil-PH' : 'en-PH'`, written out
+  three times and forgotten in a dozen others). Pass it to every `toLocale*String`.
+- **A formatter outside a component takes `locale` as a required argument**, never
+  a defaulted one. `formatReadyRange` defaulted to `'en-PH'`, so every call site
+  compiled and not one passed a locale — a resident reading in Filipino was told
+  their permit was ready by "Oct 23 – 27" with every other word on the card in
+  Filipino. Required means the compiler finds the call sites; defaulted means
+  nobody does.
+- **`<html lang>` follows the language from the first render**, through an effect
+  on the state rather than a line inside `setLanguage`. It used to be set only
+  when somebody *tapped the switch*, so a resident returning with Filipino
+  stored, or arriving on a Filipino phone, got a Filipino interface inside
+  `lang="en"` — screen-reader pronunciation wrong, and the browser offering to
+  translate the page out of a language it was not in.
+- **`npm run check:i18n`** is what keeps all of that true. It walks the resident
+  files for fixed and defaulted locales, for the handful of English phrases that
+  actually slipped through, for a `fil` string identical to its `en` (against an
+  explicit `SAME_IN_BOTH` list, so a loanword is a decision somebody recorded
+  rather than an oversight), and for Filipino sitting in the English dictionary
+  — which is how `home.greeting` opened the English app with "Magandang araw,"
+  from the day the toggle was added.
+
 Two deliberate boundaries:
 
 - **The staff console stays English.** Municipal employees work in English-language

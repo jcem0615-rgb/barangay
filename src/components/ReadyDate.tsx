@@ -12,7 +12,7 @@ import { useT } from '../lib/i18n'
  * the resident's. That case says what is needed instead.
  */
 export default function ReadyDate({ app }: { app: Application }) {
-  const { t } = useT()
+  const { t, locale } = useT()
 
   if (app.awaitingResident) {
     return (
@@ -44,7 +44,7 @@ export default function ReadyDate({ app }: { app: Application }) {
           {t('ready.title')}
         </p>
         <p className="font-display mt-0.5 text-[calc(17px_*_var(--text-scale))] font-extrabold leading-tight text-navy-950">
-          {formatReadyRange(app.expectedReady.from, app.expectedReady.to)}
+          {formatReadyRange(app.expectedReady.from, app.expectedReady.to, locale)}
         </p>
         <p className="mt-1 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-600">
           {t('ready.estimate')}

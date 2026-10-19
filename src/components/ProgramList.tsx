@@ -13,7 +13,7 @@ import { useT } from '../lib/i18n'
  */
 export default function ProgramList({ programs }: { programs: ResidentProgram[] }) {
   const { findProgram } = useCatalogue()
-  const { t } = useT()
+  const { t, locale } = useT()
 
   if (programs.length === 0) {
     return (
@@ -74,12 +74,12 @@ export default function ProgramList({ programs }: { programs: ResidentProgram[] 
                   <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 border-t border-dashed border-slate-200 pt-2 text-[calc(12px_*_var(--text-scale))]">
                     <div>
                       <dt className="text-slate-500">{t('programs.enrolledOn')}</dt>
-                      <dd className="font-medium text-navy-950">{formatDate(record.enrolledOn)}</dd>
+                      <dd className="font-medium text-navy-950">{formatDate(record.enrolledOn, locale)}</dd>
                     </div>
                     <div>
                       <dt className="text-slate-500">{t('programs.validUntil')}</dt>
                       <dd className="font-medium text-navy-950">
-                        {record.validUntil ? formatDate(record.validUntil) : t('programs.noExpiry')}
+                        {record.validUntil ? formatDate(record.validUntil, locale) : t('programs.noExpiry')}
                       </dd>
                     </div>
                     <div className="min-w-0">
@@ -104,10 +104,10 @@ export default function ProgramList({ programs }: { programs: ResidentProgram[] 
 }
 
 /** Dates come from Postgres as plain YYYY-MM-DD, with no timezone to shift. */
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   if (!y || !m || !d) return iso
-  return new Date(y, m - 1, d).toLocaleDateString('en-PH', {
+  return new Date(y, m - 1, d).toLocaleDateString(locale, {
     year: 'numeric', month: 'short', day: 'numeric',
   })
 }

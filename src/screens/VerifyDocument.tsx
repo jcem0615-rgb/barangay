@@ -185,8 +185,7 @@ function NotFound() {
 }
 
 function Found({ result }: { result: VerifyResult }) {
-  const { t, language } = useT()
-  const locale = language === 'fil' ? 'fil-PH' : 'en-PH'
+  const { t, locale } = useT()
 
   const day = (value: string | null | undefined) => {
     if (!value) return null
@@ -228,7 +227,7 @@ function Found({ result }: { result: VerifyResult }) {
             t('docCheck.amount'),
             result.amount === undefined
               ? null
-              : `PHP ${result.amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              : `PHP ${result.amount.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
           ],
         ] as Array<[string, string | null]>)
       : []),

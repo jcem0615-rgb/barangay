@@ -58,7 +58,7 @@ export const en = {
   'auth.resetFailed': 'Could not reset your password.',
 
   // dashboard
-  'home.greeting': 'Magandang araw,',
+  'home.greeting': 'Good day,',
   'home.recentRequests': 'Recent Requests',
   'home.noRequests': 'No requests yet. Pick Municipal or Barangay above to start one.',
 
@@ -620,6 +620,20 @@ export const en = {
   'docCheck.checksOne': 'Checked once — this check.',
   'docCheck.checksFew': 'Checked {count} times, including this one.',
   'docCheck.checksMany': 'Checked {count} times, including this one. A document is normally checked once or twice; this many may mean copies are circulating.',
+
+  // Relative time, and the labels a screen reader reads out.
+  //
+  // These were English literals inside the components that rendered them, so
+  // "just now" and "Go back" stayed English on an otherwise Filipino screen —
+  // easy to miss when reading quickly, and in the aria-label case only ever
+  // heard by somebody using a screen reader, which is exactly the person least
+  // able to shrug it off.
+  'time.justNow': 'just now',
+  'time.minutes': '{count}m ago',
+  'time.hours': '{count}h ago',
+  'time.yesterday': 'yesterday',
+  'a11y.goBack': 'Go back',
+  'a11y.unread': 'Unread',
 } as const
 
 export type StringKey = keyof typeof en
@@ -696,7 +710,7 @@ export const fil: Record<StringKey, string> = {
   'requests.empty': 'Wala pang kahilingan sa kategoryang ito',
   'requests.finishDraft': 'Pindutin para tapusin at isumite',
 
-  'status.draft': 'Draft',
+  'status.draft': 'Burador',
   'status.submitted': 'Naisumite',
   'status.in_progress': 'Isinasagawa',
   'status.for_payment': 'Babayaran',
@@ -930,7 +944,7 @@ export const fil: Record<StringKey, string> = {
   'profile.reachYou': 'Paano ka namin aabisuhan',
   'profile.reachBlurb': 'Lagi mong makikita ang update sa app. Pumili ng iba pang paraan.',
   'profile.email': 'Email',
-  'profile.sms': 'Text message',
+  'profile.sms': 'Text',
   'profile.mobile': 'Numero ng cellphone',
   'profile.addNumber': 'Maglagay ng numero para mabuksan ang text message.',
   'profile.digitalId': 'Digital ID at PhilSys sync',
@@ -1023,7 +1037,7 @@ export const fil: Record<StringKey, string> = {
 
   // emergency hotlines
   'sos.title': 'Mga hotline sa emergency',
-  'sos.screenTitle': 'Emergency',
+  'sos.screenTitle': 'Emerhensiya',
   'sos.dashboardTitle': 'Mga hotline sa emergency',
   'sos.dashboardBlurb': 'Pindutin para makita lahat ng numero, tapos pindutin ang isa para tumawag',
   'incident.sectionTitle': 'Hindi emergency?',
@@ -1209,4 +1223,10 @@ export const fil: Record<StringKey, string> = {
   'docCheck.checksOne': 'Isang beses pa lang sinuri \u2014 ngayon.',
   'docCheck.checksFew': 'Sinuri nang {count} beses, kasama ito.',
   'docCheck.checksMany': 'Sinuri nang {count} beses, kasama ito. Karaniwang isa o dalawang beses lang sinusuri ang isang dokumento; maaaring may kumakalat na kopya.',
+  'time.justNow': 'ngayon lang',
+  'time.minutes': '{count} min ang nakalipas',
+  'time.hours': '{count} oras ang nakalipas',
+  'time.yesterday': 'kahapon',
+  'a11y.goBack': 'Bumalik',
+  'a11y.unread': 'Hindi pa nababasa',
 }

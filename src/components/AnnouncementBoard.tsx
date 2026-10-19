@@ -42,7 +42,7 @@ const dayMonth = (iso: string, locale: string) =>
   new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' })
 
 export default function AnnouncementBoard() {
-  const { t, language } = useT()
+  const { t, locale } = useT()
   const [notices, setNotices] = useState<Announcement[]>([])
 
   useEffect(() => {
@@ -50,7 +50,6 @@ export default function AnnouncementBoard() {
   }, [])
 
   if (notices.length === 0) return null
-  const locale = language === 'fil' ? 'fil-PH' : 'en-PH'
 
   return (
     <section className="mb-5">

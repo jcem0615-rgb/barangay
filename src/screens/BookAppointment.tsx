@@ -21,7 +21,7 @@ import { useT } from '../lib/i18n'
 export default function BookAppointment({ serviceId, requestId }: { serviceId?: string; requestId?: string }) {
   const { services, findCategory } = useCatalogue()
   const { replace } = useNav()
-  const { t } = useT()
+  const { t, locale } = useT()
 
   const [chosenService, setChosenService] = useState(serviceId ?? '')
   const service = services.find((s) => s.id === chosenService)
@@ -106,7 +106,7 @@ export default function BookAppointment({ serviceId, requestId }: { serviceId?: 
             {t('book.doneTitle')}
           </h1>
           <p className="mt-1 text-[calc(14px_*_var(--text-scale))] leading-snug text-slate-600">
-            {t('book.doneBlurb', { office: office?.officeName ?? '', date: longDate(done.date), time: done.time })}
+            {t('book.doneBlurb', { office: office?.officeName ?? '', date: longDate(done.date, locale), time: done.time })}
           </p>
 
           <div className="mt-5 rounded-2xl border border-navy-100 bg-navy-50 px-5 py-4">
@@ -183,7 +183,7 @@ export default function BookAppointment({ serviceId, requestId }: { serviceId?: 
                           : 'border-slate-200 bg-white text-navy-950'
                       }`}
                     >
-                      {shortDate(d.date)}
+                      {shortDate(d.date, locale)}
                     </button>
                   ))}
                 </div>
@@ -270,14 +270,21 @@ function Section({ step, title, children }: { step: number; title: string; child
   )
 }
 
-export const longDate = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-PH', {
+/**
+ * Both take the locale because both print weekday and month names, which are
+ * the words a resident actually reads off a booking — "Lunes" and "Oktubre"
+ * rather than "Monday" and "October" on a Filipino screen. `longDate` is
+ * exported and used by the appointments list as well, so it is the caller's
+ * job to hand its own locale in.
+ */
+export const longDate = (iso: string, locale: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, {
     timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric',
   })
 
-const shortDate = (iso: string) => {
+const shortDate = (iso: string, locale: string) => {
   const d = new Date(`${iso}T00:00:00Z`)
-  return `${d.toLocaleDateString('en-PH', { timeZone: 'UTC', weekday: 'short' })}\n${d.toLocaleDateString('en-PH', { timeZone: 'UTC', month: 'short', day: 'numeric' })}`
+  return `${d.toLocaleDateString(locale, { timeZone: 'UTC', weekday: 'short' })}\n${d.toLocaleDateString(locale, { timeZone: 'UTC', month: 'short', day: 'numeric' })}`
 }
 
 export { CalendarClock }

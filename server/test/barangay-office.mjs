@@ -162,11 +162,24 @@ await j(`/barangay-staff/requests/${filed.json.id}`, {
 row = await findMine()
 check('marking it ready dates it, because that is when the paper is prepared',
   row.validUntil !== null, row.validUntil)
-const expected = new Date()
-expected.setDate(expected.getDate() + clearance.validityDays)
+/**
+ * Counted from the *office's* today, not the container's.
+ *
+ * The server stamps `valid_until` from `(now() at time zone 'Asia/Manila')`,
+ * which is the rule every date in this app follows — a server clock somewhere
+ * else must not decide what day it is at a counter in Pangasinan. This used to
+ * build the expected date from `new Date()`, so on a machine running UTC it
+ * disagreed by one for the eight hours either side of midnight in Manila and
+ * the suite went red for a third of every day with nothing wrong.
+ */
+const officeToday = new Date(
+  new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) + 'T00:00:00Z'
+)
+officeToday.setUTCDate(officeToday.getUTCDate() + clearance.validityDays)
+const expected = officeToday.toISOString().slice(0, 10)
 check('and the date is the catalogue’s period from today',
-  row.validUntil === expected.toLocaleDateString('en-CA'),
-  `${row.validUntil} vs ${expected.toLocaleDateString('en-CA')}`)
+  row.validUntil === expected,
+  `${row.validUntil} vs ${expected}`)
 check('which is in the future, so it does not read as lapsed', row.expired === false)
 
 const ready = (await j('/notifications', { token: resident })).json.notifications

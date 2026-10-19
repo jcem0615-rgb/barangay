@@ -38,8 +38,15 @@ export function parseDay(day: string): Date {
 /**
  * "Sep 10 – 14, 2026", collapsing the parts both ends share, and just
  * "Sep 10, 2026" when the range is a single day.
+ *
+ * `locale` is required rather than defaulted. It used to fall back to
+ * `'en-PH'`, which is the worst shape for this: every caller compiled, nobody
+ * passed one, and a resident reading the app in Filipino was told their permit
+ * was ready by "Oct 23 – 27" while every other word on the card was Filipino.
+ * A missing locale is now a compile error, which is the only version of this
+ * somebody cannot forget.
  */
-export function formatReadyRange(from: string, to: string, locale = 'en-PH'): string {
+export function formatReadyRange(from: string, to: string, locale: string): string {
   const a = parseDay(from)
   const b = parseDay(to)
   const year = b.getFullYear()

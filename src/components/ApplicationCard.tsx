@@ -6,14 +6,14 @@ import { useCatalogue } from '../lib/catalogue'
 import { useT } from '../lib/i18n'
 import { formatReadyRange } from '../lib/schedule'
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+function formatDate(iso: string, locale: string) {
+  return new Date(iso).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default function ApplicationCard({ app, onTap }: { app: Application; onTap: () => void }) {
   const { findCategory } = useCatalogue()
   const category = findCategory(app.categoryId)
-  const { t } = useT()
+  const { t, locale } = useT()
 
   return (
     <button
@@ -29,7 +29,7 @@ export default function ApplicationCard({ app, onTap }: { app: Application; onTa
           )}
           <p className="mt-0.5 truncate font-display text-[calc(15px_*_var(--text-scale))] font-bold text-navy-950">{app.serviceName}</p>
           <p className="mt-0.5 text-[calc(12.5px_*_var(--text-scale))] text-slate-500">
-            {app.isOfflineDraft ? 'Saved offline' : `Ref. ${app.referenceNo}`} &middot; {formatDate(app.dateSubmitted)}
+            {app.isOfflineDraft ? t('form.savedOffline') : t('pay.refShort', { ref: app.referenceNo })} &middot; {formatDate(app.dateSubmitted, locale)}
           </p>
         </div>
         <StatusPill status={app.status} />
@@ -52,7 +52,7 @@ export default function ApplicationCard({ app, onTap }: { app: Application; onTa
         <p className="mt-2 flex items-center gap-1.5 border-t border-dashed border-slate-200 pt-2 text-[calc(12.5px_*_var(--text-scale))] text-slate-600">
           <CalendarClock size={13} className="shrink-0 text-navy-700" />
           {t('ready.byShort', {
-            date: formatReadyRange(app.expectedReady.from, app.expectedReady.to),
+            date: formatReadyRange(app.expectedReady.from, app.expectedReady.to, locale),
           })}
         </p>
       )}

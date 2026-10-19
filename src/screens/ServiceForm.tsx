@@ -22,7 +22,7 @@ export default function ServiceForm({ serviceId }: { serviceId: string }) {
   const { submit, refreshDrafts } = useAppData()
   const { findService, holidays } = useCatalogue()
   const isOnline = useOnlineStatus()
-  const { t } = useT()
+  const { t, locale } = useT()
   const service = findService(serviceId)
   const draft = useDraft(serviceId)
 
@@ -34,9 +34,10 @@ export default function ServiceForm({ serviceId }: { serviceId: string }) {
     const now = new Date()
     return formatReadyRange(
       addWorkingDays(now, service.processingDaysMin, holidays),
-      addWorkingDays(now, service.processingDaysMax, holidays)
+      addWorkingDays(now, service.processingDaysMax, holidays),
+      locale
     )
-  }, [service, holidays, t])
+  }, [service, holidays, t, locale])
 
   const [values, setValues] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})

@@ -10,7 +10,7 @@ import { useT } from '../lib/i18n'
 
 export default function IdCardScreen() {
   const resident = useResidentProfile()
-  const { t } = useT()
+  const { t, locale } = useT()
   const { url: photoUrl } = useResidentPhoto()
   if (!resident) return null
 
@@ -55,7 +55,7 @@ export default function IdCardScreen() {
               <p className="text-[calc(11.5px_*_var(--text-scale))] uppercase tracking-wider text-navy-100/60">{t('id.dateOfBirth')}</p>
               <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] font-semibold">
                 {resident.birthDate
-                  ? new Date(resident.birthDate).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })
+                  ? new Date(resident.birthDate).toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' })
                   : '—'}
               </p>
             </div>
