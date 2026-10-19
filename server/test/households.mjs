@@ -159,6 +159,19 @@ const silent = await j(`/barangay-staff/households/${second.json.id}/status`, {
 })
 check('and it cannot be done silently', silent.status === 400, silent.status)
 
+/**
+ * The figures as they stand before the household leaves the register.
+ *
+ * Read here rather than asserted against a fixed number afterwards, because
+ * `households` is cumulative across runs: "Purok 3 has at most ten" was really
+ * a proxy for "the one just archived is not counted", and it stopped being
+ * true once the suite had been run enough times — which made a green assertion
+ * go red without anything in the app changing. The delta is the actual claim
+ * and it does not care how many runs came before.
+ */
+const purok3 = (f) => f.byPurok.find((p) => p.purok === 'Purok 3') ?? { households: 0, population: 0 }
+const beforeArchive = purok3((await j('/barangay-staff/households/figures/summary', { token: officer })).json)
+
 check('the administrator can, with a reason', (await j(`/barangay-staff/households/${second.json.id}/status`, {
   method: 'PATCH', token: admin, body: { status: 'moved', statusNote: 'Moved to Dagupan, March.' },
 })).status === 200)
@@ -175,8 +188,17 @@ check('it counts this barangay', figures.json.barangay === 'Poblacion', figures.
 check('a child is counted as one', figures.json.children >= 1, figures.json.children)
 check('a senior is counted as one', figures.json.seniors >= 1, figures.json.seniors)
 check('what the barangay noted is counted', figures.json.pwd >= 1 && figures.json.fourPs >= 1)
-check('and a household that moved is out of the active figures',
-  !figures.json.byPurok.some((p) => p.purok === 'Purok 3' && p.households > 10), JSON.stringify(figures.json.byPurok))
+const afterArchive = purok3(figures.json)
+check(
+  'and a household that moved is out of the active figures',
+  afterArchive.households === beforeArchive.households - 1,
+  `${beforeArchive.households} -> ${afterArchive.households}`
+)
+check(
+  'its members leave the population with it',
+  afterArchive.population < beforeArchive.population,
+  `${beforeArchive.population} -> ${afterArchive.population}`
+)
 
 const theirFigures = await j('/barangay-staff/households/figures/summary', { token: otherAdmin })
 check('another barangay counts only its own', theirFigures.json.barangay === 'Nalsian', theirFigures.json.barangay)

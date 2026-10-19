@@ -184,6 +184,16 @@ queue and has no business seeing one; separate shells mean there is no filter to
 Municipal staff — the administrator included — get 403 from every `/barangay-staff` route,
 and barangay accounts get 403 from the municipal ones. A different tier is not a wider one.
 
+**And "every route" is checked as every route.** `server/test/isolation.mjs` reads the
+routers out of the source, walks all of them from the other tier's accounts, and requires
+403 on each — so a route added next year is covered the day it is added rather than when
+somebody remembers this file. It also reads *where* each route sits: one declared above its
+mount's `requireRole` line would be served to anybody, and the three sub-routers (the
+blotter, the register, the notice board) carry no gate of their own by design, so what is
+checked for them is that they are mounted inside `barangayStaffRouter` **below** its gate.
+Both halves have a self-check proving they can still fail, because a detector nobody has
+seen go off is one nobody should trust.
+
 **Isolation is the security property, and it is not a parameter.** Every query in
 `server/src/routes/barangayStaff.ts` is scoped to the barangay on the signed-in account's
 own row, so naming another barangay's request returns 404 rather than 403 — there is
