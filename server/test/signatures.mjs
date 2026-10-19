@@ -107,6 +107,10 @@ const home = barangays.find((b) => b.id === 'poblacion') ?? barangays[0]
 const elsewhere = barangays.find((b) => b.id !== home.id)
 const brgyAdmin = await login(`admin.${home.id}@malasiqui.gov.ph`)
 const brgyOfficer = await login(`officer.${home.id}@malasiqui.gov.ph`)
+// The councillor. It is a barangay account, in this same barangay, and it is
+// the role most likely to be let into these slots by accident — which is why
+// it is in both matrices below rather than only in its own suite.
+const brgyKagawad = await login(`kagawad.${home.id}@malasiqui.gov.ph`)
 const otherAdmin = await login(`admin.${elsewhere.id}@malasiqui.gov.ph`)
 
 console.log('\n== the bytes decide, not the filename ==')
@@ -361,6 +365,7 @@ console.log('\n== every slot, every role that is not an administrator ==')
 const SLOTS = [
   ['the municipal seal', '/admin/municipality/seal'],
   ["the treasurer's signature", '/admin/municipality/treasurer-signature'],
+  ["the hall's own signatory", '/admin/municipality/signatory-signature'],
   ["an office head's signature", '/admin/offices/lcr/signature'],
 ]
 const MUNICIPAL_OUTSIDERS = [
@@ -368,16 +373,21 @@ const MUNICIPAL_OUTSIDERS = [
   ['the LCR\'s own staff', lcr],
   ['a barangay administrator', brgyAdmin],
   ['a barangay officer', brgyOfficer],
+  ['a barangay kagawad', brgyKagawad],
   ['a resident', resident],
 ]
 for (const [what, path] of SLOTS) {
   for (const [who, token] of MUNICIPAL_OUTSIDERS) {
     const put = await send(path, token, PNG, 'x.png')
+    const got = await j(path, { token })
     const del = await j(path, { method: 'DELETE', token })
+    // Reading too, not only the two verbs that write: a signature file is the
+    // picture that gets printed on official paper, and fetching one is not a
+    // lesser act than replacing it.
     check(
-      `${who} cannot upload or remove ${what}`,
-      put.status === 403 && del.status === 403,
-      `${put.status}/${del.status}`
+      `${who} cannot upload, read or remove ${what}`,
+      put.status === 403 && got.status === 403 && del.status === 403,
+      `${put.status}/${got.status}/${del.status}`
     )
   }
 }
@@ -388,15 +398,43 @@ const BARANGAY_SLOTS = [
   ["the secretary's signature", '/barangay-staff/office/signature/secretary'],
 ]
 for (const [what, path] of BARANGAY_SLOTS) {
-  for (const [who, token] of [['the barangay clerk', brgyOfficer], ['a resident', resident], ['the municipal administrator', admin]]) {
+  // Everyone outside the barangay's own desk: refused all three verbs. The
+  // councillor is in here because the gate that opens `barangayStaffRouter`
+  // excludes it, which is the whole reason the kagawad has a router of its
+  // own — a third role on that gate would leave every slot here one forgotten
+  // `requireRole` away from an elected official.
+  for (const [who, token] of [
+    ['a barangay kagawad', brgyKagawad],
+    ['a resident', resident],
+    ['the municipal administrator', admin],
+  ]) {
     const put = await send(path, token, PNG, 'x.png')
+    const got = await j(path, { token })
     const del = await j(path, { method: 'DELETE', token })
     check(
-      `${who} cannot upload or remove ${what}`,
-      put.status === 403 && del.status === 403,
-      `${put.status}/${del.status}`
+      `${who} cannot upload, read or remove ${what}`,
+      put.status === 403 && got.status === 403 && del.status === 403,
+      `${put.status}/${got.status}/${del.status}`
     )
   }
+
+  // The clerk is the one deliberate exception, and it is a split rather than a
+  // gap: the administrator writes and *both* roles read, because an officer who
+  // cannot see what is being printed on the barangay's certificates cannot
+  // notice that it is wrong. So the write is refused and the read is not.
+  const clerkPut = await send(path, brgyOfficer, PNG, 'x.png')
+  const clerkDel = await j(path, { method: 'DELETE', token: brgyOfficer })
+  const clerkGet = await j(path, { token: brgyOfficer })
+  check(
+    `the barangay clerk cannot upload or remove ${what}`,
+    clerkPut.status === 403 && clerkDel.status === 403,
+    `${clerkPut.status}/${clerkDel.status}`
+  )
+  check(
+    `but the barangay clerk may read ${what}`,
+    clerkGet.status !== 403,
+    clerkGet.status
+  )
 }
 
 console.log('\n== nothing is signed in the app ==')
