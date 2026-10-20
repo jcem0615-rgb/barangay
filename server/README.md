@@ -437,7 +437,7 @@ valid; the outcome distinguishes unknown / expired / used because those mean dif
 things at a counter. Issuing retires anything the resident still has outstanding.
 
 Reachable by any staff or admin — counter work is not department-scoped — but the response
-carries only what a counter check needs: name, residency, the PhilSys number's last four,
+carries only what a counter check needs: name, residency,
 and the *current* programme record. The portrait is a separate route, gated on the caller
 having consumed a verification for that resident in the last five minutes, so staff cannot
 browse faces. Every check records `verified_by`.

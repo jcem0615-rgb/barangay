@@ -36,7 +36,6 @@ const registerSchema = z.object({
   barangayId: z.string().max(60).optional(),
   barangay: z.string().max(120).optional(),
   address: z.string().max(300).optional(),
-  philSysId: z.string().max(60).optional(),
   // Required now, and not for decoration: with the mother's maiden name these
   // are what tell two residents of the same name apart.
   birthDate: z.iso.date(),
@@ -119,10 +118,10 @@ authRouter.post('/register', async (req, res) => {
     const created = inserted.rows[0]!
     await client.query(
       `insert into resident_profiles
-         (user_id, philsys_id, barangay, municipality, province, birth_date, address, identity_key)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+         (user_id, barangay, municipality, province, birth_date, address, identity_key)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        created.id, body.philSysId ?? null, barangay?.name ?? body.barangay ?? null, municipality.name,
+        created.id, barangay?.name ?? body.barangay ?? null, municipality.name,
         municipality.province, body.birthDate, body.address ?? null, identity,
       ]
     )
@@ -218,7 +217,7 @@ authRouter.post('/login', async (req, res) => {
 
 authRouter.get('/me', authenticate, async (req, res) => {
   const profile = await one(
-    `select philsys_id as "philSysId", barangay, municipality, province,
+    `select barangay, municipality, province,
             birth_date as "birthDate", address,
             photo_key is not null as "hasPhoto",
             photo_updated_at as "photoUpdatedAt"

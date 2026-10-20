@@ -142,11 +142,6 @@ export default function StaffVerifyId() {
               <p className="mt-0.5 text-[13px] text-slate-600">
                 {[result.barangay, result.municipality, result.province].filter(Boolean).join(', ')}
               </p>
-              {result.philSysLast4 && (
-                <p className="mt-1 text-[12.5px] text-slate-500">
-                  PhilSys ending <span className="font-semibold tabular-nums text-navy-950">{result.philSysLast4}</span>
-                </p>
-              )}
               <p className="mt-1 text-[11.5px] text-slate-500">
                 Checked {new Date(result.checkedAt).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}
               </p>

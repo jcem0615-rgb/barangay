@@ -3,7 +3,7 @@ import { useAuth } from './auth'
 
 /**
  * Builds the ID-card profile from the signed-in account. Fields the resident
- * hasn't supplied (PhilSys, address) come back blank rather than invented —
+ * hasn't supplied (an address) come back blank rather than invented —
  * the card shows what the LGU actually holds.
  */
 export function useResidentProfile(): ResidentProfile | null {
@@ -15,9 +15,6 @@ export function useResidentProfile(): ResidentProfile | null {
   return {
     fullName: user.fullName,
     firstName,
-    philSysId: profile?.philSysId ?? '',
-    // Only a synced PhilSys number counts as verified.
-    philSysSynced: Boolean(profile?.philSysId),
     barangay: profile?.barangay ?? '',
     municipality: profile?.municipality ?? '',
     province: profile?.province ?? '',

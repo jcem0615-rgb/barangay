@@ -39,7 +39,7 @@ const uniq = () => `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)
 const resident = (await j('/auth/register', { method: 'POST', body: {
   email: `pay.${stamp}@example.com`, password: 'bayad-na-2026', fullName: 'Bayani P. Reyes',
   birthDate: '1990-01-01', motherMaidenName: uniq(), residesHere: true,
-  philSysId: '3131-4141-5151-6161', barangay: 'Poblacion',
+  barangay: 'Poblacion',
 } })).json.token
 const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: process.env.SEED_PASSWORD ?? 'elgu-demo-2026' } })).json.token
 const health = (await j('/auth/login', { method: 'POST', body: { email: 'health@malasiqui.gov.ph', password: process.env.SEED_PASSWORD ?? 'elgu-demo-2026' } })).json.token

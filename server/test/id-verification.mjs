@@ -25,7 +25,7 @@ const j = async (p, o = {}) => {
 const formFor = await formFiller(API)
 const stamp = Date.now()
 
-const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `idv.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Lourdes B. Aquino', philSysId: '6392-8841-0027-3311', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan' } })).json.token
+const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `idv.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Lourdes B. Aquino', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan' } })).json.token
 const other = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true, email: `idv2.${stamp}@example.com`, password: 'patunayan-mo-2026', fullName: 'Iba Tao' } })).json.token
 const treasury = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const cswdo = (await j('/auth/login', { method: 'POST', body: { email: 'cswdo@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
@@ -55,8 +55,10 @@ console.log('\n== it answers only the question a counter asks ==')
 const body = JSON.stringify(ok.json)
 check('no email', !body.includes('@example.com'), body)
 check('no request history', !('requests' in ok.json))
-check('PhilSys is masked to four digits', ok.json.philSysLast4 === '3311', ok.json.philSysLast4)
-check('never the whole number', !body.includes('6392-8841'), body)
+// The counter check used to return the last four digits of a national ID
+// number this app never verified against anything. It holds none now, so what
+// is asserted is the absence rather than the masking.
+check('no national ID number, masked or otherwise', !/philSys/i.test(body), body)
 check('says whether a photo exists', typeof ok.json.hasPhoto === 'boolean')
 check('carries the live entitlements', Array.isArray(ok.json.programs))
 

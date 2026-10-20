@@ -17,7 +17,7 @@ const j = async (p, o = {}) => {
 const stamp = Date.now()
 const register = async (name) => (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
   email: `appt.${name}.${stamp}@example.com`, password: 'tipanan-natin-2026', fullName: `Test ${name} ${stamp}`,
-  philSysId: '1234-5678-9012-3456', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
+  barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
 } })).json.token
 
 const resident = await register('a')
@@ -146,7 +146,7 @@ check('the office sees its day', day.status === 200 && day.json.appointments.len
 check('in time order', day.json.appointments.every((a, i) => i === 0 || a.startTime >= day.json.appointments[i - 1].startTime))
 check('naming who is expected', day.json.appointments.every((a) => typeof a.residentName === 'string' && a.residentName.length > 0))
 check('and what for', day.json.appointments.every((a) => typeof a.serviceName === 'string'))
-check('but nothing more about them', day.json.appointments.every((a) => !('email' in a) && !('philSysId' in a) && !('phone' in a)))
+check('but nothing more about them', day.json.appointments.every((a) => !('email' in a) && !('phone' in a) && !('address' in a)))
 check('another office cannot see it', (await j(`/staff/appointments?date=${openDay}&departmentId=treasury`, { token: health })).status === 403)
 check('a resident cannot see it at all', (await j(`/staff/appointments?date=${openDay}`, { token: resident })).status === 403)
 check('an admin can see every office', (await j(`/staff/appointments?date=${openDay}`, { token: admin })).json.appointments.length >= day.json.appointments.length)

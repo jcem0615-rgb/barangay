@@ -127,9 +127,9 @@ export default function MyData() {
             <p className="mt-1.5 text-[calc(12.5px_*_var(--text-scale))] text-emerald-700">{t('common.saved')}</p>
           )}
 
-          {/* A name and a PhilSys number are identity claims an office verified
-              against documents. Saying where to go is more use than a disabled
-              field with no explanation. */}
+          {/* A name is an identity claim an office verified against documents.
+              Saying where to go is more use than a disabled field with no
+              explanation. */}
           <p className="mt-3 rounded-xl bg-slate-50 px-3.5 py-3 text-[calc(12.5px_*_var(--text-scale))] leading-relaxed text-slate-600">
             {t('mydata.identityNote')}
           </p>

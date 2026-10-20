@@ -257,7 +257,6 @@ export interface AuthUser {
 }
 
 export interface ResidentProfileData {
-  philSysId: string | null
   barangay: string | null
   municipality: string | null
   province: string | null
@@ -277,7 +276,6 @@ export interface IdCheck {
   barangay: string | null
   municipality: string | null
   province: string | null
-  philSysLast4: string | null
   hasPhoto: boolean
   programs: ResidentProgram[]
   checkedAt: string
@@ -465,7 +463,6 @@ async function fetchBlob(path: string): Promise<Blob | null> {
 }
 
 export interface ResidentCorrection {
-  philSysId: string | null
   barangay: string | null
   municipality: string | null
   province: string | null

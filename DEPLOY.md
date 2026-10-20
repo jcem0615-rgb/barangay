@@ -380,7 +380,8 @@ Deploying does not make these real, and residents will notice:
   `PaymentProvider` for your gateway and set `PAYMENT_PROVIDER` and `PAYMENT_SECRET`.
   **Deploying with `PAYMENT_PROVIDER=mock` makes every permit free**, because the
   mock's own route settles a payment nobody made.
-- **PhilSys verification** and the ID **QR code** are visual only.
+- **There is no PhilSys integration, and nothing in the app claims one.** The ID is proved
+  by its own verification code, which is real and checked server-side.
 - **A barangay certificate's wording is authored, and nothing verifies it.** Each type
   carries its own attestation text, and the app prints what it was given: a clearance saying
   the holder has no pending case says so because the office releasing it says so, not

@@ -6,7 +6,7 @@ import type { StringKey } from '../i18n/strings'
 /**
  * The Data Privacy Act notice.
  *
- * A Philippine government service that collects a PhilSys number, a birth date
+ * A Philippine government service that collects a birth date, an address
  * and a household's programme record owes the resident a plain statement of
  * what it holds and what they can do about it. Written as short sections rather
  * than a wall of legal text, because the point is that it gets read.

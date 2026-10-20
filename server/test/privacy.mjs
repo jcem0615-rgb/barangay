@@ -23,7 +23,7 @@ const make = async (n) => {
   const email = `priv.${n}.${stamp}@example.com`
   const token = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
     email, password: 'karapatan-ko-2026', fullName: `Privacy ${n} ${stamp}`,
-    philSysId: '1010-2020-3030-4040', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
+    barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
   } })).json.token
   return { email, token }
 }
@@ -72,11 +72,16 @@ const fixed = await j('/privacy/profile', { method: 'PATCH', token: subject.toke
   address: `12 Rizal Street, Poblacion ${stamp}`, phone: '0917 123 4567' } })
 check('address and phone can be corrected', fixed.status === 200 && fixed.json.address.includes(`${stamp}`), JSON.stringify(fixed.json))
 check('a partial correction leaves the rest alone', (await j('/privacy/profile', { method: 'PATCH', token: subject.token, body: { phone: '0918 765 4321' } })).json.address.includes(`${stamp}`))
-// A name and a PhilSys number are identity claims an office verified. A portal
-// that let someone retype either is not one an office could trust.
-const renamed = await j('/privacy/profile', { method: 'PATCH', token: subject.token, body: { philSysId: '9999-9999-9999-9999', fullName: 'Someone Else' } })
-check('a PhilSys number cannot be retyped here', renamed.status === 400, `${renamed.status} ${JSON.stringify(renamed.json)}`)
-check('and the number is unchanged', (await j('/privacy/export', { token: subject.token })).json.profile.philSysId === '1010-2020-3030-4040')
+// A name is an identity claim an office verified against documents. A portal
+// that let someone retype it is not one an office could trust. The schema
+// strips the key, which leaves nothing to change — so the refusal is the
+// empty-patch one rather than a field-by-field rejection somebody maintains.
+const renamed = await j('/privacy/profile', { method: 'PATCH', token: subject.token, body: { fullName: 'Someone Else' } })
+check('a name cannot be retyped here', renamed.status === 400, `${renamed.status} ${JSON.stringify(renamed.json)}`)
+check('and the name is unchanged', (await j('/privacy/export', { token: subject.token })).json.account.fullName !== 'Someone Else')
+// PhilSys is gone from this app entirely: the number was never checked against
+// anything, so the export must not carry a field implying it was.
+check('the export holds no national ID number', !JSON.stringify((await j('/privacy/export', { token: subject.token })).json).match(/philSys/i))
 check('an impossible birth date is refused', (await j('/privacy/profile', { method: 'PATCH', token: subject.token, body: { birthDate: '2026-02-31' } })).status === 400)
 check('an empty correction is refused', (await j('/privacy/profile', { method: 'PATCH', token: subject.token, body: {} })).status === 400)
 
@@ -99,7 +104,7 @@ check('the session is dead immediately', (await j('/requests', { token: subject.
 check('and the password no longer signs in', (await j('/auth/login', { method: 'POST', body: { email: subject.email, password: 'karapatan-ko-2026' } })).status >= 400)
 check('the email is released for a fresh registration', (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
   email: subject.email, password: 'bagong-simula-2026', fullName: 'Someone New',
-  philSysId: '5050-6060-7070-8080', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan' } })).status === 201)
+  barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan' } })).status === 201)
 check('closing twice is refused', (await j('/privacy/close', { method: 'POST', token: subject.token })).status === 401)
 
 console.log('\n== what really went, and what really stayed ==')

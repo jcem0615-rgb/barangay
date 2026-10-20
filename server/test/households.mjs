@@ -208,8 +208,8 @@ console.log('\n== it is not a view onto the user table ==')
 // The whole point of keeping members as free text: a barangay clerk must not be
 // able to turn this into a lookup of municipal accounts.
 const everything = JSON.stringify(ourSearch.json) + JSON.stringify(opened.json)
-check('no member carries a user id, email or PhilSys number',
-  !/userId|philSys|@example\.com|@malasiqui\.gov\.ph/i.test(everything))
+check('no member carries a user id or an email address',
+  !/userId|@example\.com|@malasiqui\.gov\.ph/i.test(everything))
 
 const notes = await j('/notifications', { token: resident })
 check('and nothing about a register entry notifies anybody',

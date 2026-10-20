@@ -230,8 +230,6 @@ export interface ResidentProgram {
 export interface ResidentProfile {
   fullName: string
   firstName: string
-  philSysId: string
-  philSysSynced: boolean
   barangay: string
   municipality: string
   province: string

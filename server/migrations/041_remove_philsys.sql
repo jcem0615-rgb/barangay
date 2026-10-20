@@ -1,0 +1,15 @@
+-- PhilSys here was visual only. Nothing in this app ever called a PhilSys
+-- verification API: the number was typed at registration, stored, and then the
+-- ID card printed "PhilSys Verified" over it and the profile showed a green
+-- tick. A badge asserting an identity check nobody performed is worse than no
+-- badge at all, because a counter clerk reads it as one that happened.
+--
+-- So the claim and the column it was drawn from both go. What is left is the
+-- verification this app really does perform: the ID's own code, which lives
+-- ninety seconds, is consumed on first check, and is verified server-side.
+--
+-- The column is dropped rather than left unread. A national ID number sitting
+-- in a table nobody reads is still a national ID number in a table, and the
+-- Data Privacy export, the correction screen and the counter check all had to
+-- keep describing it.
+alter table resident_profiles drop column if exists philsys_id;

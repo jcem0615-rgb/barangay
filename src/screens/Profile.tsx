@@ -1,4 +1,4 @@
-import { ChevronRight, CircleHelp, DatabaseBackup, FileText, IdCard, LogOut, MessageSquareWarning, ShieldCheck, Wifi } from 'lucide-react'
+import { ChevronRight, CircleHelp, DatabaseBackup, FileText, IdCard, LogOut, MessageSquareWarning, Wifi } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import { addressLine, useResidentProfile } from '../lib/resident'
 import { useAuth } from '../lib/auth'
@@ -46,10 +46,6 @@ export default function Profile() {
           <div className="min-w-0">
             <p className="truncate font-display text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">{resident.fullName}</p>
             <p className="truncate text-[calc(13px_*_var(--text-scale))] text-slate-500">{addressLine(resident.barangay, resident.municipality)}</p>
-            <div className="mt-1 flex items-center gap-1">
-              <ShieldCheck size={12} className="text-emerald-600" />
-              <span className="text-[calc(12px_*_var(--text-scale))] font-semibold text-emerald-700">{t('profile.philsysVerified')}</span>
-            </div>
           </div>
         </div>
 

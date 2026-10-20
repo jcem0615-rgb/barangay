@@ -35,7 +35,7 @@ privacyRouter.get('/export', async (req, res) => {
     [id]
   )
   const [profile] = await query(
-    `select philsys_id as "philSysId", barangay, municipality, province,
+    `select barangay, municipality, province,
             birth_date::text as "birthDate", address, phone,
             photo_key is not null as "hasPhoto", photo_updated_at as "photoUpdatedAt"
        from resident_profiles where user_id = $1`,
@@ -135,11 +135,11 @@ privacyRouter.get('/export', async (req, res) => {
  * Correcting what the resident can correct themselves.
  *
  * Contact details are theirs: an address or a phone number is a fact about
- * them that they know better than the office does. A name and a PhilSys number
- * are identity claims an office verified against documents, and a portal that
- * let someone retype either would not be a portal an office could trust — so
- * those go through the Local Civil Registrar, and the screen says so rather
- * than leaving a resident wondering why the field is missing.
+ * them that they know better than the office does. A name is an identity
+ * claim an office verified against documents, and a portal that let someone
+ * retype it would not be a portal an office could trust — so that goes through
+ * the Local Civil Registrar, and the screen says so rather than leaving a
+ * resident wondering why the field is missing.
  */
 const correctionBody = z.object({
   barangay: z.string().trim().max(120).nullable().optional(),
@@ -168,7 +168,7 @@ privacyRouter.patch('/profile', async (req, res) => {
     `update resident_profiles
         set barangay = $2, address = $3, phone = $4, birth_date = $5
       where user_id = $1
-      returning philsys_id as "philSysId", barangay, municipality, province,
+      returning barangay, municipality, province,
                 birth_date::text as "birthDate", address, phone`,
     [req.user!.id, merged.barangay || null, merged.address || null, merged.phone || null, merged.birthDate || null]
   )

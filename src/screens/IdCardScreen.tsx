@@ -1,4 +1,4 @@
-import { ShieldCheck, Fingerprint } from 'lucide-react'
+import { ShieldCheck, ScanLine } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import ProgramList from '../components/ProgramList'
 import EmergencyContacts from '../components/EmergencyContacts'
@@ -46,11 +46,7 @@ export default function IdCardScreen() {
             <p className="text-[calc(13px_*_var(--text-scale))] text-navy-100/70">{resident.province}</p>
           </div>
 
-          <div className="relative mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
-            <div>
-              <p className="text-[calc(11.5px_*_var(--text-scale))] uppercase tracking-wider text-navy-100/60">{t('id.philsysNo')}</p>
-              <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] font-semibold tracking-wide">{resident.philSysId}</p>
-            </div>
+          <div className="relative mt-5 grid grid-cols-1 gap-3 border-t border-white/10 pt-4">
             <div>
               <p className="text-[calc(11.5px_*_var(--text-scale))] uppercase tracking-wider text-navy-100/60">{t('id.dateOfBirth')}</p>
               <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] font-semibold">
@@ -64,7 +60,7 @@ export default function IdCardScreen() {
 
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-            <Fingerprint size={17} className="text-emerald-700" />
+            <ScanLine size={17} className="text-emerald-700" />
           </span>
           <div>
             <p className="text-[calc(14px_*_var(--text-scale))] font-bold text-emerald-800">{t('id.verifiedTitle')}</p>

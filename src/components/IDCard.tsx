@@ -1,4 +1,4 @@
-import { ShieldCheck, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import type { ResidentProfile } from '../types'
 import { useT } from '../lib/i18n'
 import { useCatalogue } from '../lib/catalogue'
@@ -14,7 +14,7 @@ import { addressLine } from '../lib/resident'
 const BADGES_ON_CARD = 3
 
 export default function IDCard({ profile, onTap }: { profile: ResidentProfile; onTap?: () => void }) {
-  const { t } = useT()
+  const { t, locale } = useT()
   const { findProgram } = useCatalogue()
   const { url: photoUrl } = useResidentPhoto()
 
@@ -46,17 +46,20 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
         </div>
       </div>
 
-      <div className="relative mt-5 flex items-end justify-between">
-        <div>
-          <p className="text-[calc(11.5px_*_var(--text-scale))] uppercase tracking-wider text-navy-100/70">{t('id.philsysNo')}</p>
-          <p className="font-display text-[calc(14.5px_*_var(--text-scale))] font-semibold tracking-wide text-white">{profile.philSysId}</p>
-        </div>
-        <div className="flex items-center gap-1 rounded-full bg-emerald-400/15 px-2.5 py-1">
-          <ShieldCheck size={13} className="text-emerald-400" />
-          <span className="text-[calc(12px_*_var(--text-scale))] font-semibold text-emerald-300">
-            {profile.philSysSynced ? t('id.synced') : t('id.notSynced')}
-          </span>
-        </div>
+      {/*
+        What the card face states is what the register holds. It carried a
+        national ID number and a green "verified" pill for a while, and neither
+        was ever checked against anything — so a clerk read an assertion this
+        app had not earned. The date of birth is a fact the register really
+        does hold, and what proves the card is the code below it.
+      */}
+      <div className="relative mt-5">
+        <p className="text-[calc(11.5px_*_var(--text-scale))] uppercase tracking-wider text-navy-100/70">{t('id.dateOfBirth')}</p>
+        <p className="font-display text-[calc(14.5px_*_var(--text-scale))] font-semibold tracking-wide text-white">
+          {profile.birthDate
+            ? new Date(profile.birthDate).toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' })
+            : '—'}
+        </p>
       </div>
 
       {active.length > 0 && (

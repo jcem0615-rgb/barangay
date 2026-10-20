@@ -43,7 +43,7 @@ const SAME_IN_BOTH = new Set([
   'auth.barangay', 'mydata.barangay', 'tier.barangay', 'brgy.title', 'brgy.hallCaptain',
   'auth.email', 'profile.email', 'help.email', 'auth.password', 'profile.account',
   'nav.profile', 'profile.title', 'notif.kindAdvanced', 'incident.videoFile',
-  'id.title', 'id.philsysNo', 'privacy.contactTitle', 'docCheck.kindReceipt',
+  'id.title', 'privacy.contactTitle', 'docCheck.kindReceipt',
   'pay.reference', 'pay.refShort', 'docCheck.reference',
   'verify.title', 'docCheck.codeLabel', 'detail.documentCode',
   // The demo panel: a place, a person and a Filipino word. "Barangay

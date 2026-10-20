@@ -20,7 +20,7 @@ const admin = (await j('/auth/login', { method: 'POST', body: { email: 'admin@ma
 const clerk = (await j('/auth/login', { method: 'POST', body: { email: 'treasury@malasiqui.gov.ph', password: 'elgu-demo-2026' } })).json.token
 const resident = (await j('/auth/register', { method: 'POST', body: { birthDate: '1990-01-01', motherMaidenName: `Maiden ${Date.now()}${Math.random().toString(36).slice(2, 8)}`, residesHere: true,
   email: `muni.${stamp}@example.com`, password: 'palitan-mo-ito-2026', fullName: 'Rosario T. Aguilar',
-  philSysId: '4455-6677-8899-0011', barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
+  barangay: 'Poblacion', municipality: 'Malasiqui', province: 'Pangasinan',
 } })).json.token
 
 console.log('\n== only an administrator may touch any of it ==')

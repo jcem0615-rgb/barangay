@@ -821,7 +821,7 @@ staffRouter.delete('/requests/:id/programs/:code', async (req, res) => {
 // citizen discount in front of them is real. What comes back is scoped to that
 // question and no wider: a face to compare, a name, where they live, and the
 // entitlements that are live right now. Not an email, not a phone number, not
-// a request history, and not a PhilSys number in full.
+// a request history, and no national ID number — this app holds none.
 //
 // This is not a directory. The only way in is a code the resident chose to
 // show, which dies in ninety seconds and works once — so a check is something
@@ -852,9 +852,9 @@ staffRouter.post('/verify-id', async (req, res) => {
 
   const resident = await one<{
     full_name: string; barangay: string | null; municipality: string | null
-    province: string | null; philsys_id: string | null; has_photo: boolean
+    province: string | null; has_photo: boolean
   }>(
-    `select u.full_name, rp.barangay, rp.municipality, rp.province, rp.philsys_id,
+    `select u.full_name, rp.barangay, rp.municipality, rp.province,
             rp.photo_key is not null as has_photo
        from users u
        left join resident_profiles rp on rp.user_id = u.id
@@ -870,8 +870,6 @@ staffRouter.post('/verify-id', async (req, res) => {
     barangay: resident.barangay,
     municipality: resident.municipality,
     province: resident.province,
-    // Last four only: enough to match against a physical card, useless to copy.
-    philSysLast4: resident.philsys_id ? resident.philsys_id.replace(/\D/g, '').slice(-4) : null,
     hasPhoto: resident.has_photo,
     // The live record, not whatever the card was showing when it was screenshotted.
     programs: await listResidentPrograms(outcome.userId),

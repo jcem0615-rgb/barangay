@@ -31,8 +31,9 @@ accurate — that:
 - **Online payment settles through a development simulator.** The architecture
   is complete and tested, but no real gateway is wired. Do not let either
   document imply otherwise, and do not deploy with `PAYMENT_PROVIDER=mock`.
-- **PhilSys verification is represented, not connected.** The ID's own
-  verification code is real and checked server-side; the PhilSys sync is not.
+- **There is no PhilSys integration, and the app no longer implies one.** The
+  ID's own verification code is real and checked server-side. Do not let
+  either document suggest a national-ID check this system does not perform.
 - **The hotlines, fees, validity periods, holiday calendar and document routes
   are placeholders.** They read as plausible because they were written
   carefully, which is exactly what makes them dangerous under a municipality's

@@ -19,7 +19,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v28'
+const STORE_KEY = 'elgu-demo-state-v29'
 
 interface DemoIncident {
   id: string
@@ -122,7 +122,7 @@ interface DemoUser {
    */
   identityKey?: string | null
   profile: {
-    philSysId: string | null; barangay: string | null; municipality: string | null
+    barangay: string | null; municipality: string | null
     province: string | null; birthDate: string | null; address: string | null; phone: string | null
   }
   /** The ID portrait, as a data URL. Null until the resident sets one. */
@@ -446,7 +446,7 @@ function seed(): DemoState {
       id: uid(), email: 'admin@malasiqui.gov.ph', password: DEMO_PASSWORD,
       fullName: 'Office of the Mayor — Administrator', role: 'admin', departments: [],
       position: null, active: true, notifyEmail: true, notifySms: false,
-      profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
+      profile: { barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
       photo: null, photoUpdatedAt: null,
       programs: [],
     },
@@ -454,7 +454,7 @@ function seed(): DemoState {
       id: uid(), email: s.email, password: DEMO_PASSWORD, fullName: s.name,
       role: 'staff' as const, departments: [s.dept], position: s.position, active: true,
       notifyEmail: true, notifySms: false,
-      profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
+      profile: { barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
       photo: null, photoUpdatedAt: null,
       programs: [],
     })),
@@ -467,7 +467,7 @@ function seed(): DemoState {
         fullName: `${b.name} Barangay Secretary`, role: 'barangay_admin' as const,
         departments: [], position: null, active: true, notifyEmail: true, notifySms: false,
         barangayId: b.id,
-        profile: { philSysId: null, barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
+        profile: { barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
         photo: null, photoUpdatedAt: null, programs: [],
       },
       ...(index === 0
@@ -476,7 +476,7 @@ function seed(): DemoState {
             fullName: `${b.name} Barangay Clerk`, role: 'barangay_officer' as const,
             departments: [], position: null, active: true, notifyEmail: true, notifySms: false,
             barangayId: b.id,
-            profile: { philSysId: null, barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
+            profile: { barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
             photo: null, photoUpdatedAt: null, programs: [],
           },
           // One kagawad, so the demo can show what an elected member sees and —
@@ -486,7 +486,7 @@ function seed(): DemoState {
             fullName: `${b.name} Barangay Kagawad`, role: 'barangay_kagawad' as const,
             departments: [], position: null, active: true, notifyEmail: true, notifySms: false,
             barangayId: b.id,
-            profile: { philSysId: null, barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
+            profile: { barangay: b.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
             photo: null, photoUpdatedAt: null, programs: [],
           }]
         : []),
@@ -502,7 +502,7 @@ function seed(): DemoState {
     // barangay console's queue and the resident's hub are the same barangay.
     barangayId: BARANGAYS[0]!.id,
     profile: {
-      philSysId: '6392-8841-0027-3311', barangay: `Barangay ${BARANGAYS[0]!.name}`,
+      barangay: `Barangay ${BARANGAYS[0]!.name}`,
       municipality: 'Municipality of Malasiqui', province: 'Pangasinan',
       birthDate: '1994-03-18', address: 'Blk 4 Lot 12, Purok 3', phone: null,
     },
@@ -3038,7 +3038,7 @@ async function route(
           fullName, role: role as DemoUser['role'],
           departments: [], position: null, active: true, notifyEmail: true, notifySms: false,
           barangayId: own.id,
-          profile: { philSysId: null, barangay: own.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
+          profile: { barangay: own.name, municipality: null, province: null, birthDate: null, address: null, phone: null },
           photo: null, photoUpdatedAt: null, programs: [],
         }
         state.users.push(created)
@@ -3345,7 +3345,7 @@ async function route(
         identityKey: identity,
         barangayId: chosenBarangay?.id ?? null,
         profile: {
-          philSysId: null, barangay: chosenBarangay?.name ?? body.barangay ?? null,
+          barangay: chosenBarangay?.name ?? body.barangay ?? null,
           municipality: MUNICIPALITY.name,
           province: MUNICIPALITY.province, birthDate: body.birthDate, address: body.address ?? null, phone: null,
         },
@@ -3677,9 +3677,6 @@ async function route(
             barangay: resident.profile.barangay,
             municipality: resident.profile.municipality,
             province: resident.profile.province,
-            philSysLast4: resident.profile.philSysId
-              ? resident.profile.philSysId.replace(/\D/g, '').slice(-4)
-              : null,
             hasPhoto: Boolean(resident.photo),
             programs: serializePrograms(resident),
             checkedAt: new Date().toISOString(),
@@ -4352,7 +4349,7 @@ async function route(
     }
 
     if (parts[1] === 'profile' && method === 'PATCH') {
-      // Contact details only. A name and a PhilSys number are identity claims an
+      // Contact details only. A name is an identity claim an
       // office verified, so an unknown key leaves nothing to change and the
       // whole request is refused rather than partly applied.
       const patch: Record<string, string | null> = {}
@@ -5076,7 +5073,7 @@ async function route(
         id: uid(), email: body.email, password: DEMO_PASSWORD, fullName: body.fullName,
         role: 'staff', departments: body.departments, position: body.position ?? null,
         active: true, notifyEmail: true, notifySms: false,
-        profile: { philSysId: null, barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
+        profile: { barangay: null, municipality: null, province: null, birthDate: null, address: null, phone: null },
         photo: null, photoUpdatedAt: null,
         programs: [],
       }

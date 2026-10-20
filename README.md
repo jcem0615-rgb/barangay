@@ -6,7 +6,8 @@ residents send them.
 
 ## Features
 
-- **Citizen Digital ID** — PhilSys sync status, barangay/municipality, and a QR verification card
+- **Citizen Digital ID** — name, barangay/municipality, live programme badges, and a
+  single-use QR verification code a counter can check
 - **Business Permits (BOSS)** — one-stop-shop application, occupational permit
 - **Social Welfare** — AICS financial assistance, Senior Citizen / PWD ID, Solo Parent ID
 - **Civil Registrar** — Birth, Marriage, and Death certificates, marriage license application

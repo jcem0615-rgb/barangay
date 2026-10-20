@@ -17,7 +17,7 @@ government* below.
 
 Both sides of the system live here: the resident PWA and the staff-facing consoles,
 backed by a real Node + Postgres API with accounts and roles (`server/`).
-PhilSys verification and payment settlement are still simulated.
+Payment settlement is still simulated.
 
 ## Stack
 
@@ -711,9 +711,9 @@ The three failure modes are reported apart because they mean different things at
 
 **Every office can check** — a clerk anywhere may be handed a senior-citizen discount to
 verify — but what comes back is scoped to that question: a face, a name, where they live,
-the PhilSys number's last four digits, and the entitlements **live on the record right now**,
-not whatever the card was showing when it was screenshotted. No email, no phone, no request
-history, never the whole PhilSys number.
+and the entitlements **live on the record right now**, not whatever the card was showing
+when it was screenshotted. No email, no phone, no request history, and no national ID
+number — this app holds none.
 
 This is not a directory. The only way in is a code the resident chose to show, so every
 check is one the resident started. The portrait is reachable for five minutes and only by
@@ -1343,10 +1343,10 @@ base64'd into it is not something a resident can open, and every file is already
 from the request it belongs to.
 
 **Correction is scoped to what is theirs to correct.** An address and a phone number are
-facts the resident knows better than the office does. A name and a PhilSys number are
-identity claims an office verified against documents, and a portal that let someone retype
-either is not one an office could trust — so those go through the Local Civil Registrar, and
-the screen says so rather than leaving a disabled field with no explanation.
+facts the resident knows better than the office does. A name is an identity claim an
+office verified against documents, and a portal that let someone retype it is not one an
+office could trust — so that goes through the Local Civil Registrar, and the screen says so
+rather than leaving a disabled field with no explanation.
 
 **Erasure is the right the app cannot grant in full, and it says so first.** A released
 business permit is a public record the municipality must keep, and a permit with no applicant
@@ -1944,8 +1944,16 @@ year of validity the barangay never granted.
 
 ## Known simplifications (intentional, flag if scope grows)
 
-- **PhilSys sync** is visual only. A production build would call a real PhilSys
-  verification API; the ID's own verification code is real and checked server-side.
+- **PhilSys is gone, and that was the honest move rather than a feature cut.** The number
+  was typed at registration and never checked against anything — nothing here ever called a
+  PhilSys API — while the card printed "PhilSys Verified" over it and the profile showed a
+  green tick. A badge asserting an identity check nobody performed is worse than no badge,
+  because a counter clerk reads it as one that happened. The claim, the column
+  (`041_remove_philsys.sql`) and the last-four digits the counter check returned are all
+  gone. What remains is the verification this app really does perform: the ID's own code,
+  which lives ninety seconds, is consumed on first check and is verified server-side. A
+  deployment that wants real PhilSys wants an eKYC integration with the PSA, which is a
+  procurement and an accreditation rather than a field on a form.
 - **No real payment gateway is wired yet.** The architecture is complete and tested —
   intents priced by the server, signed webhooks, idempotent settlement, amount checking,
   reconciliation — but the only provider implemented is the development mock. A real
@@ -2030,8 +2038,8 @@ year of validity the barangay never granted.
   deployment wants an office-initiated transfer, which is a new authorization surface.
 - **The duplicate check cannot see across municipalities**, by design — each
   deployment has its own database — so the same person may hold an account in two
-  towns. That is correct for residency and wrong for a national register; PhilSys is
-  what would settle it, and PhilSys here is still visual only.
+  towns. That is correct for residency and wrong for a national register; a real PhilSys
+  integration is what would settle it, and this app deliberately has none.
 - **There is no portal-wide administrator, and there is nowhere for one to stand.** Adding
   a municipality is `npm run provision` against a new database, not a screen — see *One
   deployment, one municipality*. Anything that wanted to list every town at once (a
