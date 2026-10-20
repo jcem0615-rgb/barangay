@@ -48,11 +48,23 @@ PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --no-save playwright
 `build.mjs` looks for a preinstalled Chromium first and falls back to
 Playwright's own lookup.
 
-## The LogicGrid mark
+## The LogicGrid brand assets
 
-Drawn in `build.mjs`, because no brand asset ships with this repository. It is
-a nine-point grid with one path traced through it. **Swap in the real file when
-there is one** — replace `logicGridMark()` and nothing else here changes.
+`assets/logicgrid-logo.png` is the badge as LogicGrid supplied it — circle,
+wordmark, tagline. `assets/logicgrid-glyph.png` is the circuit glyph cut out of
+it. Both are embedded in the PDF as data URIs, so it carries its own brand and
+renders the same anywhere.
+
+**Two files, because one size does not work at both ends of the document.** The
+badge keeps its wordmark *inside* the circle, so it is only legible above about
+120px — which is why it sits beside the title on the cover rather than above it,
+where it would cost vertical space the contents table needs. The running footer
+is 15px tall; the full badge there would be a smudge with unreadable type in it,
+so the footer gets the glyph alone with "LogicGrid" set in type next to it.
+
+The stored sizes (512px badge, 160px glyph) are deliberate: they are sharp well
+past the sizes used and keep the glyph's base64 out of seventeen page footers at
+full resolution.
 
 ## Fonts
 

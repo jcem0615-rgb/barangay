@@ -17,7 +17,7 @@ await page.emulateMedia({ media: 'print' })
 const foot = `<div style="width:100%;font:500 7.4pt 'Helvetica',sans-serif;color:#7a8396;
   padding:0 14mm;display:flex;justify-content:space-between;align-items:center;">
   <span style="display:flex;align-items:center;gap:5px;">
-    ${logicGridMark(10, { mono: false }).replace(/\n\s*/g, '')}
+    ${logicGridMark(15)}
     <span style="font-weight:700;color:#1e3a8a;">LogicGrid</span>
     <span>&middot; eLGU Citizen Portal — Overview</span>
   </span>

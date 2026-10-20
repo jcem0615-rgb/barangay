@@ -92,37 +92,37 @@ export function icon(name, { size = 17, stroke = 1.9 } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// The LogicGrid mark
+// The LogicGrid brand assets
 // ---------------------------------------------------------------------------
 
 /**
- * A nine-point grid with one path traced through it: logic running through a
- * grid. Drawn rather than fetched because no brand asset ships with this
- * repository — swap in the real file when there is one, and nothing else here
- * has to change.
+ * The real logo, supplied by LogicGrid and embedded as a data URI so the PDF
+ * carries it rather than fetching it. Two files, because one size does not
+ * work at both ends of this document:
+ *
+ *   logicgrid-logo.png   the full badge — circle, wordmark, tagline. Used on
+ *                        the cover at a size where all three are legible.
+ *   logicgrid-glyph.png  the circuit glyph alone, cut from the badge. The
+ *                        running footer is about 10px tall, and the full badge
+ *                        there would be a smudge with unreadable text inside
+ *                        it, which reads worse than no logo at all.
  */
-function logicGridMark(size = 40, { mono = false } = {}) {
-  const ink = mono ? 'currentColor' : '#1e3a8a'
-  const accent = mono ? 'currentColor' : '#fbbf24'
-  const p = [12, 32, 52]
-  const dots = []
-  for (const y of p) for (const x of p) dots.push([x, y])
-  const onPath = new Set(['12,52', '32,52', '32,32', '32,12', '52,12'])
-  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none" aria-label="LogicGrid">
-    <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="14" stroke="${ink}" stroke-width="2.5" fill="none"/>
-    <path d="M12 52 H32 V12 H52" stroke="${accent}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    ${dots
-      .map(([x, y]) =>
-        onPath.has(`${x},${y}`)
-          ? `<circle cx="${x}" cy="${y}" r="4.2" fill="${ink}"/>`
-          : `<circle cx="${x}" cy="${y}" r="2.6" fill="${ink}" opacity="0.28"/>`
-      )
-      .join('')}
-  </svg>`
+const ASSETS = resolve(root, 'proposal/overview/assets')
+
+const dataUri = (file) => {
+  const p = resolve(ASSETS, file)
+  if (!existsSync(p)) throw new Error(`missing brand asset: ${file}`)
+  return `data:image/png;base64,${readFileSync(p).toString('base64')}`
 }
 
-function logicGridWordmark(size = 40) {
-  return `<span class="lg">${logicGridMark(size)}<span class="lg-words"><span class="lg-name">LogicGrid</span><span class="lg-tag">Systems for local government</span></span></span>`
+/** The glyph alone, square. For small placements. */
+export function logicGridMark(size = 40) {
+  return `<img class="lg-glyph" src="${dataUri('logicgrid-glyph.png')}" width="${size}" height="${size}" alt="LogicGrid"/>`
+}
+
+/** The full badge: circle, wordmark and tagline, as supplied. */
+export function logicGridWordmark(size = 96) {
+  return `<img class="lg-badge" src="${dataUri('logicgrid-logo.png')}" width="${size}" height="${size}" alt="LogicGrid — Business Automation"/>`
 }
 
 // ---------------------------------------------------------------------------
@@ -149,4 +149,4 @@ const FACES = [
 const esc = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-export { logicGridMark, logicGridWordmark, FACES, PORTALS, esc, CHROME, OUT, root }
+export { FACES, PORTALS, esc, CHROME, OUT, root }

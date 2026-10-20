@@ -104,18 +104,18 @@ h1,h2,h3,h4,.disp{font-family:'JakartaP','InterP',sans-serif}
 .ic{display:block}
 .dot{display:block;width:7px;height:7px;border-radius:99px;background:currentColor;opacity:.45}
 
-/* ---------- LogicGrid lockup ---------- */
-.lg{display:flex;align-items:center;gap:10px}
-.lg-words{display:flex;flex-direction:column;line-height:1.12}
-.lg-name{font-family:'JakartaP',sans-serif;font-weight:800;font-size:15pt;color:var(--navy);letter-spacing:-.015em}
-.lg-tag{font-size:7.2pt;color:var(--mute);letter-spacing:.055em;text-transform:uppercase;font-weight:600}
+/* ---------- LogicGrid brand ---------- */
+.lg-badge{display:block}
+.lg-glyph{display:inline-block;vertical-align:middle;border-radius:3px}
 
 /* ---------- cover: the whole overview, one page ---------- */
 .cover{height:254mm;display:flex;flex-direction:column;page-break-after:always}
-.cover-top{flex:0 0 auto;margin-bottom:26px}
+.cover-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.cover-head-text{flex:1 1 auto;padding-top:4px}
+.cover-head .lg-badge{flex:0 0 auto;margin-top:-6px}
 .eyebrow{font-size:7.8pt;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin-bottom:7px}
-.cover h1{font-size:30pt;font-weight:800;line-height:1.05;letter-spacing:-.022em;color:var(--navy950)}
-.cover .sub{font-size:11.8pt;color:var(--navy);margin-top:10px;font-weight:500;max-width:150mm;line-height:1.4}
+.cover h1{font-size:28.5pt;font-weight:800;line-height:1.05;letter-spacing:-.022em;color:var(--navy950)}
+.cover .sub{font-size:11.4pt;color:var(--navy);margin-top:9px;font-weight:500;max-width:118mm;line-height:1.4}
 .cover .lede{font-size:10pt;color:#404a60;margin-top:14px;max-width:158mm;line-height:1.6}
 .cover .lede strong{color:var(--navy950);font-weight:700}
 .rule{height:4px;width:62px;background:var(--gold);border-radius:4px;margin:16px 0}
@@ -169,12 +169,15 @@ ul.controls li:nth-child(even){background:#fafbfd}
 <body>
 
 <div class="cover">
-  <div class="cover-top">${logicGridWordmark(40)}</div>
-
-  <p class="eyebrow">Feature reference</p>
-  <h1>eLGU Citizen Portal</h1>
-  <p class="sub">A two-tier electronic government system for a Philippine municipality &mdash; and for every barangay inside it.</p>
-  <div class="rule"></div>
+  <div class="cover-head">
+    <div class="cover-head-text">
+      <p class="eyebrow">Feature reference</p>
+      <h1>eLGU Citizen Portal</h1>
+      <p class="sub">A two-tier electronic government system for a Philippine municipality &mdash; and for every barangay inside it.</p>
+      <div class="rule"></div>
+    </div>
+    ${logicGridWordmark(132)}
+  </div>
   <p class="lede">One codebase serves five portals. <strong>This document lists every control in each of them, one by one, with the icon it actually carries.</strong></p>
 
   <div class="facts">
