@@ -634,6 +634,31 @@ export const en = {
   'time.yesterday': 'yesterday',
   'a11y.goBack': 'Go back',
   'a11y.unread': 'Unread',
+
+  // The demo sign-in panel.
+  //
+  // Only rendered in the demo build, and translated for the same reason the
+  // rest of the resident app is: it is the first screen anybody clicking
+  // through sees, and a Filipino visitor who switches the language before
+  // signing in should not find the one panel explaining the demo still in
+  // English. The console tab names it cites stay English on purpose — the
+  // consoles themselves are English, so translating the name of a tab would
+  // send somebody looking for a heading that is not there.
+  'demo.title': 'Demo — sign in with any of these',
+  'demo.tierResident': 'Resident',
+  'demo.tierMunicipal': 'Municipal offices',
+  'demo.tierBarangay': 'Barangay Poblacion',
+  'demo.roleResident': 'Maria Santos',
+  'demo.roleTreasury': 'Treasury staff',
+  'demo.roleAdmin': 'Administrator',
+  'demo.roleClerk': 'Clerk',
+  'demo.roleKagawad': 'Kagawad',
+  'demo.passwordAll': 'Password (all)',
+  'demo.switching': 'To follow a request through both sides, sign out and switch accounts — the demo keeps its data in this browser, so a second window or incognito tab starts over.',
+  'demo.otherBarangays': 'Every other barangay has an administrator at:',
+  'demo.noServerHere': 'Email, SMS and virus scanning need the real server and do nothing here.',
+  'demo.marksTitle': 'Seals and signatures',
+  'demo.marksBody': 'are uploaded by an administrator — municipal ones under Municipality → Office details and Official receipt, a barangay\u2019s under The hall. They upload and preview here, but the demo draws its PDFs in the browser as plain text, so neither they nor the verification QR appear on the documents it downloads. The real server prints all three. The code itself is on them, and typing it into {param} checks it here exactly as it would for real — counting the check, showing a withdrawn document as withdrawn, and saying when a replacement has been issued for it.',
 } as const
 
 export type StringKey = keyof typeof en
@@ -1229,4 +1254,20 @@ export const fil: Record<StringKey, string> = {
   'time.yesterday': 'kahapon',
   'a11y.goBack': 'Bumalik',
   'a11y.unread': 'Hindi pa nababasa',
+
+  'demo.title': 'Demo — mag-log in gamit ang alinman sa mga ito',
+  'demo.tierResident': 'Residente',
+  'demo.tierMunicipal': 'Mga tanggapan ng munisipyo',
+  'demo.tierBarangay': 'Barangay Poblacion',
+  'demo.roleResident': 'Maria Santos',
+  'demo.roleTreasury': 'Kawani ng Treasury',
+  'demo.roleAdmin': 'Administrador',
+  'demo.roleClerk': 'Kawani',
+  'demo.roleKagawad': 'Kagawad',
+  'demo.passwordAll': 'Password (lahat)',
+  'demo.switching': 'Para masundan ang isang kahilingan sa magkabilang panig, mag-sign out at magpalit ng account — nasa browser na ito nakatago ang datos ng demo, kaya magsisimula uli ang ibang window o incognito tab.',
+  'demo.otherBarangays': 'May administrador ang bawat ibang barangay sa:',
+  'demo.noServerHere': 'Kailangan ng tunay na server ang email, SMS at virus scanning — wala silang ginagawa rito.',
+  'demo.marksTitle': 'Mga selyo at lagda',
+  'demo.marksBody': 'ay ini-upload ng administrador — ang sa munisipyo ay nasa Municipality → Office details at Official receipt, ang sa barangay ay nasa The hall. Nag-a-upload at nagpa-preview ang mga ito rito, pero plain text lang ang iginuguhit na PDF ng demo sa browser, kaya hindi lumalabas ang mga ito ni ang verification QR sa mga dokumentong na-download. Sa tunay na server, nakalimbag ang tatlo. Nasa dokumento pa rin ang code, at kapag itinipa ito sa {param} susuriin ito rito nang eksakto gaya ng totoo — binibilang ang pagsusuri, ipinapakita ang binawing dokumento bilang binawi, at sinasabi kung may inilabas nang kapalit.',
 }

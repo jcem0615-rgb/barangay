@@ -2297,6 +2297,16 @@ The demo build lists all of these on its own sign-in screen (`DEMO_ACCOUNTS` in
 account nobody can find is one nobody tries, and the panel is the only place a person
 clicking through the demo would look.
 
+**The panel is translated too**, because it is the first screen anybody clicking through
+sees and the language switch sits right above it — a Filipino visitor who flips it and
+finds the one panel explaining the demo still in English has been told the toggle does not
+quite work. What stays English inside it are the console tab names it cites (*Municipality
+→ Office details*, *The hall*): the consoles themselves are English, so translating the
+name of a tab would send somebody looking for a heading that is not there. Each paragraph
+is one key rather than being split around its own `<em>` and `<span>` — a sentence cut in
+half at a markup boundary cannot be reordered by a translator, and the cost is only that
+those few words lost their emphasis.
+
 The same panel is also where the demo says what it *cannot* do, which is the other half
 of its job: email, SMS and virus scanning need the real server, and the seal and the
 signatures upload and preview exactly as they do for real and then appear on nothing,

@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { api, ApiError, IS_DEMO } from '../lib/api'
 import LanguageToggle from '../components/LanguageToggle'
 import { useT } from '../lib/i18n'
+import type { StringKey } from '../i18n/strings'
 import { useCatalogue } from '../lib/catalogue'
 
 type Mode = 'login' | 'register' | 'forgot'
@@ -230,7 +231,7 @@ export default function SignIn() {
 
         {IS_DEMO ? (
           <div className="mt-4 rounded-2xl border border-gold-500/40 bg-gold-100/50 p-4">
-            <p className="text-[calc(13px_*_var(--text-scale))] font-bold text-navy-950">Demo — sign in with any of these</p>
+            <p className="text-[calc(13px_*_var(--text-scale))] font-bold text-navy-950">{t('demo.title')}</p>
             {/*
               Grouped by tier, the same split the dashboard makes: the point of
               the demo is following one request across both levels of government,
@@ -241,12 +242,12 @@ export default function SignIn() {
               {DEMO_ACCOUNTS.map((group) => (
                 <section key={group.tier}>
                   <h3 className="pb-0.5 pt-2 text-[calc(11px_*_var(--text-scale))] font-bold uppercase tracking-wide text-slate-500">
-                    {group.tier}
+                    {t(group.tier)}
                   </h3>
                   <dl className="space-y-1">
                     {group.accounts.map(([role, email]) => (
                       <div key={email} className="flex justify-between gap-3">
-                        <dt className="shrink-0 text-slate-600">{role}</dt>
+                        <dt className="shrink-0 text-slate-600">{t(role)}</dt>
                         <dd className="min-w-0 truncate font-medium">{email}</dd>
                       </div>
                     ))}
@@ -254,16 +255,19 @@ export default function SignIn() {
                 </section>
               ))}
               <dl className="mt-2 flex justify-between gap-3 border-t border-gold-500/30 pt-2">
-                <dt className="text-slate-600">Password (all)</dt>
+                <dt className="text-slate-600">{t('demo.passwordAll')}</dt>
                 <dd className="font-mono font-medium">elgu-demo-2026</dd>
               </dl>
             </div>
             <p className="mt-2.5 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
-              To follow a request through both sides, sign out and switch
-              accounts &mdash; the demo keeps its data in <em>this</em> browser, so a
-              second window or incognito tab starts over. Every other barangay has
-              an administrator at <span className="font-mono">admin.&lt;barangay&gt;@malasiqui.gov.ph</span>.
-              Email, SMS and virus scanning need the real server and do nothing here.
+              {t('demo.switching')}
+            </p>
+            <p className="mt-1.5 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
+              {t('demo.otherBarangays')}{' '}
+              <span className="font-mono">admin.&lt;barangay&gt;@malasiqui.gov.ph</span>
+            </p>
+            <p className="mt-1.5 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
+              {t('demo.noServerHere')}
             </p>
             {/*
               The seal and the signatures upload and preview here exactly as they
@@ -274,17 +278,8 @@ export default function SignIn() {
               limit before they try it.
             */}
             <p className="mt-2 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
-              <span className="font-semibold text-navy-900">Seals and signatures</span> are
-              uploaded by an administrator &mdash; municipal ones under
-              {' '}<span className="font-medium">Municipality &rarr; Office details</span> and
-              {' '}<span className="font-medium">Official receipt</span>, a barangay&rsquo;s under
-              {' '}<span className="font-medium">The hall</span>. They upload and preview here,
-              but the demo draws its PDFs in the browser as plain text, so neither they nor the
-              verification QR appear on the documents it downloads. The real server prints all
-              three. The code itself is on them, and typing it into{' '}
-              <span className="font-mono">/?doc=</span> checks it here exactly as it would for
-              real &mdash; counting the check, showing a withdrawn document as withdrawn, and
-              saying when a replacement has been issued for it.
+              <span className="font-semibold text-navy-900">{t('demo.marksTitle')}</span>{' '}
+              {t('demo.marksBody', { param: '/?doc=' })}
             </p>
           </div>
         ) : (
@@ -305,30 +300,33 @@ export default function SignIn() {
  * names Poblacion's pair, which is the one with both roles, and says the rest
  * follow the same shape.
  */
-const DEMO_ACCOUNTS: Array<{ tier: string; accounts: Array<[string, string]> }> = [
+const DEMO_ACCOUNTS: Array<{
+  tier: StringKey
+  accounts: Array<[StringKey, string]>
+}> = [
   {
-    tier: 'Resident',
+    tier: 'demo.tierResident',
     // Named rather than labelled 'Resident' twice: this is the seeded account
     // with requests on both tiers already, so saying who you will be is worth
     // more than repeating the heading.
-    accounts: [['Maria Santos', 'maria@example.ph']],
+    accounts: [['demo.roleResident', 'maria@example.ph']],
   },
   {
-    tier: 'Municipal offices',
+    tier: 'demo.tierMunicipal',
     accounts: [
-      ['Treasury staff', 'treasury@malasiqui.gov.ph'],
-      ['Administrator', 'admin@malasiqui.gov.ph'],
+      ['demo.roleTreasury', 'treasury@malasiqui.gov.ph'],
+      ['demo.roleAdmin', 'admin@malasiqui.gov.ph'],
     ],
   },
   {
-    tier: 'Barangay Poblacion',
+    tier: 'demo.tierBarangay',
     // Three roles, and the pair worth comparing is the clerk and the kagawad:
     // one works the register and the blotter, the other sees counts and no
     // individual resident at all.
     accounts: [
-      ['Clerk', 'officer.poblacion@malasiqui.gov.ph'],
-      ['Kagawad', 'kagawad.poblacion@malasiqui.gov.ph'],
-      ['Administrator', 'admin.poblacion@malasiqui.gov.ph'],
+      ['demo.roleClerk', 'officer.poblacion@malasiqui.gov.ph'],
+      ['demo.roleKagawad', 'kagawad.poblacion@malasiqui.gov.ph'],
+      ['demo.roleAdmin', 'admin.poblacion@malasiqui.gov.ph'],
     ],
   },
 ]

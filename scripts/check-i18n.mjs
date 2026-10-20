@@ -46,6 +46,10 @@ const SAME_IN_BOTH = new Set([
   'id.title', 'id.philsysNo', 'privacy.contactTitle', 'docCheck.kindReceipt',
   'pay.reference', 'pay.refShort', 'docCheck.reference',
   'verify.title', 'docCheck.codeLabel', 'detail.documentCode',
+  // The demo panel: a place, a person and a Filipino word. "Barangay
+  // Poblacion" names somewhere, "Maria Santos" is the seeded resident, and
+  // "Kagawad" is already the Filipino for the office.
+  'demo.tierBarangay', 'demo.roleResident', 'demo.roleKagawad',
 ])
 
 const walk = (dir) =>
