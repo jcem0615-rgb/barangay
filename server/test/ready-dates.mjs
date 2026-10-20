@@ -3,6 +3,7 @@
 import { spawn } from 'node:child_process'
 import { formFiller, payRequest } from './fixtures.mjs'
 import { addWorkingDays } from '../src/schedule.ts'
+import { HOLIDAYS } from '../../src/data/mockData.ts'
 
 const API_PORT = 4113
 const API = `http://127.0.0.1:${API_PORT}/api`
@@ -57,7 +58,43 @@ check('the catalogue publishes day ranges', cat.services.every((s) => typeof s.p
 const boss = cat.services.find((s) => s.id === 'boss-application')
 check('and they match the prose', boss.processingDaysMin === 3 && boss.processingDaysMax === 5, `${boss.processingDaysMin}-${boss.processingDaysMax}`)
 check('the holiday calendar is published', Array.isArray(cat.holidays) && cat.holidays.length > 0)
-check('including the local ones', cat.holidays.some((h) => h.isLocal === true))
+// What the catalogue owes a client is the *flag*, so a local day can be told
+// from a national one. Whether an upcoming day happens to be local is a fact
+// about where in the year we are: this used to assert one was, and went red
+// for the rest of the year the moment the last local day went past.
+check('every published day says whether it is local',
+  cat.holidays.every((h) => typeof h.isLocal === 'boolean'),
+  JSON.stringify(cat.holidays.find((h) => typeof h.isLocal !== 'boolean')))
+check('and the published days are the upcoming ones',
+  cat.holidays.every((h) => h.date >= new Date(Date.now() - 8 * 864e5).toISOString().slice(0, 10)),
+  JSON.stringify(cat.holidays.map((h) => h.date)))
+
+// That a municipality declares its own days is an authoring rule, checked
+// against the authored set — the same footing document-steps.mjs puts the
+// step chains on. It is not a fact about whatever is in the database, which a
+// deployment edits in the Municipality tab from its first week.
+console.log('\n== the authored calendar ==')
+check('the authored calendar carries local days',
+  HOLIDAYS.some((h) => h.local === true),
+  HOLIDAYS.length)
+check('every authored day is a real date',
+  HOLIDAYS.every((h) => /^\d{4}-\d{2}-\d{2}$/.test(h.date) && !Number.isNaN(Date.parse(h.date))),
+  JSON.stringify(HOLIDAYS.filter((h) => Number.isNaN(Date.parse(h.date)))))
+check('no date is authored twice',
+  new Set(HOLIDAYS.map((h) => h.date)).size === HOLIDAYS.length,
+  HOLIDAYS.map((h) => h.date).filter((d, i, a) => a.indexOf(d) !== i).join(', '))
+
+// The calendar running out is the failure this file now exists to catch, and
+// it is a quiet one: the arithmetic keeps working, it just stops skipping days
+// the hall is shut, and a resident is quoted a date nobody can keep. A permit
+// quoted 15 working days lands about three weeks out, so a calendar that does
+// not reach 90 days ahead is already answering some requests off the end of
+// itself. Seed the next year in mockData.ts when this goes red.
+const horizon = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10)
+const last = HOLIDAYS.map((h) => h.date).sort().at(-1)
+check('the calendar reaches at least 90 days ahead',
+  last >= horizon,
+  `last authored day is ${last}, needs to reach ${horizon} — add the next year to HOLIDAYS`)
 
 console.log('\n== a free service is estimated from submission ==')
 // Birth certificate: 3-5 days, no fee up front in this catalogue? Use whichever is free.

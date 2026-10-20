@@ -1375,7 +1375,36 @@ export const SECTORAL_PROGRAMS: SectoralProgram[] = [
  * These are 2026 dates for a sample municipality. Check them against the year's
  * proclamation and replace the local ones before deploying.
  */
+
+/**
+ * The hall's calendar: the days it is shut, which is what every date this app
+ * quotes is computed over — expected ready dates, appointment days, complaint
+ * deadlines and the turnaround figures in the reports.
+ *
+ * **Two years, and that is deliberate.** A calendar that stops at the end of
+ * the current year goes wrong quietly: the arithmetic keeps working, it just
+ * stops skipping days the hall is actually closed, and a resident is quoted a
+ * date nobody can keep. Seeding the year ahead means the gap is a thing
+ * somebody refreshes once a year rather than something that decays into wrong
+ * answers in December.
+ *
+ * **Still placeholder content**, exactly like the hotlines. The national
+ * regular holidays are fixed by law and the movable ones are computed from
+ * Easter, but which special days a given year actually carries is set by
+ * proclamation and changes — and the two local rows are invented. Check both
+ * years against the proclamation and replace the local rows before deploying.
+ *
+ * **The Islamic holidays are not here.** Eid'l Fitr and Eid'l Adha are
+ * declared per year on the moon sighting, so no table can hold them in
+ * advance. They are added as rows in the Municipality tab when proclaimed,
+ * which is the same place every other correction is made.
+ */
 export const HOLIDAYS: Array<{ date: string; name: string; local?: boolean }> = [
+  // ---- 2026 -------------------------------------------------------------
+  // Kept although the year is nearly out. Working-day arithmetic runs
+  // backwards as well as forwards: the reports scan closed periods and
+  // compute turnaround over this calendar, so dropping a past year would
+  // quietly change figures an office has already reported upward.
   { date: '2026-01-01', name: "New Year's Day" },
   { date: '2026-04-02', name: 'Maundy Thursday' },
   { date: '2026-04-03', name: 'Good Friday' },
@@ -1393,6 +1422,30 @@ export const HOLIDAYS: Array<{ date: string; name: string; local?: boolean }> = 
   // Declared by the municipality — replace with the real ones.
   { date: '2026-05-15', name: 'Municipal Founding Anniversary', local: true },
   { date: '2026-10-12', name: 'Fiesta ng Bayan', local: true },
+
+  // ---- 2027 -------------------------------------------------------------
+  // The movable days are computed, not remembered: Easter 2027 falls on
+  // 28 March, which puts Maundy Thursday on the 25th and Good Friday on the
+  // 26th, and the last Monday of August is the 30th.
+  { date: '2027-01-01', name: "New Year's Day" },
+  { date: '2027-03-25', name: 'Maundy Thursday' },
+  { date: '2027-03-26', name: 'Good Friday' },
+  { date: '2027-04-09', name: 'Araw ng Kagitingan' },
+  { date: '2027-05-01', name: 'Labor Day' },
+  { date: '2027-06-12', name: 'Independence Day' },
+  { date: '2027-08-21', name: 'Ninoy Aquino Day' },
+  { date: '2027-08-30', name: 'National Heroes Day' },
+  { date: '2027-11-01', name: "All Saints' Day" },
+  { date: '2027-11-30', name: 'Bonifacio Day' },
+  { date: '2027-12-08', name: 'Feast of the Immaculate Conception' },
+  { date: '2027-12-25', name: 'Christmas Day' },
+  { date: '2027-12-30', name: 'Rizal Day' },
+  { date: '2027-12-31', name: "New Year's Eve" },
+  // Declared by the municipality — replace with the real ones. A founding
+  // anniversary and a patronal fiesta are fixed dates, so they carry over;
+  // a municipality that moves either must say so here.
+  { date: '2027-05-15', name: 'Municipal Founding Anniversary', local: true },
+  { date: '2027-10-12', name: 'Fiesta ng Bayan', local: true },
 ]
 
 /**
