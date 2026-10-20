@@ -36,13 +36,6 @@ const PILLARS = [
   },
 ]
 
-const CHANGED = [
-  {
-    icon: 'ban',
-    title: 'No national-ID check is claimed',
-    body: 'PhilSys was removed: the number was never verified against anything, while the card printed “PhilSys Verified” over it. What proves this ID is its own code — ninety seconds, consumed on first check, server-side.',
-  },
-]
 
 const tone = {
   navy: ['#1e3a8a', '#eef2fb'],
@@ -112,7 +105,7 @@ h1,h2,h3,h4,.disp{font-family:'JakartaP','InterP',sans-serif}
 .cover{height:254mm;display:flex;flex-direction:column;page-break-after:always}
 .cover-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
 .cover-head-text{flex:1 1 auto;padding-top:4px}
-.cover-head .lg-badge{flex:0 0 auto;margin-top:-6px}
+.cover-head .lg-badge{flex:0 0 auto}
 .eyebrow{font-size:7.8pt;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin-bottom:7px}
 .cover h1{font-size:28.5pt;font-weight:800;line-height:1.05;letter-spacing:-.022em;color:var(--navy950)}
 .cover .sub{font-size:11.4pt;color:var(--navy);margin-top:9px;font-weight:500;max-width:118mm;line-height:1.4}
@@ -130,11 +123,6 @@ h1,h2,h3,h4,.disp{font-family:'JakartaP','InterP',sans-serif}
 .pillar .ph{display:flex;align-items:center;gap:7px;color:var(--navy)}
 .pillar h4{font-size:9.8pt;font-weight:700;color:var(--navy950)}
 .pillar p{font-size:8.5pt;color:#44506a;margin-top:5px;line-height:1.5}
-
-.callout{border:1px solid #f0d9a8;background:#fdf8ec;border-radius:10px;padding:11px 13px;margin-top:10px}
-.callout .ph{display:flex;align-items:center;gap:7px;color:#8a5a06}
-.callout h4{font-size:9.8pt;font-weight:700;color:#6b4604}
-.callout p{font-size:8.5pt;color:#5d4a2a;margin-top:5px;line-height:1.5}
 
 .toc{margin-top:16px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .toc div{display:flex;justify-content:space-between;padding:7px 13px;font-size:9pt;border-top:1px solid var(--line)}
@@ -190,10 +178,6 @@ ul.controls li:nth-child(even){background:#fafbfd}
     ).join('')}
   </div>
 
-  ${CHANGED.map(
-    (c) => `<div class="callout"><div class="ph">${icon(c.icon, { size: 17 })}<h4>${esc(c.title)}</h4></div><p>${c.body}</p></div>`
-  ).join('')}
-
   <div class="toc">
     <div><span>The five portals</span><span>Controls</span></div>
     ${totals.map((t) => `<div><span>${esc(t.name)}</span><b>${t.n}</b></div>`).join('')}
@@ -215,6 +199,5 @@ export function iconNames() {
   const names = []
   for (const p of PORTALS) for (const g of p.groups) for (const i of g.items) names.push(i.icon)
   for (const p of PILLARS) names.push(p.icon)
-  for (const c of CHANGED) names.push(c.icon)
   return names.filter(Boolean)
 }
