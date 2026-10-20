@@ -1,0 +1,662 @@
+[
+  {
+    "id": "abonagan",
+    "name": "Abonagan",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "agdao",
+    "name": "Agdao",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "alacan",
+    "name": "Alacan",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "aliaga",
+    "name": "Aliaga",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "amacalan",
+    "name": "Amacalan",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "anolid",
+    "name": "Anolid",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "apaya",
+    "name": "Apaya",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "asin-este",
+    "name": "Asin Este",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "asin-weste",
+    "name": "Asin Weste",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "bacundao-este",
+    "name": "Bacundao Este",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "bacundao-weste",
+    "name": "Bacundao Weste",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "bakitiw",
+    "name": "Bakitiw",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "balite",
+    "name": "Balite",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "banawang",
+    "name": "Banawang",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "barang",
+    "name": "Barang",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "bawer",
+    "name": "Bawer",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "binalay",
+    "name": "Binalay",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "bobon",
+    "name": "Bobon",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "bolaoit",
+    "name": "Bolaoit",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "bongar",
+    "name": "Bongar",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "butao",
+    "name": "Butao",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "cabatling",
+    "name": "Cabatling",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "cabueldatan",
+    "name": "Cabueldatan",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "calbueg",
+    "name": "Calbueg",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "canan-norte",
+    "name": "Canan Norte",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "canan-sur",
+    "name": "Canan Sur",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "cawayan-bogtong",
+    "name": "Cawayan Bogtong",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "don-pedro",
+    "name": "Don Pedro",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "gatang",
+    "name": "Gatang",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "goliman",
+    "name": "Goliman",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "gomez",
+    "name": "Gomez",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "guilig",
+    "name": "Guilig",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "ican",
+    "name": "Ican",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "ingalagala",
+    "name": "Ingalagala",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "lareg-lareg",
+    "name": "Lareg-lareg",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "lasip",
+    "name": "Lasip",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "lepa",
+    "name": "Lepa",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "loqueb-este",
+    "name": "Loqueb Este",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "loqueb-norte",
+    "name": "Loqueb Norte",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "loqueb-sur",
+    "name": "Loqueb Sur",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "lunec",
+    "name": "Lunec",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "mabulitec",
+    "name": "Mabulitec",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "malimpec",
+    "name": "Malimpec",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "manggan-dampay",
+    "name": "Manggan-Dampay",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "nalsian-norte",
+    "name": "Nalsian Norte",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "nalsian-sur",
+    "name": "Nalsian Sur",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "nancapian",
+    "name": "Nancapian",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "nansangaan",
+    "name": "Nansangaan",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "olea",
+    "name": "Olea",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "pacuan",
+    "name": "Pacuan",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "palapar-norte",
+    "name": "Palapar Norte",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "palapar-sur",
+    "name": "Palapar Sur",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "palong",
+    "name": "Palong",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "pamaranum",
+    "name": "Pamaranum",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "pasima",
+    "name": "Pasima",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "payar",
+    "name": "Payar",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "poblacion",
+    "name": "Poblacion",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "polong-norte",
+    "name": "Polong Norte",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "polong-sur",
+    "name": "Polong Sur",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "potiocan",
+    "name": "Potiocan",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "san-julian",
+    "name": "San Julian",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "tabo-sili",
+    "name": "Tabo-Sili",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "taloy",
+    "name": "Taloy",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "talospatang",
+    "name": "Talospatang",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "tambac",
+    "name": "Tambac",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "warey",
+    "name": "Warey",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  }
+]

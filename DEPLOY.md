@@ -217,10 +217,22 @@ usually `1` behind a single load balancer or ingress.
 - [ ] **The Filipino routes have been read by somebody who speaks it**, not only the
       English. Both are authored in `mockData.ts` and a wrong instruction translates
       perfectly well; the Filipino is the version most residents will actually read
-- [ ] **The barangay roster is the municipality's real one.** The seed ships six sample
-      barangays with invented captains and secretaries; Malasiqui has 73. Take the list from
-      the PSGC listing for this municipality, and get the officials' names from the hall —
-      they are printed on every certificate and they change at every barangay election
+- [ ] **The barangay roster is the municipality's real one, and it is complete.**
+      `server/barangays.malasiqui.json` is a **draft carrying 66 of Malasiqui's 73** —
+      the names that could be corroborated. The last seven were deliberately not
+      invented. Complete it from the PSGC table for this municipality
+      (`0105524000`) and check every spelling against it: sources disagree on
+      several, and the PSGC spelling is the one a certificate has to match. The six
+      names in `mockData.ts` are samples; `Tolonguat` among them could not be
+      corroborated at all. See `server/BARANGAYS.md`
+- [ ] **`BARANGAY_COUNT` is set to the real number**, so an incomplete roster cannot
+      provision. Shape validation cannot catch this one: a short roster parses and
+      seeds perfectly, and then the missing barangays' residents cannot register with
+      nothing in the app to say why. With the draft as it stands, `BARANGAY_COUNT=73`
+      refuses to provision and says seven are missing — which is the point
+- [ ] **The officials' names come from the hall, not from the roster file.** Every row
+      ships with them blank; each barangay fills in its own from **The hall** tab. They
+      are printed on every certificate and change at every barangay election
 - [ ] Each barangay's certificate fees match what it actually charges (set them in that
       barangay's own console, not by reseeding), and the free ones are still free —
       indigency and the first-time jobseeker certificate are free by law
@@ -272,6 +284,7 @@ MUNICIPALITY_CODE=bugallon-pangasinan     # the identity every account is stampe
 MUNICIPALITY_NAME=Bugallon
 MUNICIPALITY_PROVINCE=Pangasinan
 BARANGAY_ROSTER=/etc/elgu/bugallon-barangays.json
+BARANGAY_COUNT=24                          # refuses to seed a short roster
 ADMIN_EMAIL=admin@bugallon.gov.ph
 ADMIN_NAME="Office of the Mayor — Administrator"
 SEED_PASSWORD=…                            # required in production

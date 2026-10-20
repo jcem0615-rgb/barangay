@@ -131,6 +131,35 @@ export function configuredBarangays(): BarangaySeed[] {
   if (ids.size !== parsed.data.length) {
     throw new Error(`The barangay roster at ${path} has two barangays with the same id.`)
   }
+
+  // How many the municipality actually has, when the deployment states it.
+  //
+  // Shape validation cannot catch the failure that matters here: a roster of
+  // 66 well-formed rows for a town of 73 parses perfectly, seeds perfectly,
+  // and then seven barangays' worth of residents cannot register — with
+  // nothing in the running app to say why, because every screen is working
+  // exactly as written. The count is the only thing that knows.
+  //
+  // So a deployment that knows its own number says it, and a roster that does
+  // not match is refused with the gap named rather than seeded short. It is
+  // deliberately opt-in: a development copy has no business declaring 73.
+  const expected = trimmed('BARANGAY_COUNT')
+  if (expected) {
+    const want = Number(expected)
+    if (!Number.isInteger(want) || want < 1) {
+      throw new Error(`BARANGAY_COUNT must be a whole number, not ${expected}.`)
+    }
+    if (parsed.data.length !== want) {
+      const short = want - parsed.data.length
+      throw new Error(
+        `The barangay roster at ${path} has ${parsed.data.length} barangays, ` +
+        `but BARANGAY_COUNT says ${want} — ` +
+        (short > 0 ? `${short} missing.` : `${-short} too many.`) +
+        ' Seeding part of a roster leaves residents of the missing barangays' +
+        ' unable to register, with nothing in the app to say why.'
+      )
+    }
+  }
   return parsed.data
 }
 
