@@ -2062,11 +2062,16 @@ year of validity the barangay never granted.
   time — the accepted trade for not leaving accounts guessable.
 - **Queue paging** is keyset on `(submitted_at, id)`; the cursor must carry the
   timestamp at full microsecond precision or pages overlap. See `server/README.md`.
-- **The barangay roster is six sample barangays, not Malasiqui's real 73.** `BARANGAYS` in
-  `mockData.ts` is placeholder data with invented captains and secretaries; the real roster
-  belongs in the PSGC listing for the municipality, and the officials' names change every
-  barangay election. Replace both before deploying, and treat the names as data somebody
-  has to maintain rather than something seeded once.
+- **The real roster is all 73 and lives in `server/barangays.malasiqui.json`**, which is
+  what `BARANGAY_ROSTER` points at; `BARANGAYS` in `mockData.ts` stays six samples, the
+  no-configuration fallback for a development copy. **The officials are still nobody.**
+  Every row ships with its captain, secretary, address, hours and phone blank, because
+  those change at every barangay election and the hall cannot maintain them for
+  seventy-three barangays from a source file — each barangay fills in its own from its
+  Hall tab. `BARANGAY_COUNT` is what stops a short roster seeding: shape validation
+  cannot catch a 66-row file for a 73-barangay town, which parses and seeds perfectly
+  and then leaves seven barangays' residents unable to register with nothing in the app
+  to say why.
 - **Nothing checks what a certificate attests.** The wording is authored per type and the
   app prints it; a clearance saying the holder has no pending case says so because the
   office releasing it says so. Nothing cross-checks the blotter, and nothing could — the

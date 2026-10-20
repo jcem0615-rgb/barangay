@@ -31,7 +31,7 @@ const register = async (tag) => (await j('/auth/register', { method: 'POST', bod
 
 const admin = await login('admin.poblacion@malasiqui.gov.ph')
 const officer = await login('officer.poblacion@malasiqui.gov.ph')
-const otherAdmin = await login('admin.nalsian@malasiqui.gov.ph')
+const otherAdmin = await login('admin.nalsian-norte@malasiqui.gov.ph')
 const municipalAdmin = await login('admin@malasiqui.gov.ph')
 
 // One resident here, one in the next barangay, one who has not said where they live.
@@ -40,7 +40,7 @@ const elsewhere = await register('elsewhere')
 const nowhere = await register('nowhere')
 const barangays = (await j('/barangays')).json
 const poblacion = barangays.find((b) => b.id === 'poblacion')
-const nalsian = barangays.find((b) => b.id === 'nalsian')
+const nalsian = barangays.find((b) => b.id === 'nalsian-norte')
 await j('/barangay/me', { method: 'PUT', token: here, body: { barangayId: poblacion.id } })
 await j('/barangay/me', { method: 'PUT', token: elsewhere, body: { barangayId: nalsian.id } })
 

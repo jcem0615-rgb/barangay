@@ -33,7 +33,7 @@ const register = async (tag) => (await j('/auth/register', { method: 'POST', bod
 
 const admin = await login('admin.poblacion@malasiqui.gov.ph')
 const officer = await login('officer.poblacion@malasiqui.gov.ph')
-const otherAdmin = await login('admin.nalsian@malasiqui.gov.ph')
+const otherAdmin = await login('admin.nalsian-norte@malasiqui.gov.ph')
 const municipalAdmin = await login('admin@malasiqui.gov.ph')
 
 const resident = await register('resident')
@@ -114,7 +114,7 @@ check('a field can be emptied, and comes back as not stated rather than blank te
 console.log('\n== another barangay’s hall ==')
 
 const theirs = await j('/barangay-staff/office', { token: otherAdmin })
-check('the next barangay reads its own, not ours', theirs.json.id === 'nalsian', theirs.json.id)
+check('the next barangay reads its own, not ours', theirs.json.id === 'nalsian-norte', theirs.json.id)
 await j('/barangay-staff/office', { method: 'PATCH', token: otherAdmin, body: { officeHours: 'Nalsian hours' } })
 check('and editing theirs does not touch ours',
   !(await j('/barangay-staff/office', { token: admin })).json.officeHours.includes('Nalsian'))

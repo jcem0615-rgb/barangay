@@ -27,7 +27,7 @@ const stamp = Date.now()
 const admin = await login('admin.poblacion@malasiqui.gov.ph')
 const officer = await login('officer.poblacion@malasiqui.gov.ph')
 const kagawad = await login('kagawad.poblacion@malasiqui.gov.ph')
-const otherAdmin = await login('admin.nalsian@malasiqui.gov.ph')
+const otherAdmin = await login('admin.nalsian-norte@malasiqui.gov.ph')
 const municipalAdmin = await login('admin@malasiqui.gov.ph')
 
 check('the seeded kagawad can sign in', Boolean(kagawad))

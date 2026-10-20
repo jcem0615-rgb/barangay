@@ -32,7 +32,7 @@ const resident = (await j('/auth/register', { method: 'POST', body: {
 
 const admin = await login('admin.poblacion@malasiqui.gov.ph')
 const officer = await login('officer.poblacion@malasiqui.gov.ph')
-const otherAdmin = await login('admin.nalsian@malasiqui.gov.ph')
+const otherAdmin = await login('admin.nalsian-norte@malasiqui.gov.ph')
 const municipalAdmin = await login('admin@malasiqui.gov.ph')
 const municipalStaff = await login('cswdo@malasiqui.gov.ph')
 
@@ -201,7 +201,7 @@ check(
 )
 
 const theirFigures = await j('/barangay-staff/households/figures/summary', { token: otherAdmin })
-check('another barangay counts only its own', theirFigures.json.barangay === 'Nalsian', theirFigures.json.barangay)
+check('another barangay counts only its own', theirFigures.json.barangay === 'Nalsian Norte', theirFigures.json.barangay)
 
 console.log('\n== it is not a view onto the user table ==')
 

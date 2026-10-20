@@ -33,7 +33,7 @@ const register = async (tag) => (await j('/auth/register', { method: 'POST', bod
 
 const admin = await login('admin.poblacion@malasiqui.gov.ph')
 const officer = await login('officer.poblacion@malasiqui.gov.ph')
-const otherAdmin = await login('admin.nalsian@malasiqui.gov.ph')
+const otherAdmin = await login('admin.nalsian-norte@malasiqui.gov.ph')
 const municipalAdmin = await login('admin@malasiqui.gov.ph')
 const municipalStaff = await login('bpls@malasiqui.gov.ph')
 const resident = await register('a')

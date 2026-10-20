@@ -217,19 +217,16 @@ usually `1` behind a single load balancer or ingress.
 - [ ] **The Filipino routes have been read by somebody who speaks it**, not only the
       English. Both are authored in `mockData.ts` and a wrong instruction translates
       perfectly well; the Filipino is the version most residents will actually read
-- [ ] **The barangay roster is the municipality's real one, and it is complete.**
-      `server/barangays.malasiqui.json` is a **draft carrying 66 of Malasiqui's 73** —
-      the names that could be corroborated. The last seven were deliberately not
-      invented. Complete it from the PSGC table for this municipality
-      (`0105524000`) and check every spelling against it: sources disagree on
-      several, and the PSGC spelling is the one a certificate has to match. The six
-      names in `mockData.ts` are samples; `Tolonguat` among them could not be
-      corroborated at all. See `server/BARANGAYS.md`
+- [ ] **The barangay roster is this municipality's.** `server/barangays.malasiqui.json`
+      carries all 73 of Malasiqui's, transcribed from the municipality's own listing.
+      A different town replaces the file; see `server/BARANGAYS.md`. Three pairs in it
+      look like typos and are not — `Palong` is a different barangay from `Polong
+      Norte`/`Polong Sur`, `Taloy` from `Taloyan`, `Tabo-Sili` from `Tobor` — so do not
+      "correct" them
 - [ ] **`BARANGAY_COUNT` is set to the real number**, so an incomplete roster cannot
       provision. Shape validation cannot catch this one: a short roster parses and
       seeds perfectly, and then the missing barangays' residents cannot register with
-      nothing in the app to say why. With the draft as it stands, `BARANGAY_COUNT=73`
-      refuses to provision and says seven are missing — which is the point
+      nothing in the app to say why
 - [ ] **The officials' names come from the hall, not from the roster file.** Every row
       ships with them blank; each barangay fills in its own from **The hall** tab. They
       are printed on every certificate and change at every barangay election

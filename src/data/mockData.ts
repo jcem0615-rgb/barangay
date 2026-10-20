@@ -99,9 +99,12 @@ export const BARANGAYS: BarangaySeed[] = [
   { id: 'san-julian', name: 'San Julian', captain: 'Hon. Ernesto B. Dizon', secretary: 'Marites R. Flores',
     hallAddress: 'Barangay Hall, San Julian Road, San Julian', officeHours: 'Mon–Fri, 8:00am–5:00pm',
     phone: '(075) 632-1184', email: 'sanjulian@malasiqui.gov.ph'  },
-  { id: 'nalsian', name: 'Nalsian', captain: 'Hon. Teresita M. Ramos', secretary: 'Allan G. Sison',
-    hallAddress: 'Barangay Hall, Nalsian Centro', officeHours: 'Mon–Fri, 8:00am–5:00pm',
-    phone: '(075) 632-1188', email: 'nalsian@malasiqui.gov.ph'  },
+  // Malasiqui has Nalsian Norte and Nalsian Sur; there is no plain "Nalsian".
+  // The other five samples are real barangays of this municipality — only
+  // their officials and contact details are invented. See server/BARANGAYS.md.
+  { id: 'nalsian-norte', name: 'Nalsian Norte', captain: 'Hon. Teresita M. Ramos', secretary: 'Allan G. Sison',
+    hallAddress: 'Barangay Hall, Nalsian Norte', officeHours: 'Mon–Fri, 8:00am–5:00pm',
+    phone: '(075) 632-1188', email: 'nalsiannorte@malasiqui.gov.ph'  },
   { id: 'tolonguat', name: 'Tolonguat', captain: 'Hon. Benigno S. Padilla', secretary: 'Cecilia V. Mendoza',
     hallAddress: 'Barangay Hall, Tolonguat Proper', officeHours: 'Mon–Fri, 8:00am–12:00nn and 1:00–5:00pm',
     phone: '0917 845 2210', email: 'tolonguat@malasiqui.gov.ph'  },

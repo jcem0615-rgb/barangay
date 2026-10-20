@@ -32,7 +32,7 @@ const bpls = await login('bpls@malasiqui.gov.ph')
 const admin = await login('admin.poblacion@malasiqui.gov.ph')
 const officer = await login('officer.poblacion@malasiqui.gov.ph')
 const kagawad = await login('kagawad.poblacion@malasiqui.gov.ph')
-const otherAdmin = await login('admin.nalsian@malasiqui.gov.ph')
+const otherAdmin = await login('admin.nalsian-norte@malasiqui.gov.ph')
 
 const resident = (await j('/auth/register', { method: 'POST', body: {
   email: `cert.${stamp}@example.com`, password: 'katibayan-2026',

@@ -440,6 +440,16 @@
     "email": ""
   },
   {
+    "id": "nancapian",
+    "name": "Nancapian",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
     "id": "nalsian-norte",
     "name": "Nalsian Norte",
     "captain": "",
@@ -452,16 +462,6 @@
   {
     "id": "nalsian-sur",
     "name": "Nalsian Sur",
-    "captain": "",
-    "secretary": "",
-    "hallAddress": "",
-    "officeHours": "",
-    "phone": "",
-    "email": ""
-  },
-  {
-    "id": "nancapian",
-    "name": "Nancapian",
     "captain": "",
     "secretary": "",
     "hallAddress": "",
@@ -620,8 +620,8 @@
     "email": ""
   },
   {
-    "id": "taloy",
-    "name": "Taloy",
+    "id": "tobor",
+    "name": "Tobor",
     "captain": "",
     "secretary": "",
     "hallAddress": "",
@@ -640,8 +640,78 @@
     "email": ""
   },
   {
+    "id": "taloy",
+    "name": "Taloy",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "taloyan",
+    "name": "Taloyan",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
     "id": "tambac",
     "name": "Tambac",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "tolonguat",
+    "name": "Tolonguat",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "tomling",
+    "name": "Tomling",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "umando",
+    "name": "Umando",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "viado",
+    "name": "Viado",
+    "captain": "",
+    "secretary": "",
+    "hallAddress": "",
+    "officeHours": "",
+    "phone": "",
+    "email": ""
+  },
+  {
+    "id": "waig",
+    "name": "Waig",
     "captain": "",
     "secretary": "",
     "hallAddress": "",
