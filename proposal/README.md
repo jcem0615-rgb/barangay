@@ -31,6 +31,14 @@ accurate — that:
 - **Online payment settles through a development simulator.** The architecture
   is complete and tested, but no real gateway is wired. Do not let either
   document imply otherwise, and do not deploy with `PAYMENT_PROVIDER=mock`.
+## What is here
+
+| File | What it is |
+| --- | --- |
+| `eLGU-Overview.pdf` | The system overview and per-control feature reference — every button in every portal, with its own icon. Built by `overview/`; see that folder's README. |
+| `eLGU-Letter-of-Intent.pdf` | The letter, built by `build_letter.py`. |
+| `eLGU-Overview.pptx` | The deck, built by `build_deck.cjs`. |
+
 - **There is no PhilSys integration, and the app no longer implies one.** The
   ID's own verification code is real and checked server-side. Do not let
   either document suggest a national-ID check this system does not perform.
