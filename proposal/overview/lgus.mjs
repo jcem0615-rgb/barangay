@@ -19,6 +19,7 @@ export const LGUS = [
   { slug: 'dagupan',    name: 'Dagupan City',    kind: 'city' },
   { slug: 'rosales',    name: 'Rosales',         kind: 'municipality' },
   { slug: 'sual',       name: 'Sual',            kind: 'municipality' },
+  { slug: 'labrador',   name: 'Labrador',        kind: 'municipality' },
 ]
 
 export const FIRM = {
