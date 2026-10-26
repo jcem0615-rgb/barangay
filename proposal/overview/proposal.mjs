@@ -69,12 +69,11 @@ function letterPage(lgu) {
     </header>
 
     <div class="addressee">
-      <p>The Honorable <span class="blank"></span></p>
-      <p>${esc(mayorTitle)}</p>
-      <p>${esc(lgu.name)}, Pangasinan</p>
+      <p class="hon">The Honorable <span class="named"><span class="blank"></span><span class="under">${esc(mayorTitle)}</span></span></p>
+      <p class="place">${esc(lgu.name)}, Pangasinan</p>
     </div>
 
-    <p class="salutation">Dear Mayor <span class="blank short"></span>,</p>
+    <p class="salutation">Dear Mayor <span class="blank"></span>,</p>
 
     <p class="subject">Subject: &nbsp;Proposal &mdash; eLGU Citizen Portal for ${esc(lgu.name)}</p>
 
@@ -203,8 +202,13 @@ h1,h2,h3,h4,.disp{font-family:'JakartaP','InterP',sans-serif}
 .firm-sub{font-size:7.6pt;color:var(--mute);letter-spacing:.055em;text-transform:uppercase;font-weight:600;margin-top:2px}
 .date{font-size:9.2pt;color:var(--mute);padding-top:5px}
 .addressee p{font-size:10pt;line-height:1.55}
-.blank{display:inline-block;width:62mm;border-bottom:1px solid #9aa3b5;height:1em;vertical-align:-2px}
-.blank.short{width:42mm}
+.addressee .hon{display:flex;align-items:flex-start;gap:5px}
+.named{display:inline-block}
+.blank{display:block;width:62mm;border-bottom:1px solid #9aa3b5;height:1.05em}
+.under{display:block;text-align:center;width:62mm;font-size:9.4pt;color:var(--navy950);
+  font-weight:600;margin-top:2px;line-height:1.3}
+.place{margin-top:3px}
+.salutation .blank{display:inline-block;width:42mm;vertical-align:-2px}
 .salutation{margin-top:16px;font-size:10pt}
 .subject{margin-top:14px;font-size:10pt;font-weight:700;color:var(--navy950)}
 .body{margin-top:12px}
