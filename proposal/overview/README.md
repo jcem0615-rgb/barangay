@@ -71,3 +71,32 @@ full resolution.
 Inter and Plus Jakarta Sans — the two the app itself is set in — are embedded
 as base64 from `proposal/fonts/`, so the PDF renders identically on a machine
 that has neither. Run `proposal/fetch_fonts.sh` if that directory is empty.
+
+## The per-LGU proposals
+
+```bash
+node proposal/overview/build-proposals.mjs            # all eight
+node proposal/overview/build-proposals.mjs malasiqui  # just one
+```
+
+Output lands in `proposal/lgu/`. Each is a covering letter to the mayor, a
+one-page overview, then the same per-control pages as the overview PDF.
+
+`lgus.mjs` holds the addressees and the firm's details. Two things in it are
+not cosmetic:
+
+- **`kind` decides the mayor's title and the wording.** A city is not a
+  municipality, and handing a City Mayor a letter addressed to the "Municipal
+  Mayor" is how a proposal gets put down unread. It also relabels the
+  **Municipal staff console** as the **City staff console**.
+- **`barangays` is stated only where it has been verified.** Malasiqui's 73 are
+  loaded and checked; every other LGU's letter says the roster is taken from
+  the PSGC listing at setup rather than quoting a number nobody confirmed.
+
+`forLgu()` in `proposal.mjs` strips the reference catalogue's own counts — "17
+services across the hall's 6 offices" — from the control text. Those describe
+Malasiqui's seeded catalogue, and in a proposal they read as a claim about the
+reader's own LGU.
+
+The mayor's name is deliberately left as a ruled blank in two places, to be
+filled in by hand.

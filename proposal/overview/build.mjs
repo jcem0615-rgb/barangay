@@ -10,7 +10,7 @@
  *
  *   node proposal/overview/build.mjs
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
@@ -24,10 +24,20 @@ const ICONS = resolve(root, 'node_modules/lucide-react/dist/esm/icons')
 const FONTS = resolve(root, 'proposal/fonts')
 const OUT = resolve(root, 'proposal/eLGU-Overview.pdf')
 
-// Chromium is preinstalled in this environment; fall back to Playwright's own
-// lookup anywhere else.
-const CHROME = ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome']
-  .find((p) => existsSync(p))
+// Chromium is preinstalled in this environment, but its directory carries a
+// build number that changes when the image is rebuilt — hardcoding one path
+// means this breaks silently in a container nobody has touched. Find it.
+const CHROME = (() => {
+  const base = '/opt/pw-browsers'
+  if (!existsSync(base)) return undefined
+  for (const dir of readdirSync(base).filter((d) => d.startsWith('chromium-')).sort().reverse()) {
+    for (const exe of ['chrome-linux64/chrome', 'chrome-linux/chrome']) {
+      const p = resolve(base, dir, exe)
+      if (existsSync(p)) return p
+    }
+  }
+  return undefined
+})()
 
 // ---------------------------------------------------------------------------
 // Icons, straight out of lucide-react's own data
