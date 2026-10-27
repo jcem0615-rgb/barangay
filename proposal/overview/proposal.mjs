@@ -6,7 +6,7 @@
  * addressee and a handful of words; the system described is the same one.
  */
 import { icon, FACES, PORTALS, esc } from './build.mjs'
-import { FIRM, titleFor, placeFor } from './lgus.mjs'
+import { FIRM, titleFor, placeFor, surnameOf } from './lgus.mjs'
 
 const TODAY = new Date().toLocaleDateString('en-PH', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -69,11 +69,14 @@ function letterPage(lgu) {
     </header>
 
     <div class="addressee">
-      <p class="hon">The Honorable <span class="named"><span class="blank"></span><span class="under">${esc(mayorTitle)}</span></span></p>
-      <p class="place">${esc(lgu.name)}, Pangasinan</p>
+      ${lgu.mayor
+        ? `<p>The Honorable <strong>${esc(lgu.mayor)}</strong></p>
+           <p>${esc(mayorTitle)}</p>`
+        : `<p class="hon">The Honorable <span class="named"><span class="blank"></span><span class="under">${esc(mayorTitle)}</span></span></p>`}
+      <p class="place">${esc(lgu.name)}, ${esc(lgu.province)}</p>
     </div>
 
-    <p class="salutation">Dear Mayor <span class="blank"></span>,</p>
+    <p class="salutation">Dear Mayor ${lgu.mayor ? `${esc(surnameOf(lgu))},` : '<span class="blank"></span>,'}</p>
 
     <p class="subject">Subject: &nbsp;Proposal &mdash; eLGU Citizen Portal for ${esc(lgu.name)}</p>
 
