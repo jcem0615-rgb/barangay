@@ -51,7 +51,8 @@
     "test:hotlines": "node test/hotlines.mjs",
     "test:portrait": "node test/portrait.mjs",
     "test:field-rules": "node test/field-rules.mjs",
-    "test:ready-dates": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/ready-dates.mjs"
+    "test:ready-dates": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/ready-dates.mjs",
+    "test:tier": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/tier.mjs"
   },
   "dependencies": {
     "@types/compression": "^1.8.1",
