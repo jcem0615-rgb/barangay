@@ -25,17 +25,27 @@ const SETTINGS = [
   { icon: CircleHelp, label: 'profile.help' as const, screen: 'help' as const },
 ]
 
+/**
+ * A complaint under RA 11032 is filed against an office, and the form picks one
+ * from the catalogue's departments. A barangay deployment seeds none, so the
+ * row would open a screen whose only control is an empty picker — the same
+ * reason the dashboard asks no tier question there, and the same rule as the QR
+ * that encoded nothing: a control that cannot work is worse than none.
+ */
+const BARANGAY_TIER_SETTINGS = SETTINGS.filter((s) => s.label !== 'profile.complaints')
+
 export default function Profile() {
   const resident = useResidentProfile()
   const { logout } = useAuth()
   const { t } = useT()
-  const { productName } = useCatalogue()
+  const { productName, tier } = useCatalogue()
   // Above the early return, not below it: hooks must run in the same order on
   // every render, and a null profile used to skip these two — which is the
   // "rendered fewer hooks than expected" crash waiting for the first render
   // where the profile has not arrived.
   const { push } = useNav()
   const isOnline = useOnlineStatus()
+  const rows = tier === 'barangay' ? BARANGAY_TIER_SETTINGS : SETTINGS
   if (!resident) return null
 
   return (
@@ -80,12 +90,12 @@ export default function Profile() {
 
         <p className="mb-2 mt-6 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">{t('profile.account')}</p>
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          {SETTINGS.map(({ icon: Icon, label, screen }, i) => (
+          {rows.map(({ icon: Icon, label, screen }, i) => (
             <button
               key={label}
               onClick={() => screen && push({ name: screen })}
               className={`tap-target flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-slate-50 ${
-                i !== SETTINGS.length - 1 ? 'border-b border-slate-100' : ''
+                i !== rows.length - 1 ? 'border-b border-slate-100' : ''
               }`}
             >
               <Icon size={17} className="text-navy-800" />

@@ -39,7 +39,7 @@ const CONSOLE_FILES = [
  * the reminder.
  */
 const SAME_IN_BOTH = new Set([
-  'auth.title', 'id.cardLabel',
+  'auth.title', 'id.cardLabel', 'id.cardLabelBarangay',
   'auth.barangay', 'mydata.barangay', 'tier.barangay', 'brgy.title', 'brgy.hallCaptain',
   'auth.email', 'profile.email', 'help.email', 'auth.password', 'profile.account',
   'nav.profile', 'profile.title', 'notif.kindAdvanced', 'incident.videoFile',
@@ -50,6 +50,10 @@ const SAME_IN_BOTH = new Set([
   // Poblacion" names somewhere, "Maria Santos" is the seeded resident, and
   // "Kagawad" is already the Filipino for the office.
   'demo.tierBarangay', 'demo.roleResident', 'demo.roleKagawad',
+  // Two place names and the word "Barangay", which is the Filipino word
+  // already — "Barangay Poblacion, Malasiqui" is what is said in both
+  // languages, the same rule 'tier.barangay' is on this list for.
+  'auth.barangayOf',
 ])
 
 const walk = (dir) =>

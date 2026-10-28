@@ -29,12 +29,16 @@ export const en = {
   // sign in
   'auth.title': 'eLGU Citizen Portal',
   'auth.municipalityOf': 'Municipality of {name}',
+  'auth.barangayOf': 'Barangay {barangay}, {name}',
   'auth.birthDate': 'Date of birth',
   'auth.motherMaidenName': "Mother's maiden name",
   'auth.motherHint': 'Used only to tell apart residents with the same name. Staff never see it.',
   'auth.residesHere': 'I live in {name}, {province}',
   'auth.residesElsewhere':
     'This portal serves {name} only. If you live in another municipality, register on that municipality\u2019s own portal \u2014 an account here would not reach the offices that hold your records.',
+  'auth.residesHereBarangay': 'I live in Barangay {barangay}, {name}',
+  'auth.residesElsewhereBarangay':
+    'This portal serves Barangay {barangay} only. If you live in another barangay, register on its own portal or with the municipality — an account here would not reach the office that holds your records.',
   'auth.loadingMunicipality': 'Checking which municipality this portal serves\u2026',
   'auth.signIn': 'Sign in',
   'auth.createAccount': 'Create account',
@@ -48,6 +52,7 @@ export const en = {
   'auth.sendResetLink': 'Send reset link',
   'auth.forgotBlurb': "Enter the email you registered with and we'll send a link to choose a new password.",
   'auth.staffNote': 'Municipal staff sign in with the account issued by their office.',
+  'auth.staffNoteBarangay': 'Barangay officials and staff sign in with the account issued by the barangay.',
   'auth.newPassword': 'New password',
   'auth.confirmPassword': 'Confirm new password',
   'auth.choosePassword': 'Choose a new password',
@@ -60,7 +65,6 @@ export const en = {
   // dashboard
   'home.greeting': 'Good day,',
   'home.recentRequests': 'Recent Requests',
-  'home.noRequestsSolo': 'No requests yet. Open your barangay above to start one.',
   'home.noRequests': 'No requests yet. Pick Municipal or Barangay above to start one.',
 
   // services
@@ -571,7 +575,8 @@ export const en = {
   'id.subtitle': 'Present this for verification',
   'id.dateOfBirth': 'Date of birth',
   'id.address': 'Address',
-  'id.cardLabel': 'ELGU CITIZEN DIGITAL ID',
+  'id.cardLabel': 'eLGU Citizen Digital ID',
+  'id.cardLabelBarangay': 'eBarangay Digital ID',
   'id.verifiedTitle': 'How a counter checks this ID',
   'id.verifiedBlurb': 'Show the verification code below at an LGU counter. It lasts ninety seconds and works once, so a screenshot proves nothing \u2014 which is what makes the check worth something.',
   'id.registeredAddress': 'Registered address',
@@ -681,12 +686,16 @@ export const fil: Record<StringKey, string> = {
 
   'auth.title': 'eLGU Citizen Portal',
   'auth.municipalityOf': 'Munisipyo ng {name}',
+  'auth.barangayOf': 'Barangay {barangay}, {name}',
   'auth.birthDate': 'Petsa ng kapanganakan',
   'auth.motherMaidenName': 'Pangalan ng ina bago ikasal',
   'auth.motherHint': 'Ginagamit lamang para mapaghiwalay ang magkapareho ang pangalan. Hindi ito nakikita ng staff.',
   'auth.residesHere': 'Naninirahan ako sa {name}, {province}',
   'auth.residesElsewhere':
     'Ang portal na ito ay para sa {name} lamang. Kung sa ibang bayan ka nakatira, magparehistro sa sariling portal ng bayan mo \u2014 hindi aabot sa mga opisinang may hawak ng rekord mo ang account dito.',
+  'auth.residesHereBarangay': 'Naninirahan ako sa Barangay {barangay}, {name}',
+  'auth.residesElsewhereBarangay':
+    'Ang portal na ito ay para sa Barangay {barangay} lamang. Kung sa ibang barangay ka nakatira, magparehistro sa sariling portal nito o sa munisipyo — hindi aabot sa opisinang may hawak ng rekord mo ang account dito.',
   'auth.loadingMunicipality': 'Tinitingnan kung aling munisipyo ang sinusuportahan ng portal na ito\u2026',
   'auth.signIn': 'Mag-log in',
   'auth.createAccount': 'Gumawa ng account',
@@ -700,6 +709,7 @@ export const fil: Record<StringKey, string> = {
   'auth.sendResetLink': 'Ipadala ang link',
   'auth.forgotBlurb': 'Ilagay ang email na ginamit mo sa pagpaparehistro at padadalhan ka namin ng link para makapili ng bagong password.',
   'auth.staffNote': 'Ang mga kawani ng munisipyo ay gumagamit ng account na ibinigay ng kanilang tanggapan.',
+  'auth.staffNoteBarangay': 'Ang mga opisyal at kawani ng barangay ay gumagamit ng account na ibinigay ng barangay.',
   'auth.newPassword': 'Bagong password',
   'auth.confirmPassword': 'Ulitin ang bagong password',
   'auth.choosePassword': 'Pumili ng bagong password',
@@ -711,7 +721,6 @@ export const fil: Record<StringKey, string> = {
 
   'home.greeting': 'Magandang araw,',
   'home.recentRequests': 'Mga Kamakailang Kahilingan',
-  'home.noRequestsSolo': 'Wala pang kahilingan. Buksan ang barangay mo sa itaas para magsimula.',
   'home.noRequests': 'Wala pang kahilingan. Piliin ang Munisipyo o Barangay sa itaas para magsimula.',
 
   'services.title': 'Mga Serbisyo',
@@ -1201,7 +1210,8 @@ export const fil: Record<StringKey, string> = {
   'id.subtitle': 'Ipakita ito para sa beripikasyon',
   'id.dateOfBirth': 'Petsa ng kapanganakan',
   'id.address': 'Tirahan',
-  'id.cardLabel': 'ELGU CITIZEN DIGITAL ID',
+  'id.cardLabel': 'eLGU Citizen Digital ID',
+  'id.cardLabelBarangay': 'eBarangay Digital ID',
   'id.verifiedTitle': 'Paano sinusuri ng counter ang ID na ito',
   'id.verifiedBlurb': 'Ipakita ang verification code sa ibaba sa counter ng LGU. Siyamnapung segundo lang ito at isang beses gumagana, kaya walang silbi ang screenshot \u2014 iyon ang dahilan kung bakit may halaga ang pagsusuri.',
   'id.registeredAddress': 'Nakarehistrong tirahan',

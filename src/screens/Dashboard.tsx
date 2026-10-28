@@ -174,6 +174,15 @@ export default function Dashboard() {
         </>
       )}
 
+      {/*
+        The hall's request list, and only the hall's. A barangay deployment
+        files no municipal requests and this section would be a heading over a
+        permanent empty state, with a "See all" leading to the tab that was
+        dropped from the bottom bar for the same reason. What a resident has
+        asked their barangay for is in the hub, beside the certificates.
+      */}
+      {tier !== 'barangay' && (
+      <>
       <div className="mt-6 flex items-center justify-between">
         <h2 className="font-display text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">{t('home.recentRequests')}</h2>
         <button onClick={() => push({ name: 'applications' })} className="text-[calc(13.5px_*_var(--text-scale))] font-semibold text-navy-800">
@@ -183,13 +192,15 @@ export default function Dashboard() {
       <div className="mt-3 space-y-2.5">
         {recent.length === 0 && (
           <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-[calc(14px_*_var(--text-scale))] text-slate-500">
-            {t(tier === 'barangay' ? 'home.noRequestsSolo' : 'home.noRequests')}
+            {t('home.noRequests')}
           </p>
         )}
         {recent.map((app) => (
           <ApplicationCard key={app.id} app={app} onTap={() => push({ name: 'application-detail', id: app.id })} />
         ))}
       </div>
+      </>
+      )}
     </div>
   )
 }

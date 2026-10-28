@@ -7,10 +7,12 @@ import IdPortrait, { IdPortraitFrame } from '../components/IdPortrait'
 import { useResidentPhoto } from '../lib/useResidentPhoto'
 import { addressLine, useResidentProfile } from '../lib/resident'
 import { useT } from '../lib/i18n'
+import { useCatalogue } from '../lib/catalogue'
 
 export default function IdCardScreen() {
   const resident = useResidentProfile()
   const { t, locale } = useT()
+  const { tier } = useCatalogue()
   const { url: photoUrl } = useResidentPhoto()
   if (!resident) return null
 
@@ -26,7 +28,7 @@ export default function IdCardScreen() {
           <div className="relative flex items-center gap-2">
             <ShieldCheck size={15} className="text-gold-400" />
             <p className="text-[calc(11.5px_*_var(--text-scale))] font-semibold uppercase tracking-[0.16em] text-gold-400">
-              Republic of the Philippines &middot; eLGU Citizen Digital ID
+              Republic of the Philippines &middot; {t(tier === 'barangay' ? 'id.cardLabelBarangay' : 'id.cardLabel')}
             </p>
           </div>
 

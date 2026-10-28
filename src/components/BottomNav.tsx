@@ -12,15 +12,23 @@ const ITEMS = [
 ] as const
 
 /**
- * Appointments are the hall's: a counter, a slot and a queue number against an
- * office's booking row. A barangay deployment has no offices and the routes are
- * not mounted, so the tab would open a screen whose first request 404s.
+ * Two of the five are the hall's.
+ *
+ * Appointments are a counter, a slot and a queue number against an office's
+ * booking row. A barangay deployment has no offices and the routes are not
+ * mounted, so the tab would open a screen whose first request 404s.
+ *
+ * Requests is the municipal request list, and a barangay deployment files no
+ * municipal requests — a certificate request lives in the barangay hub, listed
+ * under the notices and the certificates it was asked for from. Keeping the tab
+ * would give a resident a second place to look that is empty for ever, and the
+ * emptier of the two is the one with the official-looking name.
  *
  * Services stays, because "what can I ask for?" is still the question — it just
  * has one answer there, so it opens the barangay instead of a switch between
  * two tiers.
  */
-const BARANGAY_TIER_ITEMS = ITEMS.filter((i) => i.key !== 'appointments')
+const BARANGAY_TIER_ITEMS = ITEMS.filter((i) => i.key !== 'appointments' && i.key !== 'applications')
 
 export default function BottomNav() {
   const { screen, replace } = useNav()

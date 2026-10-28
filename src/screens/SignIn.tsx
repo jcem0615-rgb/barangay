@@ -25,7 +25,7 @@ export default function SignIn() {
   })
   const [barangays, setBarangays] = useState<Array<{ id: string; name: string }>>([])
   const [residesHere, setResidesHere] = useState(false)
-  const { municipality, productName } = useCatalogue()
+  const { municipality, productName, tier, servedBarangay } = useCatalogue()
 
   // Public, and needed before anybody has an account. Fetched once rather than
   // on switching to the register tab, so the list is there the moment it is
@@ -73,8 +73,22 @@ export default function SignIn() {
             <Building2 size={26} strokeWidth={1.9} />
           </span>
           <h1 className="font-display text-[calc(22px_*_var(--text-scale))] font-extrabold text-navy-950">{productName}</h1>
+          {/*
+            Which government this is. A barangay deployment names the barangay
+            and the town it sits in, because "Municipality of Malasiqui" over a
+            portal that issues only Barangay Poblacion's certificates names the
+            wrong office — and the one it names has a hall somebody would travel
+            to. The non-breaking space holds the line's height until the
+            catalogue answers, rather than letting the card jump.
+          */}
           <p className="mt-1 text-[calc(14px_*_var(--text-scale))] text-slate-500">
-            {municipality ? t('auth.municipalityOf', { name: municipality.name }) : '\u00a0'}
+            {tier === 'barangay'
+              ? servedBarangay && municipality
+                ? t('auth.barangayOf', { barangay: servedBarangay.name, name: municipality.name })
+                : '\u00a0'
+              : municipality
+                ? t('auth.municipalityOf', { name: municipality.name })
+                : '\u00a0'}
           </p>
         </div>
 
@@ -194,12 +208,24 @@ export default function SignIn() {
                       onChange={(e) => setResidesHere(e.target.checked)}
                       className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-navy-800"
                     />
+                    {/*
+                      A barangay deployment asks the question one tier down,
+                      because that is the boundary the account is bound to. The
+                      portal serves one barangay, and a resident of the next one
+                      registering here would be stamped as living in this one —
+                      the declaration has to name the place it is actually
+                      about, or it is a tick against something nobody asked.
+                    */}
                     <span className="text-[calc(13.5px_*_var(--text-scale))] font-medium leading-snug text-navy-950">
-                      {t('auth.residesHere', { name: municipality.name, province: municipality.province })}
+                      {tier === 'barangay' && servedBarangay
+                        ? t('auth.residesHereBarangay', { barangay: servedBarangay.name, name: municipality.name })
+                        : t('auth.residesHere', { name: municipality.name, province: municipality.province })}
                     </span>
                   </label>
                   <p className="mt-2 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-500">
-                    {t('auth.residesElsewhere', { name: municipality.name })}
+                    {tier === 'barangay' && servedBarangay
+                      ? t('auth.residesElsewhereBarangay', { barangay: servedBarangay.name })
+                      : t('auth.residesElsewhere', { name: municipality.name })}
                   </p>
                 </div>
               ) : (
@@ -305,7 +331,7 @@ export default function SignIn() {
           </div>
         ) : (
           <p className="mt-4 text-center text-[calc(12.5px_*_var(--text-scale))] leading-relaxed text-slate-500">
-            {t('auth.staffNote')}
+            {t(tier === 'barangay' ? 'auth.staffNoteBarangay' : 'auth.staffNote')}
           </p>
         )}
       </div>

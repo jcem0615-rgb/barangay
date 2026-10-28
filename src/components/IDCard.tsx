@@ -15,7 +15,7 @@ const BADGES_ON_CARD = 3
 
 export default function IDCard({ profile, onTap }: { profile: ResidentProfile; onTap?: () => void }) {
   const { t, locale } = useT()
-  const { findProgram } = useCatalogue()
+  const { findProgram, tier } = useCatalogue()
   const { url: photoUrl } = useResidentPhoto()
 
   // A lapsed record is not a badge: it should not read as a live entitlement at
@@ -37,8 +37,19 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
         <div className="flex min-w-0 items-start gap-3">
           <IdPortraitFrame url={photoUrl} name={profile.fullName} size={52} onDark />
           <div className="min-w-0">
+          {/*
+            What the card calls itself, and the one string on this face that is
+            not about the resident. It was an English literal, which is how the
+            barangay product ended up issuing a card headed "eLGU" — the name of
+            a system that deployment does not run.
+
+            It follows the tier rather than `productName` on purpose: the name
+            is printed on the face of an identity document, and PRODUCT_NAME
+            renames the app for whoever deploys it. A card that reads whatever
+            somebody typed into an environment variable is not an ID card.
+          */}
           <p className="text-[calc(11.5px_*_var(--text-scale))] font-semibold uppercase tracking-[0.16em] text-gold-400">
-            eLGU Citizen Digital ID
+            {t(tier === 'barangay' ? 'id.cardLabelBarangay' : 'id.cardLabel')}
           </p>
           <p className="font-display mt-1 text-[calc(19px_*_var(--text-scale))] font-bold leading-tight text-white">{profile.fullName}</p>
           <p className="mt-0.5 text-[calc(13.5px_*_var(--text-scale))] text-navy-100">{addressLine(profile.barangay, profile.municipality)}</p>

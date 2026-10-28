@@ -3,6 +3,7 @@ import TopBar from '../components/TopBar'
 import EmergencyContacts from '../components/EmergencyContacts'
 import { useNav } from '../lib/nav'
 import { useT } from '../lib/i18n'
+import { useCatalogue } from '../lib/catalogue'
 
 /**
  * One screen for "something is wrong".
@@ -16,10 +17,19 @@ import { useT } from '../lib/i18n'
  * Ringing comes first and reporting second on purpose. A report is not an
  * emergency call, and a resident watching a fire should be dialling, not
  * filling in a form.
+ *
+ * The hotlines are in both products; reporting is not. An incident report
+ * lands with the municipal administrator, because a downed line is the
+ * cooperative's work and a flooded road is engineering's — a barangay
+ * deployment has neither, and the route is not mounted there. So the section
+ * is not rendered either: a control whose only possible outcome is a failed
+ * request is worse than no control, the same rule the QR that encoded nothing
+ * was removed under.
  */
 export default function Emergency() {
   const { push } = useNav()
   const { t } = useT()
+  const { tier } = useCatalogue()
 
   return (
     <div className="animate-tap-in pb-24">
@@ -28,6 +38,8 @@ export default function Emergency() {
       <div className="px-4 pt-4">
         <EmergencyContacts />
 
+        {tier !== 'barangay' && (
+        <>
         <p className="mb-2 mt-6 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">
           {t('incident.sectionTitle')}
         </p>
@@ -48,6 +60,8 @@ export default function Emergency() {
           </span>
           <ChevronRight size={17} className="shrink-0 text-slate-400" />
         </button>
+        </>
+        )}
       </div>
     </div>
   )
