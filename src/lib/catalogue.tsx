@@ -15,6 +15,7 @@ import type {
 const CACHE_KEY = 'elgu-catalogue-v1'
 
 interface CachedCatalogue {
+  productName: string
   tier: DeploymentTier
   servedBarangay: ServedBarangay | null
   municipality: Municipality | null
@@ -59,6 +60,11 @@ interface CatalogueValue {
    * server that has not been upgraded, renders what it always did.
    */
   tier: DeploymentTier
+  /**
+   * What this install calls itself. The two tiers are two products sold to two
+   * buyers, so a barangay deployment is not an "eLGU Citizen Portal".
+   */
+  productName: string
   /** In `barangay` tier, the one barangay served. Null municipally. */
   servedBarangay: ServedBarangay | null
   /**
@@ -90,6 +96,7 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
   // than an empty shell that fills in once the network answers.
   const cached = readCache()
   const [tier, setTier] = useState<DeploymentTier>(cached?.tier ?? 'municipal')
+  const [productName, setProductName] = useState<string>(cached?.productName ?? 'eLGU Citizen Portal')
   const [servedBarangay, setServedBarangay] = useState<ServedBarangay | null>(cached?.servedBarangay ?? null)
   const [municipality, setMunicipality] = useState<Municipality | null>(cached?.municipality ?? null)
   const [departments, setDepartments] = useState<ServiceCategory[]>(cached?.departments ?? [])
@@ -107,6 +114,7 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
       .then((c) => {
         const holidayDates = (c.holidays ?? []).map((h) => h.date)
         setTier(c.tier ?? 'municipal')
+        setProductName(c.productName ?? 'eLGU Citizen Portal')
         setServedBarangay(c.barangay ?? null)
         setMunicipality(c.municipality ?? null)
         setDepartments(c.departments)
@@ -116,6 +124,7 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
         setHolidays(new Set(holidayDates))
         writeCache({
           tier: c.tier ?? 'municipal',
+          productName: c.productName ?? 'eLGU Citizen Portal',
           servedBarangay: c.barangay ?? null,
           municipality: c.municipality ?? null,
           departments: c.departments,
@@ -130,10 +139,21 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoaded(true))
   }, [])
 
+  // The tab, and the window title of an installed copy.
+  //
+  // index.html carries a build-time title, which is right for the first paint
+  // and wrong the moment one bundle is pointed at the other tier's server. The
+  // catalogue knows which product this actually is, so it says so — the same
+  // reasoning as <html lang> following the language rather than the last tap.
+  useEffect(() => {
+    document.title = productName
+  }, [productName])
+
   return (
     <CatalogueContext.Provider
       value={{
         tier,
+        productName,
         servedBarangay,
         municipality,
         departments,

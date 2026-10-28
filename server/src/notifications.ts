@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { productName } from './deployment.ts'
 import { one } from './db.ts'
 import { sendMail } from './mailer.ts'
 import { sendSms, smsEnabled, trimForSms } from './sms.ts'
@@ -71,7 +72,7 @@ export async function deliverNotification(input: NotificationInput): Promise<voi
       await sendMail({
         to: person.email,
         subject: input.title,
-        text: `${input.body}\n\nView it here: ${env.publicUrl}\n\n— eLGU Citizen Portal`,
+        text: `${input.body}\n\nView it here: ${env.publicUrl}\n\n— ${productName()}`,
       }).catch((err) => console.error('notification email failed', err))
     }
 

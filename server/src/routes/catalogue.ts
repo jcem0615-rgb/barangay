@@ -3,7 +3,7 @@ import { query, one } from '../db.ts'
 import { WORKFLOW_STEPS } from '../workflow.ts'
 import { toPesos } from '../serialize.ts'
 import { servedMunicipality } from '../identity.ts'
-import { configuredTier } from '../deployment.ts'
+import { configuredTier, productName } from '../deployment.ts'
 
 export const catalogueRouter = Router()
 
@@ -73,6 +73,8 @@ catalogueRouter.get('/', async (_req, res) => {
     // and read before the first render, which is exactly when the shell has to
     // decide what to draw.
     tier,
+    // What the app should call itself: the two tiers are two products.
+    productName: productName(),
     // In barangay tier, the one barangay this instance serves: the resident
     // app has no tier switch and no barangay picker, so it needs to know whose
     // notices and certificates it is showing before anybody signs in.

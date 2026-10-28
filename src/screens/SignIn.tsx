@@ -25,7 +25,7 @@ export default function SignIn() {
   })
   const [barangays, setBarangays] = useState<Array<{ id: string; name: string }>>([])
   const [residesHere, setResidesHere] = useState(false)
-  const { municipality } = useCatalogue()
+  const { municipality, productName } = useCatalogue()
 
   // Public, and needed before anybody has an account. Fetched once rather than
   // on switching to the register tab, so the list is there the moment it is
@@ -72,7 +72,7 @@ export default function SignIn() {
           <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-navy-800 text-white">
             <Building2 size={26} strokeWidth={1.9} />
           </span>
-          <h1 className="font-display text-[calc(22px_*_var(--text-scale))] font-extrabold text-navy-950">eLGU Citizen Portal</h1>
+          <h1 className="font-display text-[calc(22px_*_var(--text-scale))] font-extrabold text-navy-950">{productName}</h1>
           <p className="mt-1 text-[calc(14px_*_var(--text-scale))] text-slate-500">
             {municipality ? t('auth.municipalityOf', { name: municipality.name }) : '\u00a0'}
           </p>

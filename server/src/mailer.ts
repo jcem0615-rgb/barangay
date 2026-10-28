@@ -1,4 +1,5 @@
 import { appendFile } from 'node:fs/promises'
+import { productName } from './deployment.ts'
 import nodemailer from 'nodemailer'
 import { env } from './env.ts'
 
@@ -40,7 +41,7 @@ export async function sendMail(mail: Mail): Promise<void> {
 
 export function resetEmail(link: string, expiresInMinutes: number): Omit<Mail, 'to'> {
   return {
-    subject: 'Reset your eLGU Citizen Portal password',
+    subject: `Reset your ${productName()} password`,
     text: [
       'We received a request to reset your password.',
       '',

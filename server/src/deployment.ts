@@ -58,6 +58,23 @@ export function configuredTier(): DeploymentTier {
 export const isBarangayTier = () => configuredTier() === 'barangay'
 
 /**
+ * What this install calls itself.
+ *
+ * The two tiers are two products sold to two buyers, so they are not the same
+ * name: a barangay captain is not buying an "eLGU Citizen Portal", and a
+ * resident of a standalone deployment opening an app named after the
+ * municipal hall would reasonably wonder whose it is.
+ *
+ * It is a runtime value rather than a build flag because the same bundle
+ * serves both, and it reaches the client on the catalogue. `PRODUCT_NAME`
+ * overrides it, for a deployment that sells under its own name.
+ */
+export function productName(): string {
+  return trimmed('PRODUCT_NAME')
+    ?? (configuredTier() === 'barangay' ? 'eBarangay Portal' : 'eLGU Citizen Portal')
+}
+
+/**
  * Which barangay a `barangay` deployment serves.
  *
  * Required in that tier and refused in the other: an id here with the hall

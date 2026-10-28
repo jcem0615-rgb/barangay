@@ -689,6 +689,8 @@ export const api = {
     request<{
       /** Which product this install is; absent on a server older than the tiers. */
       tier?: 'municipal' | 'barangay'
+      /** What this install calls itself. */
+      productName?: string
       /** The one barangay served, in `barangay` tier only. */
       barangay?: { id: string; name: string } | null
       municipality: Municipality

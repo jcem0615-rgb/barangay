@@ -10,6 +10,7 @@ import TextSizeToggle from '../components/TextSizeToggle'
 import { useNav } from '../lib/nav'
 import { useOnlineStatus } from '../lib/useOnlineStatus'
 import { useT } from '../lib/i18n'
+import { useCatalogue } from '../lib/catalogue'
 
 /**
  * Every row goes somewhere. A chevron that does nothing when tapped reads as a
@@ -28,6 +29,7 @@ export default function Profile() {
   const resident = useResidentProfile()
   const { logout } = useAuth()
   const { t } = useT()
+  const { productName } = useCatalogue()
   // Above the early return, not below it: hooks must run in the same order on
   // every render, and a null profile used to skip these two — which is the
   // "rendered fewer hooks than expected" crash waiting for the first render
@@ -100,7 +102,7 @@ export default function Profile() {
           <LogOut size={16} /> {t('profile.signOut')}
         </button>
 
-        <p className="mt-6 text-center text-[calc(12px_*_var(--text-scale))] text-slate-500">eLGU Citizen Portal &middot; v1.0.0</p>
+        <p className="mt-6 text-center text-[calc(12px_*_var(--text-scale))] text-slate-500">{productName} &middot; v1.0.0</p>
       </div>
     </div>
   )
