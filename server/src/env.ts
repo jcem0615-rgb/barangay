@@ -1,4 +1,24 @@
 import 'dotenv/config'
+import { configuredTier, productName } from './deployment.ts'
+
+/**
+ * The host this deployment actually answers on, taken from `PUBLIC_URL`.
+ *
+ * It is what the generated from-address and push contact address are built
+ * from, so a deployment that never sets `MAIL_FROM` still sends as itself
+ * rather than as somebody else. The old defaults were sample data — a real
+ * `@malasiqui.gov.ph` address — which meant a barangay in another province
+ * sent its password-reset mail signed as another town's municipal portal.
+ * Falling back to `localhost` is obviously a development copy; falling back
+ * to a real LGU's domain is a claim.
+ */
+function publicHost(raw: string): string {
+  try {
+    return new URL(raw).hostname || 'localhost'
+  } catch {
+    return 'localhost'
+  }
+}
 
 function required(name: string): string {
   const value = process.env[name]
@@ -9,6 +29,9 @@ function required(name: string): string {
   }
   return value
 }
+
+const PUBLIC_URL = (process.env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, '')
+const HOST = publicHost(PUBLIC_URL)
 
 export const env = {
   databaseUrl: required('DATABASE_URL'),
@@ -40,10 +63,17 @@ export const env = {
    * The shared secret the gateway signs its callbacks with. Development falls
    * back to a fixed string so the flow is clickable out of the box; production
    * must set a real one, and the server refuses to start without it.
+   *
+   * **Only where the deployment can actually take money.** A barangay
+   * deployment settles its fees at the hall and the payments router is not
+   * mounted there at all, so demanding a gateway secret from it is refusing to
+   * start over a subsystem that does not exist — the first thing a barangay
+   * buying this would hit, and with nothing in the message to say it is
+   * irrelevant to them.
    */
   paymentSecret:
     process.env.PAYMENT_SECRET ??
-    (process.env.NODE_ENV === 'production'
+    (process.env.NODE_ENV === 'production' && configuredTier() === 'municipal'
       ? required('PAYMENT_SECRET')
       : 'development-payment-secret'),
   isProduction: process.env.NODE_ENV === 'production',
@@ -70,12 +100,12 @@ export const env = {
     'console' | 'file' | 'smtp',
   smtpUrl: process.env.SMTP_URL || undefined,
   mailOutbox: process.env.MAIL_OUTBOX || undefined,
-  mailFrom: process.env.MAIL_FROM ?? 'eLGU Citizen Portal <no-reply@malasiqui.gov.ph>',
+  mailFrom: process.env.MAIL_FROM ?? `${productName()} <no-reply@${HOST}>`,
   /**
    * Public base URL of the web app, used to build the reset link. Must be the
    * address residents actually reach, not the server's own hostname.
    */
-  publicUrl: (process.env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
+  publicUrl: PUBLIC_URL,
 
   // Web Push. Absent means push is simply off — the app still records every
   // notification and still sends mail, so a deployment without these loses a
@@ -83,7 +113,7 @@ export const env = {
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? '',
   // Who a push service should contact about a misbehaving sender.
-  vapidSubject: process.env.VAPID_SUBJECT ?? 'mailto:dpo@malasiqui.gov.ph',
+  vapidSubject: process.env.VAPID_SUBJECT ?? `mailto:dpo@${HOST}`,
 
   /** 'off' | 'log' | 'http'. SMS costs money per message, so it is opt-in. */
   smsTransport: (process.env.SMS_TRANSPORT ?? 'off') as 'off' | 'log' | 'http',

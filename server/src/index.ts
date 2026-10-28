@@ -6,7 +6,7 @@ import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
 import { env } from './env.ts'
-import { configuredMunicipality, configuredTier, configuredBarangaySlug } from './deployment.ts'
+import { configuredMunicipality, configuredTier, configuredBarangaySlug, productName } from './deployment.ts'
 import { isDatabaseReachable, one, pool } from './db.ts'
 import { authRouter } from './routes/auth.ts'
 import { catalogueRouter } from './routes/catalogue.ts'
@@ -251,7 +251,7 @@ await refuseAMismatchedBarangay()
 
 const server = app.listen(env.port, () => {
   const municipality = configuredMunicipality()
-  console.log(`eLGU API listening on http://localhost:${env.port}`)
+  console.log(`${productName()} API listening on http://localhost:${env.port}`)
   // Said on every boot, because "which municipality is this instance?" is the
   // question somebody asks exactly when they are about to get it wrong.
   console.log(`serving ${municipality.name} (${municipality.code}) — from the ${municipality.source}`)

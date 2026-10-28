@@ -40,15 +40,19 @@ Everything is environment variables. Only the first two are required.
 | `SERVE_WEB` | no | `false` to run API-only |
 | `VAPID_PUBLIC_KEY` | for push | Generate a pair: `npx web-push generate-vapid-keys`. Without both keys push is simply off, and the app's notification switch does not appear. |
 | `VAPID_PRIVATE_KEY` | for push | Keep it secret, like `JWT_SECRET`. Changing it invalidates every existing subscription, and every device has to be turned on again. |
-| `VAPID_SUBJECT` | for push | `mailto:` for whoever a push service should contact about this sender. Defaults to the DPO address. |
+| `VAPID_SUBJECT` | for push | `mailto:` for whoever a push service should contact about this sender. Defaults to `dpo@` this deployment's own host, from `PUBLIC_URL`. |
 | `UPLOAD_DIR` | **in a container** | Must be a mounted volume, or uploads are lost on deploy |
 | `CLAMAV_HOST` | **for public traffic** | clamd for scanning uploads. Unset = no scanning |
 | `SMTP_URL` | **for public traffic** | Password reset links go nowhere without it |
+| `MAIL_FROM` | **for public traffic** | Who the mail is from. Defaults to this product's name at this deployment's own host, from `PUBLIC_URL` — set it to an address that can actually receive a reply |
 | `MAX_EVIDENCE_MB` | no | Largest incident evidence file, default 512. Half an hour of 1080p phone video is 1–2 GB, so raise it only if storage and bandwidth can take it |
 | `PAYMENT_PROVIDER` | **to take money** | The gateway. `mock` is the development provider and **must not** be deployed — it exposes a route that settles a payment without one being made |
-| `PAYMENT_SECRET` | **to take money** | The secret the gateway signs callbacks with. The server refuses to start in production without it |
+| `PAYMENT_SECRET` | **to take money** | The secret the gateway signs callbacks with. The server refuses to start in production without it — in municipal tier only; a barangay deployment takes no online payment and is not asked for one |
 | `PUBLIC_URL` | **yes** | Address residents reach. Reset and notification links use it, and so does the QR printed on every document — see the checklist, because that one is frozen into each PDF at issue |
 | `SMS_TRANSPORT` | optional | `http` plus `SMS_URL`/`SMS_API_KEY` to text residents |
+| `DEPLOYMENT_TIER` | no | `municipal` (default) or `barangay`. The second product — see *Standing up a barangay* |
+| `BARANGAY_ID` | **in barangay tier** | Which roster row this deployment serves. Refused in municipal tier |
+| `PRODUCT_NAME` | no | Overrides what the app calls itself. The home-screen icon and the ID card do not follow it |
 | `MUNICIPALITY_ADDRESS` | for receipts | The hall's address as it should read on an official receipt |
 | `MUNICIPALITY_PHONE` | for receipts | Printed on the receipt. Ring it before you set it |
 | `MUNICIPALITY_EMAIL` | for receipts | Printed on the receipt |
@@ -356,6 +360,102 @@ over. In particular:
 - [ ] No signature has been carried over from another deployment. A scanned signature is
       the one uploaded thing that names a specific person; it belongs to the town that
       obtained it
+
+## Standing up a barangay
+
+The same binary sells twice. `DEPLOYMENT_TIER=barangay` is the second product — one
+barangay, standing alone, with no municipal hall behind it — and it provisions exactly the
+same way a municipality does. See `server/BARANGAY-TIER.md` for what the tier does and does
+not mount.
+
+```bash
+DEPLOYMENT_TIER=barangay
+BARANGAY_ID=bolasi                       # must appear in the roster below
+
+# A barangay is still *in* a town. This is printed on every certificate it
+# issues and stamped on every account; it is not the hall running anything.
+MUNICIPALITY_CODE=san-fabian-pangasinan
+MUNICIPALITY_NAME="San Fabian"
+MUNICIPALITY_PROVINCE=Pangasinan
+
+BARANGAY_ROSTER=/etc/elgu/bolasi.json    # one row is enough here
+ADMIN_EMAIL=captain@bolasi.gov.ph        # becomes the barangay_admin, not a municipal admin
+ADMIN_NAME="Barangay Bolasi — Administrator"
+PUBLIC_URL=https://bolasi.gov.ph         # the QR on every certificate is built from this
+SEED_PASSWORD=…                          # required in production
+npm run provision
+```
+
+The roster file is the same shape as a municipality's and needs only the one barangay:
+
+```json
+[{ "id": "bolasi", "name": "Bolasi" }]
+```
+
+Leave `BARANGAY_COUNT` unset. It exists to refuse a roster that is short of a
+*municipality's* real barangay count, and a barangay deployment reads the whole file and
+then keeps the one row `BARANGAY_ID` names. A barangay that is being sold ahead of its
+municipality can equally be given the town's full roster — the extra rows are ignored, and
+joining the municipal deployment later is then a settings change rather than a re-key.
+
+**Four things differ from a municipality, and the first is the one to know:**
+
+- **`PAYMENT_SECRET` is not required.** Nothing is paid online at this tier and the payments
+  router is not mounted, so the server does not refuse to start over a gateway that does not
+  exist. `PAYMENT_PROVIDER` is irrelevant here for the same reason.
+- **No office accounts are created, because there are no offices.** The provision makes the
+  one `barangay_admin` and nobody else; it issues its own clerks and kagawads from the
+  **Officers** tab, by emailed invitation. `SEED_SAMPLE_ACCOUNTS` is off in production
+  exactly as it is for a town.
+- **The certificate catalogue is the barangay's own**, not a shared municipal one. There is
+  no `/admin` mount to edit a shared catalogue from, so the rows are stamped with this
+  barangay at seed and are editable in its own **Certificates** tab.
+- **`MAIL_FROM` and `VAPID_SUBJECT` default to this deployment's own host** (from
+  `PUBLIC_URL`) rather than to a sample address. Set them explicitly to addresses that
+  actually receive mail, but nothing will go out signed as another LGU if you forget.
+
+Build the web app for the right product, because the manifest and the iOS home-screen label
+are baked in at build time and cannot be corrected by anything the running app renders:
+
+```bash
+VITE_PRODUCT=barangay npm run build
+```
+
+### Per-barangay checklist
+
+The main pre-launch list applies, minus the parts that belong to a hall. In particular:
+
+- [ ] `BARANGAY_ID` matches the roster row, and `MUNICIPALITY_CODE` is the real town — both
+      are stamped on every account and neither is a rename afterwards
+- [ ] `PUBLIC_URL` is the address residents will actually reach. **Every certificate's QR is
+      built from it and the PDF is stored, so this cannot be corrected after issue**
+- [ ] `VITE_PRODUCT=barangay` was set for the build that is deployed
+- [ ] The certificate fees, wording and validity periods are this barangay's own — the
+      seeded ones are placeholders, and the attestation goes out over the Punong Barangay's
+      name
+- [ ] The hall's address, hours and phone are filled in from the **The hall** tab, and the
+      phone has been rung
+- [ ] The seal and both signatures are this barangay's, obtained from the two officials who
+      hold those offices now
+- [ ] The hotlines have been checked — the seeded municipal ones are Malasiqui's and apply
+      nowhere else; 911 and 143 are correct nationwide
+- [ ] The administrator changed the `SEED_PASSWORD` on first sign-in
+
+## There is no owner's portal, and nowhere for one to stand
+
+Adding a customer is **provisioning a deployment**, not creating a row. There is no
+vendor-side console that lists every LGU and no account anywhere that can see across two of
+them, and that is the same decision as everything else here rather than a missing feature:
+one deployment, one database, no `municipality_id` on any table. Two customers that share no
+rows cannot leak into each other, and the guarantee costs one check on boot instead of a
+`where` clause every future query has to remember.
+
+So the owner's tooling is the runbook above, run once per customer: a database, an
+environment, `npm run provision`, a build, and a domain. What a vendor portal would have to
+be is a **separate service** that drives those five things — it would hold deploy
+credentials rather than resident data, and it would still not be able to read inside any
+deployment, because nothing in the app would let it. That is a sensible thing to build when
+the customer count makes it worth it; it is not a role that can be added to this one.
 
 ## Scaling
 

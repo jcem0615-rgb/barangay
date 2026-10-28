@@ -442,7 +442,11 @@ async function main() {
     // for the logins the development copy has and conclude the seed failed.
     console.log(
       'sample staff and barangay logins were not created (SEED_SAMPLE_ACCOUNTS is off).\n' +
-      `  sign in as ${ADMIN.email} and issue the rest from the Accounts tab.`
+      // Two tiers, two tabs. "Accounts" is the municipal administrator's; a
+      // barangay deployment has no such tab and sending somebody to look for
+      // one is how a correct provision reads as a broken one.
+      `  sign in as ${ADMIN.email} and issue the rest from the ` +
+      (TIER === 'barangay' ? 'Officers tab.' : 'Accounts tab.')
     )
   }
   if (created > 0) {
