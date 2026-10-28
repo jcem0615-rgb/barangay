@@ -4,6 +4,8 @@ import {
   FileText, ScanLine,
 } from 'lucide-react'
 import MarkUpload, { SignatureCaveat } from '../../components/MarkUpload'
+import PortalLink from '../../components/PortalLink'
+import { useCatalogue } from '../../lib/catalogue'
 import CertificateCatalogue, { type CatalogueDraft } from '../../components/CertificateCatalogue'
 import {
   api, ApiError,
@@ -334,6 +336,7 @@ function Holidays() {
 /* ----------------------------------------------------------------- offices */
 
 function Offices() {
+  const { productName } = useCatalogue()
   const [rows, setRows] = useState<OfficeContact[]>([])
   const [town, setTown] = useState<MunicipalityDetails | null>(null)
   const { loading, error, run, reload } = useLoader(
@@ -372,6 +375,19 @@ function Offices() {
           />
         ))}
       </ul>
+
+      {/*
+        How a resident gets the app in the first place.
+
+        It sits under the office details because it is the same kind of fact:
+        something the hall tells people so they can reach it. The barangay
+        console carries the identical card one tier down — both offices have
+        the same problem, which is that a portal nobody was told about is a
+        portal nobody uses.
+      */}
+      <div className="mt-4">
+        <PortalLink place={town ? town.name : 'This municipality'} product={productName} kind="municipal" />
+      </div>
     </Panel>
   )
 }

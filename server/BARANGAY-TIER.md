@@ -74,6 +74,68 @@ more interesting of the two. It is printed on the face of an identity document,
 and `PRODUCT_NAME` renames the app for whoever deploys it — a card that reads
 whatever somebody typed into an environment variable is not an ID card.
 
+## Two apps on one home screen
+
+Install identity is **per origin**, so two deployments on two domains are
+already two separate installed apps: separate storage, separate service worker,
+separate session, and a resident can hold both at once without them colliding.
+Nothing had to be built for that. What had to be built is telling them apart.
+
+Three things name the product on a phone's home screen, and all three are
+build-time, because they are read before any JavaScript runs:
+
+| | Where it comes from |
+| --- | --- |
+| Icon | `public/icons/` (navy, house) or `public/icons/barangay/` (green, hall) |
+| Android / Chromium label | the manifest's `short_name` |
+| **iOS label** | `apple-mobile-web-app-title` in `index.html` |
+
+The iOS one is the trap. Safari has no install API — a resident adds the app
+from the Share menu — and *that meta tag* is what ends up under the icon. It
+was a literal, so the barangay product installed on an iPhone as **"eLGU
+Portal"**: the wrong app's name, on the home screen, unreachable by anything
+the running app renders. `index.html` is now templated through a
+`transformIndexHtml` plugin in `vite.config.ts`, so the title, the description,
+the touch icon and that label all follow `VITE_PRODUCT`.
+
+The icons were shared, which is the same failure in a different place. An icon
+that belongs to another app is a wrong icon rather than a missing one, and two
+government apps side by side on a home screen with the same mark is worse than
+either having none. `scripts/build-icons.mjs` generates both from one spec —
+identical ring, disc, palette and proportions; different field colour and
+glyph — so they read as one family and never as one app. Green is not a new
+colour: it is the one the app already uses for the barangay tier everywhere.
+**Both are still placeholders** for the LGU's own seal; what this fixes is the
+pair being indistinguishable, which replacing one of them would not have.
+
+`id` is stated in the manifest rather than left to default to `start_url`, so
+the install identity is a decision instead of a consequence of whichever path
+the resident happened to be on when they installed.
+
+## How a resident is told the link at all
+
+A PWA has no store listing, which is most of why it suits this: nothing to
+review, nothing to update through a store, and it runs on the cheap Android
+phones a barangay actually owns. The cost is that **somebody has to tell the
+resident the address**, and nothing in either console did.
+
+So both the barangay's **Hall** tab and the municipality's **Office details**
+tab carry the same card: the address, a real QR of it, a copy button, and a
+printable A4 poster with the Android and the iPhone routes side by side —
+because a resident following the wrong one of the two gets nowhere.
+
+The URL is `window.location.origin`, not configuration. Whoever is reading that
+screen reached it on the deployment's own address, so the browser already knows
+the one thing a setting could get wrong — and a poster carrying an address that
+does not resolve is worse than no poster, because somebody will print a hundred
+of them.
+
+The poster is built as its own document and printed from a new window rather
+than being the console with a print stylesheet over it. A print stylesheet has
+to hide the whole console around it, and every tab added later is one more
+thing that can leak onto the paper — which on *that* console would mean a
+household address or a blotter entry on something taped to a wall.
+
 ## The hall is not mounted, rather than mounted and refusing
 
 A route that answers 403 still tells a caller it exists, and is one forgotten
