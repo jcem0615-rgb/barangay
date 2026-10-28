@@ -6,7 +6,7 @@ import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
 import { env } from './env.ts'
-import { configuredMunicipality } from './deployment.ts'
+import { configuredMunicipality, configuredTier, configuredBarangaySlug } from './deployment.ts'
 import { isDatabaseReachable, one, pool } from './db.ts'
 import { authRouter } from './routes/auth.ts'
 import { catalogueRouter } from './routes/catalogue.ts'
@@ -98,23 +98,43 @@ app.get('/api/health', async (_req, res) => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// What this instance serves
+//
+// Both tiers mount the same barangay routers, the same auth, the same public
+// verification. What `municipal` adds is the hall: its services, its queue,
+// its payments, its appointments and its administrator.
+//
+// **The hall's routers are not mounted at all in barangay tier, rather than
+// mounted and refusing.** A route that answers 403 still tells a caller it
+// exists, and more to the point it is one forgotten `requireRole` away from
+// answering properly; a route that was never mounted cannot be reached by a
+// mistake nobody made yet. It is the same reasoning as the barangay console
+// being a separate shell rather than a filtered tab — there is nothing to get
+// wrong, instead of something to get right.
+// ---------------------------------------------------------------------------
+const tier = configuredTier()
+
 app.use('/api/auth', authRouter)
 app.use('/api/catalogue', catalogueRouter)
-app.use('/api/requests', requestsRouter)
-app.use('/api/payments', paymentsRouter)
-app.use('/api/incidents', incidentsRouter)
 app.use('/api/barangays', barangayPublicRouter)
 app.use('/api/barangay', barangayRouter)
 app.use('/api/barangay-staff', barangayStaffRouter)
 // Its own mount, not a branch of the staff router: see barangayKagawad.ts.
 app.use('/api/barangay-kagawad', barangayKagawadRouter)
-app.use('/api/appointments', appointmentsRouter)
 app.use('/api/feedback', feedbackRouter)
 app.use('/api/privacy', privacyRouter)
-app.use('/api/staff', staffRouter)
 app.use('/api/verify', verifyRouter)
-app.use('/api/admin', adminRouter)
 app.use('/api/notifications', notificationsRouter)
+
+if (tier === 'municipal') {
+  app.use('/api/requests', requestsRouter)
+  app.use('/api/payments', paymentsRouter)
+  app.use('/api/incidents', incidentsRouter)
+  app.use('/api/appointments', appointmentsRouter)
+  app.use('/api/staff', staffRouter)
+  app.use('/api/admin', adminRouter)
+}
 
 // Unknown API routes are an error, never the SPA's index.html — returning HTML
 // to a fetch() would surface as a confusing parse error in the client.
@@ -194,7 +214,40 @@ async function refuseAMismatchedDatabase(): Promise<void> {
   }
 }
 
+/**
+ * The same refusal one tier down.
+ *
+ * A barangay deployment has exactly one tenant, and every statement in that
+ * console scopes to the barangay on the signed-in account's own row. Point it
+ * at a database seeded for a different barangay and nothing in the running app
+ * looks wrong — the console simply serves another barangay's blotter and
+ * register to whoever signs in. That is the failure the municipal check exists
+ * to prevent, and it is worse here: a blotter names people accused of things.
+ */
+async function refuseAMismatchedBarangay(): Promise<void> {
+  if (configuredTier() !== 'barangay') return
+  const want = configuredBarangaySlug()!
+
+  const rows = await one<{ id: string; name: string; total: string }>(
+    `select id, name, (select count(*) from barangays)::text as total from barangays order by id limit 1`
+  ).catch(() => null)
+  if (!rows) return // not seeded yet, which is the normal state between migrate and seed
+
+  if (Number(rows.total) !== 1 || rows.id !== want) {
+    console.error(
+      `\nThis database does not hold the barangay this instance serves.\n` +
+      `  the database holds: ${rows.total} barangay(s), first is ${rows.name} (${rows.id})\n` +
+      `  this instance is for: ${want}\n\n` +
+      `Refusing to start. A barangay deployment serves one barangay, and serving ` +
+      `this database here would show another barangay's register and blotter to ` +
+      `whoever signs in. Check DATABASE_URL and BARANGAY_ID.\n`
+    )
+    process.exit(1)
+  }
+}
+
 await refuseAMismatchedDatabase()
+await refuseAMismatchedBarangay()
 
 const server = app.listen(env.port, () => {
   const municipality = configuredMunicipality()
@@ -202,6 +255,13 @@ const server = app.listen(env.port, () => {
   // Said on every boot, because "which municipality is this instance?" is the
   // question somebody asks exactly when they are about to get it wrong.
   console.log(`serving ${municipality.name} (${municipality.code}) — from the ${municipality.source}`)
+  // Which product this is, for the same reason: somebody reading a log is
+  // usually reading it because they expected the other one.
+  console.log(
+    tier === 'barangay'
+      ? `tier: barangay — Barangay ${configuredBarangaySlug()} only; the hall's routes are not mounted`
+      : `tier: municipal — the hall and every barangay in its roster`
+  )
   if (env.serveWeb && existsSync(webRoot)) console.log(`serving web app from ${webRoot}`)
 })
 

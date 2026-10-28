@@ -21,6 +21,70 @@ import { BARANGAYS, MUNICIPALITY, type BarangaySeed } from '../../src/data/mockD
 
 const trimmed = (name: string) => process.env[name]?.trim() || undefined
 
+/**
+ * Which product this instance is.
+ *
+ * **`municipal`** is the whole thing: the hall's six offices, its services and
+ * payments, and every barangay under it.
+ *
+ * **`barangay`** is one barangay standing on its own, sold to that barangay —
+ * its certificate queue, blotter, register, notice board and council view, with
+ * a resident app scoped to it. There is no hall: no departments, no municipal
+ * services, no payment gateway, and `/staff` and `/admin` are not mounted at
+ * all rather than mounted and refusing.
+ *
+ * **It is one codebase because the barangay tier never needed the hall.** Every
+ * query in that console already scopes to the barangay on the signed-in
+ * account's own row, and the only thing it takes from the municipality is a
+ * name and a province to print on a certificate — which a standalone barangay
+ * still has, because a barangay is still *in* a town. So the two products are
+ * the same code with the hall switched off, and a barangay that later joins a
+ * municipal deployment is a setting rather than a migration.
+ *
+ * The default is `municipal`: an instance that was never told is the system
+ * that already existed.
+ */
+export type DeploymentTier = 'municipal' | 'barangay'
+
+export function configuredTier(): DeploymentTier {
+  const raw = trimmed('DEPLOYMENT_TIER')?.toLowerCase()
+  if (!raw) return 'municipal'
+  if (raw !== 'municipal' && raw !== 'barangay') {
+    throw new Error(`DEPLOYMENT_TIER must be 'municipal' or 'barangay', not '${raw}'.`)
+  }
+  return raw
+}
+
+export const isBarangayTier = () => configuredTier() === 'barangay'
+
+/**
+ * Which barangay a `barangay` deployment serves.
+ *
+ * Required in that tier and refused in the other: an id here with the hall
+ * switched on would read as "this municipal instance is somehow also one
+ * barangay", which is not a thing, and guessing it from a one-row roster would
+ * make a typo in the roster silently decide the tenant.
+ */
+export function configuredBarangaySlug(): string | undefined {
+  const slug = trimmed('BARANGAY_ID')
+  if (configuredTier() === 'municipal') {
+    if (slug) {
+      throw new Error(
+        'BARANGAY_ID is set but DEPLOYMENT_TIER is municipal. A municipal deployment serves ' +
+        'every barangay in its roster; set DEPLOYMENT_TIER=barangay to serve just one.'
+      )
+    }
+    return undefined
+  }
+  if (!slug) {
+    throw new Error(
+      'DEPLOYMENT_TIER=barangay needs BARANGAY_ID — the id of the one barangay this ' +
+      'instance serves, as it appears in the roster.'
+    )
+  }
+  return slug
+}
+
 export interface ConfiguredMunicipality {
   code: string
   name: string

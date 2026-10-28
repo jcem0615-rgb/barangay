@@ -5,6 +5,7 @@
  */
 import {
   configuredAdministrator, configuredBarangays, configuredMunicipality, seedsSampleAccounts,
+  configuredTier, configuredBarangaySlug,
 } from './deployment.ts'
 import {
   BARANGAY_CERTIFICATES, EMERGENCY_CONTACTS, HOLIDAYS,
@@ -38,7 +39,30 @@ const ADMIN = configuredAdministrator()
  * this repository. See `deployment.ts`.
  */
 const TOWN = configuredMunicipality()
-const ROSTER = configuredBarangays()
+const TIER = configuredTier()
+
+/**
+ * Who this instance serves.
+ *
+ * In `municipal` tier that is the whole roster. In `barangay` tier it is one
+ * barangay, and naming an id the roster does not hold stops the seed rather
+ * than quietly seeding nothing — an empty `barangays` table in that tier means
+ * every console route answers 409 and no resident can register, with nothing in
+ * the running app to say why.
+ */
+const ROSTER = (() => {
+  const all = configuredBarangays()
+  if (TIER !== 'barangay') return all
+  const want = configuredBarangaySlug()!
+  const one = all.find((b) => b.id === want)
+  if (!one) {
+    throw new Error(
+      `BARANGAY_ID is '${want}', which is not in the roster. ` +
+      `The roster holds: ${all.map((b) => b.id).join(', ')}.`
+    )
+  }
+  return [one]
+})()
 
 /**
  * The sample staff and barangay logins all share one password, which is right
@@ -59,74 +83,91 @@ const STAFF: Array<{ email: string; name: string; department: string; position: 
 
 async function main() {
   await transaction(async (client) => {
-    for (const [index, dept] of SERVICE_CATEGORIES.entries()) {
-      await client.query(
-        // `head_title` is seeded because it is a fact about the office; the head's
-        // *name* is not, because nobody has held it here — a released document
-        // prints the rule and the title with no name over it until the hall fills
-        // one in, and a seeded name would be a person this app invented signing
-        // official paper.
-        `insert into departments (id, name, office_name, description, icon, sort_order,
-                                  address, hours, phone, email, head_title)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-         on conflict (id) do update set
-           name = excluded.name, office_name = excluded.office_name,
-           description = excluded.description, icon = excluded.icon,
-           sort_order = excluded.sort_order, address = excluded.address,
-           hours = excluded.hours, phone = excluded.phone, email = excluded.email,
-           head_title = coalesce(departments.head_title, excluded.head_title)`,
-        [
-          dept.id, dept.name, dept.officeName, dept.description, dept.icon, index,
-          dept.address ?? null, dept.hours ?? null, dept.phone ?? null, dept.email ?? null,
-          dept.headTitle ?? null,
-        ]
-      )
+    // ---------------------------------------------------------------------
+    // The hall's catalogue: its offices, its services, and the sectoral
+    // registers its social welfare office administers.
+    //
+    // None of it exists in a barangay deployment. A barangay does not run a
+    // Business Permits office and cannot enrol anybody in 4Ps — those records
+    // are issued by the municipality, and seeding empty departments here would
+    // put offices in the resident's app that nobody is behind.
+    //
+    // The hotlines, the holiday calendar and the municipality row below are
+    // seeded in both: a barangay still wants the numbers to ring in an
+    // emergency, still shuts on the same holidays, and is still *in* a town
+    // whose name and province print on every certificate it issues.
+    // ---------------------------------------------------------------------
+    if (TIER === 'municipal') {
+      for (const [index, dept] of SERVICE_CATEGORIES.entries()) {
+        await client.query(
+          // `head_title` is seeded because it is a fact about the office; the head's
+          // *name* is not, because nobody has held it here — a released document
+          // prints the rule and the title with no name over it until the hall fills
+          // one in, and a seeded name would be a person this app invented signing
+          // official paper.
+          `insert into departments (id, name, office_name, description, icon, sort_order,
+                                    address, hours, phone, email, head_title)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           on conflict (id) do update set
+             name = excluded.name, office_name = excluded.office_name,
+             description = excluded.description, icon = excluded.icon,
+             sort_order = excluded.sort_order, address = excluded.address,
+             hours = excluded.hours, phone = excluded.phone, email = excluded.email,
+             head_title = coalesce(departments.head_title, excluded.head_title)`,
+          [
+            dept.id, dept.name, dept.officeName, dept.description, dept.icon, index,
+            dept.address ?? null, dept.hours ?? null, dept.phone ?? null, dept.email ?? null,
+            dept.headTitle ?? null,
+          ]
+        )
+      }
+
+      for (const service of SERVICES) {
+        await client.query(
+          `insert into services (id, department_id, name, short_description, processing_time,
+                                 processing_days_min, processing_days_max,
+                                 fee_centavos, requires_payment, requirements, fields,
+                                 search_terms, steps, active)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
+           on conflict (id) do update set
+             department_id = excluded.department_id, name = excluded.name,
+             short_description = excluded.short_description,
+             processing_time = excluded.processing_time,
+             processing_days_min = excluded.processing_days_min,
+             processing_days_max = excluded.processing_days_max,
+             fee_centavos = excluded.fee_centavos,
+             requires_payment = excluded.requires_payment,
+             requirements = excluded.requirements, fields = excluded.fields,
+             search_terms = excluded.search_terms, steps = excluded.steps, active = true`,
+          [
+            service.id, service.categoryId, service.name, service.shortDescription,
+            service.processingTime, service.processingDaysMin, service.processingDaysMax,
+            toCentavos(service.fee), service.requiresPayment,
+            JSON.stringify(service.requirements), JSON.stringify(service.fields),
+            service.searchTerms ?? [],
+            JSON.stringify(service.steps ?? []),
+          ]
+        )
+      }
+
+      for (const [index, program] of SECTORAL_PROGRAMS.entries()) {
+        await client.query(
+          `insert into sectoral_programs (code, name, kind, short_name, description, benefit,
+                                          issuing_office, id_label, expires, sort_order)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           on conflict (code) do update set
+             name = excluded.name, kind = excluded.kind, short_name = excluded.short_name,
+             description = excluded.description, benefit = excluded.benefit,
+             issuing_office = excluded.issuing_office, id_label = excluded.id_label,
+             expires = excluded.expires, sort_order = excluded.sort_order`,
+          [
+            program.code, program.name, program.kind, program.shortName, program.description,
+            program.benefit, program.issuingOffice, program.idLabel, program.expires, index,
+          ]
+        )
+      }
     }
 
-    for (const service of SERVICES) {
-      await client.query(
-        `insert into services (id, department_id, name, short_description, processing_time,
-                               processing_days_min, processing_days_max,
-                               fee_centavos, requires_payment, requirements, fields,
-                               search_terms, steps, active)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
-         on conflict (id) do update set
-           department_id = excluded.department_id, name = excluded.name,
-           short_description = excluded.short_description,
-           processing_time = excluded.processing_time,
-           processing_days_min = excluded.processing_days_min,
-           processing_days_max = excluded.processing_days_max,
-           fee_centavos = excluded.fee_centavos,
-           requires_payment = excluded.requires_payment,
-           requirements = excluded.requirements, fields = excluded.fields,
-           search_terms = excluded.search_terms, steps = excluded.steps, active = true`,
-        [
-          service.id, service.categoryId, service.name, service.shortDescription,
-          service.processingTime, service.processingDaysMin, service.processingDaysMax,
-          toCentavos(service.fee), service.requiresPayment,
-          JSON.stringify(service.requirements), JSON.stringify(service.fields),
-          service.searchTerms ?? [],
-          JSON.stringify(service.steps ?? []),
-        ]
-      )
-    }
-
-    for (const [index, program] of SECTORAL_PROGRAMS.entries()) {
-      await client.query(
-        `insert into sectoral_programs (code, name, kind, short_name, description, benefit,
-                                        issuing_office, id_label, expires, sort_order)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         on conflict (code) do update set
-           name = excluded.name, kind = excluded.kind, short_name = excluded.short_name,
-           description = excluded.description, benefit = excluded.benefit,
-           issuing_office = excluded.issuing_office, id_label = excluded.id_label,
-           expires = excluded.expires, sort_order = excluded.sort_order`,
-        [
-          program.code, program.name, program.kind, program.shortName, program.description,
-          program.benefit, program.issuingOffice, program.idLabel, program.expires, index,
-        ]
-      )
-    }
     for (const [index, contact] of EMERGENCY_CONTACTS.entries()) {
       await client.query(
         `insert into emergency_contacts (id, label, agency, phone, is_national, sort_order)
@@ -171,22 +212,39 @@ async function main() {
         ]
       )
     }
+    // Who owns the certificate catalogue, and it is the whole difference
+    // between the two products.
+    //
+    // Municipally the rows are **shared** — `barangay_id` null — because a
+    // Barangay Clearance is the same document in all seventy-three, and letting
+    // each invent its own would make a resident's certificate depend on which
+    // street they live on. The municipal administrator owns that list.
+    //
+    // In a barangay deployment there is no municipal administrator, and
+    // `/admin` is not mounted. Seeding shared rows there would leave a
+    // catalogue nobody in the running system can edit — the barangay console
+    // reaches its *own* rows and a shared one reads as not found. So the rows
+    // are stamped with this barangay and the administrator owns them outright,
+    // which is also the honest model: a barangay standing alone decides what it
+    // issues and what it charges.
+    const catalogueOwner = TIER === 'barangay' ? ROSTER[0]!.id : null
     for (const [index, type] of BARANGAY_CERTIFICATES.entries()) {
       await client.query(
         `insert into barangay_certificate_types
            (id, name, description, fee_centavos, purpose_hint, sort_order, steps,
-            validity_days, attestation)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            validity_days, attestation, barangay_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          on conflict (id) do update set
            name = excluded.name, description = excluded.description,
            fee_centavos = excluded.fee_centavos, purpose_hint = excluded.purpose_hint,
            sort_order = excluded.sort_order, steps = excluded.steps,
            validity_days = excluded.validity_days,
-           attestation = excluded.attestation`,
+           attestation = excluded.attestation,
+           barangay_id = excluded.barangay_id`,
         [
           type.id, type.name, type.description, toCentavos(type.fee), type.purposeHint,
           index, JSON.stringify(type.steps ?? []), type.validityDays ?? null,
-          type.attestation?.trim() || null,
+          type.attestation?.trim() || null, catalogueOwner,
         ]
       )
     }
@@ -246,10 +304,13 @@ async function main() {
     }
   })
   console.log(
-    `catalogue: ${TOWN.name}, ${TOWN.province} — ` +
-      `${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services, ` +
-      `${SECTORAL_PROGRAMS.length} programmes, ${HOLIDAYS.length} holidays, ` +
-      `${EMERGENCY_CONTACTS.length} hotlines`
+    TIER === 'barangay'
+      ? `catalogue: ${TOWN.name}, ${TOWN.province} — no hall in this tier; ` +
+        `${HOLIDAYS.length} holidays, ${EMERGENCY_CONTACTS.length} hotlines`
+      : `catalogue: ${TOWN.name}, ${TOWN.province} — ` +
+        `${SERVICE_CATEGORIES.length} offices, ${SERVICES.length} services, ` +
+        `${SECTORAL_PROGRAMS.length} programmes, ${HOLIDAYS.length} holidays, ` +
+        `${EMERGENCY_CONTACTS.length} hotlines`
   )
 
   const passwordHash = await hashPassword(DEMO_PASSWORD)
@@ -262,10 +323,28 @@ async function main() {
   if (existingAdmin) {
     kept++
   } else {
+    // The root account, and in a barangay deployment it is a *barangay*
+    // administrator rather than a municipal one.
+    //
+    // Municipally the escalation line runs downward: the hall issues each
+    // barangay its administrator, and a barangay can issue its own clerks and
+    // kagawads but never another administrator, so a revoked captain cannot
+    // have left one behind. Standing alone there is no hall above to issue it,
+    // so provisioning creates it directly — and it is still the only account
+    // that exists, with everyone else invited from inside the app.
+    //
+    // A municipal `admin` here would be worse than useless: `/admin` and
+    // `/staff` are not mounted in this tier, so it could sign in and reach
+    // nothing at all.
     await query(
-      `insert into users (email, password_hash, role, full_name, municipality_code)
-       values ($1, $2, 'admin', $3, $4)`,
-      [ADMIN.email, passwordHash, ADMIN.name, TOWN.code]
+      TIER === 'barangay'
+        ? `insert into users (email, password_hash, role, full_name, municipality_code, barangay_id)
+           values ($1, $2, 'barangay_admin', $3, $4, $5)`
+        : `insert into users (email, password_hash, role, full_name, municipality_code)
+           values ($1, $2, 'admin', $3, $4)`,
+      TIER === 'barangay'
+        ? [ADMIN.email, passwordHash, ADMIN.name, TOWN.code, ROSTER[0]!.id]
+        : [ADMIN.email, passwordHash, ADMIN.name, TOWN.code]
     )
     created++
   }
@@ -273,7 +352,10 @@ async function main() {
   // real deployment gets the administrator and nobody else: the hall issues its
   // own staff from the Accounts tab and each barangay issues its own clerks and
   // kagawads, both of which mail an invitation rather than setting a password.
-  for (const staff of SAMPLE_ACCOUNTS ? STAFF : []) {
+  // The sample office logins sit in departments, and a barangay deployment has
+  // none — so there is nobody for them to be, and the insert would fail on the
+  // foreign key rather than on anything meaningful.
+  for (const staff of SAMPLE_ACCOUNTS && TIER === 'municipal' ? STAFF : []) {
     const existing = await one<{ id: string }>(
       `select id from users where lower(email) = lower($1)`, [staff.email]
     )
@@ -349,7 +431,12 @@ async function main() {
   // Existing accounts keep their own password — saying otherwise would send
   // someone hunting for a login that does not work.
   console.log(`accounts: ${created} created, ${kept} already existed (incl. ${ADMIN.email})`)
-  console.log(`barangays: ${ROSTER.length} seeded, ${barangayAccounts} barangay accounts created`)
+  console.log(
+    TIER === 'barangay'
+      ? `barangay: ${ROSTER[0]!.name} — ${BARANGAY_CERTIFICATES.length} certificate types, ` +
+        `${barangayAccounts} staff accounts created`
+      : `barangays: ${ROSTER.length} seeded, ${barangayAccounts} barangay accounts created`
+  )
   if (!SAMPLE_ACCOUNTS) {
     // Said plainly, because somebody provisioning a town will otherwise look
     // for the logins the development copy has and conclude the seed failed.
