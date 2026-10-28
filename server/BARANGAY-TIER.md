@@ -32,6 +32,48 @@ municipal deployment is a **setting rather than a migration**. A copied repo
 would have started drifting at the first bug fix, and "integrate later" would
 have meant a rewrite.
 
+## What the resident app drops, and why it is not a filter
+
+Six surfaces in the resident app belong to the municipality, and in a barangay
+deployment their routes are not mounted. Each is removed at the point it would
+be drawn rather than left to fail:
+
+| Surface | Why it is the hall's |
+| --- | --- |
+| Complaints | RA 11032 files against an office; the tier seeds none, so the form's only field is an empty picker. |
+| Report an incident | A report lands with the municipal administrator — a downed line is the cooperative's work. |
+| Requests tab | The hall's request list. A certificate request lives in the barangay hub. |
+| Recent requests | The same list on the dashboard, with a "See all" into the tab above. |
+| Appointments tab | A slot and a queue number against an office's booking row. |
+| `GET /requests` on load | Asked on every sign-in, answering 404 and putting a server error in front of a working app. |
+
+The rule underneath is the one the static QR was removed under: **a control that
+cannot work is worse than no control.** A resident who taps Complaints and finds
+an empty office picker concludes the app is broken, not that the feature is
+somebody else's.
+
+The Requests tab is the one worth stating twice, because dropping it looks like
+a loss. It is not: a barangay deployment files no municipal requests, so the tab
+was a second place to look that is empty for ever — and the emptier of the two
+places had the official-looking name on it.
+
+## Branding is a runtime value, with one exception
+
+`productName()` comes off `/api/catalogue`, so the sign-in heading, the Profile
+footer, `document.title`, the password-reset subject and the notification email
+footer all follow the tier. `PRODUCT_NAME` overrides it for a reseller.
+
+Two things do not follow it.
+
+The **web manifest** is the one build-time flag (`VITE_PRODUCT=barangay npm run
+build`), because an installed app's name is baked in at install and cannot be
+corrected by a later catalogue read.
+
+The **ID card label** follows the tier rather than `productName`, which is the
+more interesting of the two. It is printed on the face of an identity document,
+and `PRODUCT_NAME` renames the app for whoever deploys it — a card that reads
+whatever somebody typed into an environment variable is not an ID card.
+
 ## The hall is not mounted, rather than mounted and refusing
 
 A route that answers 403 still tells a caller it exists, and is one forgotten
