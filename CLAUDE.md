@@ -1296,6 +1296,24 @@ emailed invitation rather than a password anybody has seen.
 roster means residents of the missing barangays cannot register at all, and nothing in the
 running app would say why.
 
+## Telling residents the app exists
+
+The manifest and the service worker made the portal installable from the first commit and
+nothing told a resident so — see *Installing the app*. The other half of that is the
+address: a PWA has no store listing, so **somebody has to tell people where it is**, and
+nothing in either console ever did.
+
+That somebody is the firm that sold the portal, not the office running it, so the QR lives
+in the **owner portal** (`owner/`). It is built from the `public_url` on the deployment's
+registry row, which means it exists the moment a customer is added — no step, no setting
+and nothing for an office to configure — with an A4 poster behind it carrying the Android
+and the iPhone routes side by side, because a resident following the wrong one of the two
+gets nowhere.
+
+It briefly lived in the LGU consoles instead and was taken out again. The address is a fact
+recorded at the sale; an office should not have to find out its own portal's URL from a
+screen inside that portal.
+
 ## Installing the app
 
 The manifest and service worker made the portal installable from the first commit;
@@ -2040,11 +2058,15 @@ year of validity the barangay never granted.
   deployment has its own database — so the same person may hold an account in two
   towns. That is correct for residency and wrong for a national register; a real PhilSys
   integration is what would settle it, and this app deliberately has none.
-- **There is no portal-wide administrator, and there is nowhere for one to stand.** Adding
-  a municipality is `npm run provision` against a new database, not a screen — see *One
-  deployment, one municipality*. Anything that wanted to list every town at once (a
-  province-level dashboard, say) is a separate service reading each deployment, not a role
-  inside this one.
+- **There is still no portal-wide administrator inside the app, and the owner portal is
+  not one.** `owner/` is a separate service with its own database that keeps the registry
+  of deployments, probes each one's `/api/ops/status` and prints the download poster. It
+  holds nothing *from* a customer: the status endpoint publishes counts, identity and
+  health and no row of any kind, it is not mounted unless `OPS_TOKEN` is set, and there is
+  no connection from the owner service to any deployment's database. Adding a municipality
+  is still `npm run provision` against a new database — the portal generates the env file
+  and the commands and a person runs them. See `owner/README.md` and *The owner portal* in
+  `DEPLOY.md`.
 - **The catalogue, the hotlines, the holidays and the document routes do not carry between
   deployments.** Every per-town fact is seeded from that deployment's own configuration and
   corrected in its own app, so standing up a second municipality means doing the whole

@@ -33,3 +33,7 @@ server/uploads
 
 # Fonts fetched by proposal/fetch_fonts.sh — not redistributed here.
 proposal/fonts/
+
+# The owner portal's own secrets and dependencies.
+owner/.env
+owner/node_modules

@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Phone } from 'lucide-react'
 import { api, ApiError, type BarangayOffice as Office } from '../../lib/api'
 import MarkUpload, { SignatureCaveat } from '../../components/MarkUpload'
-import PortalLink from '../../components/PortalLink'
-import { useCatalogue } from '../../lib/catalogue'
 
 /**
  * The hall's own details, as residents read them.
@@ -69,7 +67,6 @@ const FIELDS: Array<{
 ]
 
 export default function BarangayOffice({ readOnly }: { readOnly: boolean }) {
-  const { productName } = useCatalogue()
   const [office, setOffice] = useState<Office | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -234,16 +231,6 @@ export default function BarangayOffice({ readOnly }: { readOnly: boolean }) {
           </div>
         )}
       </div>
-
-      {/*
-        How residents get the app at all.
-
-        It sits on this tab because it is the same kind of fact as the address
-        and the hours: something the hall tells people so they can reach it.
-        Both roles see it — a clerk is who actually hands a resident a poster —
-        and there is nothing to save, so `readOnly` does not apply.
-      */}
-      <PortalLink place={`Barangay ${office.name}`} product={productName} kind="barangay" />
     </div>
   )
 }

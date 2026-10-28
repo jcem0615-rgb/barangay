@@ -23,6 +23,7 @@ import { staffRouter } from './routes/staff.ts'
 import { verifyRouter } from './routes/verify.ts'
 import { adminRouter } from './routes/admin.ts'
 import { notificationsRouter } from './routes/notifications.ts'
+import { opsRouter } from './routes/ops.ts'
 import { MAX_FILE_BYTES } from './uploads.ts'
 import { scanningEnabled } from './antivirus.ts'
 
@@ -126,6 +127,12 @@ app.use('/api/feedback', feedbackRouter)
 app.use('/api/privacy', privacyRouter)
 app.use('/api/verify', verifyRouter)
 app.use('/api/notifications', notificationsRouter)
+
+/**
+ * The owner's view of this deployment: counts, identity and health, never a
+ * resident. Mounted only where a token is configured — see routes/ops.ts.
+ */
+if (env.opsToken) app.use('/api/ops', opsRouter)
 
 if (tier === 'municipal') {
   app.use('/api/requests', requestsRouter)

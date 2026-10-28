@@ -115,6 +115,16 @@ export const env = {
   // Who a push service should contact about a misbehaving sender.
   vapidSubject: process.env.VAPID_SUBJECT ?? `mailto:dpo@${HOST}`,
 
+  /**
+   * The bearer token the owner portal calls `/api/ops/status` with.
+   *
+   * Unset means the ops router is **not mounted at all**, so a deployment
+   * nobody monitors has no ops surface to attack — the same rule the hall's
+   * routers follow in barangay tier. It is per deployment and is not a
+   * password anybody types: generate it with `openssl rand -hex 32`.
+   */
+  opsToken: process.env.OPS_TOKEN || undefined,
+
   /** 'off' | 'log' | 'http'. SMS costs money per message, so it is opt-in. */
   smsTransport: (process.env.SMS_TRANSPORT ?? 'off') as 'off' | 'log' | 'http',
   smsUrl: process.env.SMS_URL || undefined,

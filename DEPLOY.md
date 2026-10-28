@@ -441,21 +441,47 @@ The main pre-launch list applies, minus the parts that belong to a hall. In part
       nowhere else; 911 and 143 are correct nationwide
 - [ ] The administrator changed the `SEED_PASSWORD` on first sign-in
 
-## There is no owner's portal, and nowhere for one to stand
+## The owner portal
 
-Adding a customer is **provisioning a deployment**, not creating a row. There is no
-vendor-side console that lists every LGU and no account anywhere that can see across two of
-them, and that is the same decision as everything else here rather than a missing feature:
-one deployment, one database, no `municipality_id` on any table. Two customers that share no
-rows cannot leak into each other, and the guarantee costs one check on boot instead of a
-`where` clause every future query has to remember.
+Adding a customer is **provisioning a deployment**, not creating a row — the runbooks above
+are the act, and nothing inside a deployment can see another one. What keeps track of them
+is `owner/`: a **separate service, with its own database**, that holds the registry of who
+bought the portal, asks each deployment how it is doing, and prints the poster that gets
+residents onto it. See `owner/README.md`.
 
-So the owner's tooling is the runbook above, run once per customer: a database, an
-environment, `npm run provision`, a build, and a domain. What a vendor portal would have to
-be is a **separate service** that drives those five things — it would hold deploy
-credentials rather than resident data, and it would still not be able to read inside any
-deployment, because nothing in the app would let it. That is a sensible thing to build when
-the customer count makes it worth it; it is not a role that can be added to this one.
+It is separate for the same reason everything else here is. One deployment, one database, no
+`municipality_id` on any table: two customers that share no rows cannot leak into each
+other. A control plane holding every `DATABASE_URL` would undo that in one line and become
+the single most valuable target in the system — one stolen session, every town's residents.
+
+**So the owner never reads a customer's database.** It asks the instance, over HTTP, and
+takes what that instance publishes:
+
+```bash
+OPS_TOKEN=…        # openssl rand -hex 32, generated in the owner portal
+```
+
+`GET /api/ops/status` then answers with the tier, the identity, health, and counts — no
+name, no address, no reference number and no row of any kind. **Unset, the route is not
+mounted at all**, the same rule the hall's routers follow in barangay tier, so a deployment
+nobody monitors has no ops surface to attack.
+
+A probe checks more than "did something answer". The identity in the response is compared
+against the registry, and a mismatch is reported with both sides named — the same check the
+deployment performs against its own database on boot, from the other end. A DNS change, a
+proxy pointed at the wrong container or a restore into the wrong environment all answer
+healthily under the wrong identity, and all of them are otherwise silent.
+
+**The download QR comes from here, not from the LGU's console.** A PWA has no store listing,
+so somebody has to tell residents the address — and that somebody is whoever sold them the
+portal. The code is built from the address on the registry row, so it exists the moment the
+customer is added, with an A4 poster behind it carrying the Android and the iPhone routes
+side by side.
+
+The owner portal **does not provision anything itself**: its Setup tab generates the exact
+env file, roster and commands from the row, and a person runs them. A web page that created
+databases and started containers would hold credentials for every customer's
+infrastructure.
 
 ## Scaling
 
