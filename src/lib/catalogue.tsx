@@ -15,6 +15,8 @@ import type {
 const CACHE_KEY = 'elgu-catalogue-v1'
 
 interface CachedCatalogue {
+  tier: DeploymentTier
+  servedBarangay: ServedBarangay | null
   municipality: Municipality | null
   departments: ServiceCategory[]
   services: ServiceDefinition[]
@@ -41,7 +43,24 @@ function writeCache(value: CachedCatalogue) {
   }
 }
 
+/** Which product this install is. See the server's `deployment.ts`. */
+export type DeploymentTier = 'municipal' | 'barangay'
+export interface ServedBarangay { id: string; name: string }
+
 interface CatalogueValue {
+  /**
+   * `municipal` is the hall and every barangay under it. `barangay` is one
+   * barangay standing alone, with no hall: no municipal services, no payments,
+   * no appointments, and no tier switch to show.
+   *
+   * It comes off the catalogue rather than a build flag because the same bundle
+   * serves both, and it is read before the first paint because it decides what
+   * the shell draws. Defaults to `municipal` so an older cached catalogue, or a
+   * server that has not been upgraded, renders what it always did.
+   */
+  tier: DeploymentTier
+  /** In `barangay` tier, the one barangay served. Null municipally. */
+  servedBarangay: ServedBarangay | null
   /**
    * The municipality this portal serves. Null until the catalogue has been
    * fetched once — the sign-up screen waits rather than guessing, because naming
@@ -70,6 +89,8 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
   // Seeded from the cache so the first paint already has something, rather
   // than an empty shell that fills in once the network answers.
   const cached = readCache()
+  const [tier, setTier] = useState<DeploymentTier>(cached?.tier ?? 'municipal')
+  const [servedBarangay, setServedBarangay] = useState<ServedBarangay | null>(cached?.servedBarangay ?? null)
   const [municipality, setMunicipality] = useState<Municipality | null>(cached?.municipality ?? null)
   const [departments, setDepartments] = useState<ServiceCategory[]>(cached?.departments ?? [])
   const [services, setServices] = useState<ServiceDefinition[]>(cached?.services ?? [])
@@ -85,6 +106,8 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
       .catalogue()
       .then((c) => {
         const holidayDates = (c.holidays ?? []).map((h) => h.date)
+        setTier(c.tier ?? 'municipal')
+        setServedBarangay(c.barangay ?? null)
         setMunicipality(c.municipality ?? null)
         setDepartments(c.departments)
         setServices(c.services)
@@ -92,6 +115,8 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
         setEmergencyContacts(c.emergencyContacts ?? [])
         setHolidays(new Set(holidayDates))
         writeCache({
+          tier: c.tier ?? 'municipal',
+          servedBarangay: c.barangay ?? null,
           municipality: c.municipality ?? null,
           departments: c.departments,
           services: c.services,
@@ -108,6 +133,8 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
   return (
     <CatalogueContext.Provider
       value={{
+        tier,
+        servedBarangay,
         municipality,
         departments,
         services,

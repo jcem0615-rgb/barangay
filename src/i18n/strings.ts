@@ -60,6 +60,7 @@ export const en = {
   // dashboard
   'home.greeting': 'Good day,',
   'home.recentRequests': 'Recent Requests',
+  'home.noRequestsSolo': 'No requests yet. Open your barangay above to start one.',
   'home.noRequests': 'No requests yet. Pick Municipal or Barangay above to start one.',
 
   // services
@@ -466,6 +467,7 @@ export const en = {
   'sos.national': 'Nationwide',
   'sos.call': 'Call {agency} at {phone}',
 
+  'auth.barangayOnly': 'You are registering with Barangay {barangay}.',
   'auth.barangayPick': 'Choose your barangay',
 
   // How long a service takes, rendered from the catalogue's own day counts so it
@@ -496,6 +498,8 @@ export const en = {
   'tier.label': 'Level of government',
   'tier.municipal': 'Municipal',
   'tier.barangay': 'Barangay',
+  'tier.soloTitle': 'Your barangay',
+  'tier.soloBlurb': 'Certificates, notices and requests from your own barangay hall.',
   'tier.pickTitle': 'Where are you going?',
   'tier.pickBlurb': 'Two levels issue documents. Pick the one that issues yours.',
   'tier.municipalBlurb': '{offices} offices \u2014 permits, certificates, payments',
@@ -707,6 +711,7 @@ export const fil: Record<StringKey, string> = {
 
   'home.greeting': 'Magandang araw,',
   'home.recentRequests': 'Mga Kamakailang Kahilingan',
+  'home.noRequestsSolo': 'Wala pang kahilingan. Buksan ang barangay mo sa itaas para magsimula.',
   'home.noRequests': 'Wala pang kahilingan. Piliin ang Munisipyo o Barangay sa itaas para magsimula.',
 
   'services.title': 'Mga Serbisyo',
@@ -1103,6 +1108,7 @@ export const fil: Record<StringKey, string> = {
   'sos.national': 'Buong bansa',
   'sos.call': 'Tawagan ang {agency} sa {phone}',
 
+  'auth.barangayOnly': 'Magpaparehistro ka sa Barangay {barangay}.',
   'auth.barangayPick': 'Piliin ang barangay mo',
   'time.sameDay': 'Kaparehong araw',
   'time.day': '{n} araw ng trabaho',
@@ -1126,6 +1132,8 @@ export const fil: Record<StringKey, string> = {
   'tier.label': 'Antas ng pamahalaan',
   'tier.municipal': 'Munisipyo',
   'tier.barangay': 'Barangay',
+  'tier.soloTitle': 'Ang barangay mo',
+  'tier.soloBlurb': 'Mga sertipiko, abiso at kahilingan mula sa sarili mong barangay hall.',
   'tier.pickTitle': 'Saan ka pupunta?',
   'tier.pickBlurb': 'Dalawang antas ang naglalabas ng dokumento. Piliin ang naglalabas ng sa iyo.',
   'tier.municipalBlurb': '{offices} tanggapan \u2014 permit, sertipiko, bayarin',

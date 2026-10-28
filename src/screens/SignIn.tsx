@@ -31,7 +31,17 @@ export default function SignIn() {
   // on switching to the register tab, so the list is there the moment it is
   // wanted.
   useEffect(() => {
-    api.barangays().then(setBarangays).catch(() => undefined)
+    api
+      .barangays()
+      .then((list) => {
+        setBarangays(list)
+        // One barangay is not a choice, so it is chosen. The field renders as a
+        // line of text instead of a select, and without this the form would
+        // submit with no barangay at all — leaving the account unattached and
+        // the hub asking a question the deployment had already answered.
+        if (list.length === 1) setForm((f) => ({ ...f, barangayId: list[0]!.id }))
+      })
+      .catch(() => undefined)
   }, [])
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
@@ -119,7 +129,18 @@ export default function SignIn() {
                 it. Where the list has not arrived the field is simply absent and
                 the barangay hub asks later, rather than offering an empty one.
               */}
-              {barangays.length > 0 && (
+              {/*
+                One barangay means no choice to make. The deployment already
+                knows whose residents these are, so the field is a line of text
+                confirming it rather than a select with a single option — which
+                reads as a question whose answer was never in doubt, and which a
+                resident can get wrong by leaving blank.
+              */}
+              {barangays.length === 1 ? (
+                <p className="rounded-xl bg-slate-50 px-3.5 py-3 text-[calc(13.5px_*_var(--text-scale))] text-slate-600">
+                  {t('auth.barangayOnly', { barangay: barangays[0]!.name })}
+                </p>
+              ) : barangays.length > 1 && (
                 <label className="block">
                   <span className="mb-1 block text-[calc(13.5px_*_var(--text-scale))] font-medium text-navy-950">
                     {t('auth.barangay')}

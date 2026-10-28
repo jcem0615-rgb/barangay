@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n'
 
 export default function Dashboard() {
   const { push } = useNav()
-  const { departments } = useCatalogue()
+  const { departments, tier, servedBarangay } = useCatalogue()
   const resident = useResidentProfile()
   const { t } = useT()
   const [unread, setUnread] = useState(0)
@@ -98,42 +98,81 @@ export default function Dashboard() {
         answer. The same pair appears as a switch at the top of both catalogues,
         so changing your mind never means coming back here.
       */}
-      <h2 className="font-display mt-6 text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">
-        {t('tier.pickTitle')}
-      </h2>
-      <p className="mt-0.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-500">
-        {t('tier.pickBlurb')}
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <button
-          onClick={() => push({ name: 'services' })}
-          className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm shadow-slate-900/[0.03] active:scale-[0.98] active:bg-slate-50"
-        >
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy-800 text-white">
-            <Landmark size={21} strokeWidth={1.9} />
-          </span>
-          <span className="font-display text-[calc(15px_*_var(--text-scale))] font-extrabold leading-tight text-navy-950">
-            {t('tier.municipal')}
-          </span>
-          <span className="text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-500">
-            {t('tier.municipalBlurb', { offices: String(departments.length) })}
-          </span>
-        </button>
-        <button
-          onClick={() => push({ name: 'barangay' })}
-          className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm shadow-slate-900/[0.03] active:scale-[0.98] active:bg-slate-50"
-        >
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-700 text-white">
-            <Building size={21} strokeWidth={1.9} />
-          </span>
-          <span className="font-display text-[calc(15px_*_var(--text-scale))] font-extrabold leading-tight text-navy-950">
-            {t('tier.barangay')}
-          </span>
-          <span className="text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-500">
-            {t('tier.barangayBlurb')}
-          </span>
-        </button>
-      </div>
+      {/*
+        One tier, one control.
+
+        Asking "municipal or barangay?" is the right question when a resident
+        really does deal with two levels of government. In a barangay
+        deployment there is only one, and the pair would be a choice with a
+        wrong answer in it: a Municipal button opening an office list that is
+        empty because no hall was ever seeded. So the question is not asked and
+        the single door is opened directly.
+      */}
+      {tier === 'barangay' ? (
+        <>
+          <h2 className="font-display mt-6 text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">
+            {t('tier.soloTitle')}
+          </h2>
+          <p className="mt-0.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-500">
+            {t('tier.soloBlurb')}
+          </p>
+          <button
+            onClick={() => push({ name: 'barangay' })}
+            className="tap-target mt-3 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm shadow-slate-900/[0.03] active:scale-[0.99] active:bg-slate-50"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white">
+              <Building size={21} strokeWidth={1.9} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="font-display block text-[calc(15px_*_var(--text-scale))] font-extrabold leading-tight text-navy-950">
+                {servedBarangay ? `Barangay ${servedBarangay.name}` : t('tier.barangay')}
+              </span>
+              <span className="mt-0.5 block text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-500">
+                {t('tier.barangayBlurb')}
+              </span>
+            </span>
+          </button>
+        </>
+      ) : (
+        <>
+        <h2 className="font-display mt-6 text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">
+          {t('tier.pickTitle')}
+        </h2>
+        <p className="mt-0.5 text-[calc(12.5px_*_var(--text-scale))] leading-snug text-slate-500">
+          {t('tier.pickBlurb')}
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <button
+            onClick={() => push({ name: 'services' })}
+            className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm shadow-slate-900/[0.03] active:scale-[0.98] active:bg-slate-50"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy-800 text-white">
+              <Landmark size={21} strokeWidth={1.9} />
+            </span>
+            <span className="font-display text-[calc(15px_*_var(--text-scale))] font-extrabold leading-tight text-navy-950">
+              {t('tier.municipal')}
+            </span>
+            <span className="text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-500">
+              {t('tier.municipalBlurb', { offices: String(departments.length) })}
+            </span>
+          </button>
+          <button
+            onClick={() => push({ name: 'barangay' })}
+            className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm shadow-slate-900/[0.03] active:scale-[0.98] active:bg-slate-50"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-700 text-white">
+              <Building size={21} strokeWidth={1.9} />
+            </span>
+            <span className="font-display text-[calc(15px_*_var(--text-scale))] font-extrabold leading-tight text-navy-950">
+              {t('tier.barangay')}
+            </span>
+            <span className="text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-500">
+              {t('tier.barangayBlurb')}
+            </span>
+          </button>
+        </div>
+        </>
+      )}
 
       <div className="mt-6 flex items-center justify-between">
         <h2 className="font-display text-[calc(15.5px_*_var(--text-scale))] font-bold text-navy-950">{t('home.recentRequests')}</h2>
@@ -144,7 +183,7 @@ export default function Dashboard() {
       <div className="mt-3 space-y-2.5">
         {recent.length === 0 && (
           <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-[calc(14px_*_var(--text-scale))] text-slate-500">
-            {t('home.noRequests')}
+            {t(tier === 'barangay' ? 'home.noRequestsSolo' : 'home.noRequests')}
           </p>
         )}
         {recent.map((app) => (

@@ -1,6 +1,7 @@
 import { Home, LayoutGrid, FileClock, CalendarClock, UserRound } from 'lucide-react'
 import { useNav } from '../lib/nav'
 import { useT } from '../lib/i18n'
+import { useCatalogue } from '../lib/catalogue'
 
 const ITEMS = [
   { key: 'dashboard', label: 'nav.home', icon: Home },
@@ -10,9 +11,23 @@ const ITEMS = [
   { key: 'profile', label: 'nav.profile', icon: UserRound },
 ] as const
 
+/**
+ * Appointments are the hall's: a counter, a slot and a queue number against an
+ * office's booking row. A barangay deployment has no offices and the routes are
+ * not mounted, so the tab would open a screen whose first request 404s.
+ *
+ * Services stays, because "what can I ask for?" is still the question — it just
+ * has one answer there, so it opens the barangay instead of a switch between
+ * two tiers.
+ */
+const BARANGAY_TIER_ITEMS = ITEMS.filter((i) => i.key !== 'appointments')
+
 export default function BottomNav() {
   const { screen, replace } = useNav()
   const { t } = useT()
+  const { tier } = useCatalogue()
+  const solo = tier === 'barangay'
+  const items = solo ? BARANGAY_TIER_ITEMS : ITEMS
 
   const activeKey =
     screen.name === 'dashboard'
@@ -32,12 +47,16 @@ export default function BottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-[430px] items-stretch border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-      {ITEMS.map(({ key, label, icon: Icon }) => {
+      {items.map(({ key, label, icon: Icon }) => {
         const active = activeKey === key
         return (
           <button
             key={key}
-            onClick={() => replace({ name: key } as never)}
+            onClick={() =>
+              // With one tier there is no catalogue to switch within, so the
+              // Services tab opens the barangay directly rather than a chooser.
+              replace({ name: solo && key === 'services' ? 'barangay' : key } as never)
+            }
             className="tap-target flex flex-1 flex-col items-center justify-center gap-1 py-2.5 pt-3 transition-colors active:opacity-60"
           >
             <Icon

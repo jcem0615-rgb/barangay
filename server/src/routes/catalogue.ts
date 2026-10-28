@@ -1,8 +1,9 @@
 import { Router } from 'express'
-import { query } from '../db.ts'
+import { query, one } from '../db.ts'
 import { WORKFLOW_STEPS } from '../workflow.ts'
 import { toPesos } from '../serialize.ts'
 import { servedMunicipality } from '../identity.ts'
+import { configuredTier } from '../deployment.ts'
 
 export const catalogueRouter = Router()
 
@@ -41,6 +42,7 @@ catalogueRouter.get('/', async (_req, res) => {
   // municipality it is registering someone into before they have an account.
   const municipality = await servedMunicipality()
 
+  const tier = configuredTier()
   res.json({
     municipality,
     departments,
@@ -61,6 +63,22 @@ catalogueRouter.get('/', async (_req, res) => {
       searchTerms: s.search_terms,
       steps: s.steps,
     })),
+    // Which product this is.
+    //
+    // The client cannot infer it from an empty service list — that is also
+    // what a municipal deployment looks like before anybody seeds it — and
+    // guessing wrong means a resident in a barangay deployment is shown a
+    // "Municipal services" button that leads to a tab with nothing behind it.
+    // Published on the catalogue because it is public, cached on the device,
+    // and read before the first render, which is exactly when the shell has to
+    // decide what to draw.
+    tier,
+    // In barangay tier, the one barangay this instance serves: the resident
+    // app has no tier switch and no barangay picker, so it needs to know whose
+    // notices and certificates it is showing before anybody signs in.
+    barangay: tier === 'barangay'
+      ? await one<{ id: string; name: string }>(`select id, name from barangays limit 1`)
+      : null,
     workflowSteps: WORKFLOW_STEPS,
     // Published so the app can say "apply today, ready by …" on the form,
     // without shipping a second copy of the holiday calendar to the client.

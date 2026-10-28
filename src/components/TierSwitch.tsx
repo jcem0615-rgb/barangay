@@ -1,6 +1,7 @@
 import { Building, Landmark } from 'lucide-react'
 import { useNav, type Screen } from '../lib/nav'
 import { useT } from '../lib/i18n'
+import { useCatalogue } from '../lib/catalogue'
 
 /**
  * Which tier of government you are looking at.
@@ -18,6 +19,12 @@ import { useT } from '../lib/i18n'
 export default function TierSwitch({ active }: { active: 'municipal' | 'barangay' }) {
   const { replace } = useNav()
   const { t } = useT()
+  const { tier } = useCatalogue()
+
+  // Nothing to switch between when the deployment is one barangay. Rendering
+  // the pair anyway would offer a Municipal tab that leads to an empty office
+  // list — a control that cannot work, which this app refuses everywhere else.
+  if (tier === 'barangay') return null
 
   const tiers: Array<{ key: 'municipal' | 'barangay'; screen: Screen; label: string; icon: typeof Landmark }> = [
     { key: 'municipal', screen: { name: 'services' }, label: t('tier.municipal'), icon: Landmark },

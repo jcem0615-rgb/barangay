@@ -687,6 +687,10 @@ export interface NotificationPreferences {
 export const api = {
   catalogue: () =>
     request<{
+      /** Which product this install is; absent on a server older than the tiers. */
+      tier?: 'municipal' | 'barangay'
+      /** The one barangay served, in `barangay` tier only. */
+      barangay?: { id: string; name: string } | null
       municipality: Municipality
       departments: ServiceCategory[]
       services: ServiceDefinition[]

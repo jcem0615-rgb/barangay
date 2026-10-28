@@ -28,10 +28,13 @@ export default function Profile() {
   const resident = useResidentProfile()
   const { logout } = useAuth()
   const { t } = useT()
-  if (!resident) return null
-
+  // Above the early return, not below it: hooks must run in the same order on
+  // every render, and a null profile used to skip these two — which is the
+  // "rendered fewer hooks than expected" crash waiting for the first render
+  // where the profile has not arrived.
   const { push } = useNav()
   const isOnline = useOnlineStatus()
+  if (!resident) return null
 
   return (
     <div className="animate-tap-in pb-24">
