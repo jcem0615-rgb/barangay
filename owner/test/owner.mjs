@@ -323,6 +323,79 @@ section('a live deployment cannot be removed without decommissioning first')
 }
 
 // ---------------------------------------------------------------------------
+section('changing your own password')
+{
+  // A second session for the same director, to prove the other one is ended.
+  const elsewhere = client()
+  await elsewhere.post('/sign-in', { email: 'director@example.test', password: OWNER_PW })
+  check('the second session works to begin with', (await elsewhere.get('/')).status === 200)
+
+  const page = await owner.get('/password')
+  check('the page renders', page.status === 200 && /Your password/.test(page.body))
+  let f = csrfOf(page.body)
+
+  const wrong = await owner.post('/password', { _csrf: f, current: 'not-it', next: 'a-long-new-passphrase', confirm: 'a-long-new-passphrase' })
+  check('a wrong current password is refused', wrong.status === 400 && /not your current password/.test(wrong.body))
+
+  f = csrfOf((await owner.get('/password')).body)
+  const mismatch = await owner.post('/password', { _csrf: f, current: OWNER_PW, next: 'a-long-new-passphrase', confirm: 'something-else-entirely' })
+  check('two different new passwords are refused', mismatch.status === 400 && /do not match/.test(mismatch.body))
+
+  f = csrfOf((await owner.get('/password')).body)
+  const short = await owner.post('/password', { _csrf: f, current: OWNER_PW, next: 'short', confirm: 'short' })
+  check('a password under the floor is refused', short.status === 400 && /at least 8 characters/.test(short.body))
+
+  f = csrfOf((await owner.get('/password')).body)
+  const same = await owner.post('/password', { _csrf: f, current: OWNER_PW, next: OWNER_PW, confirm: OWNER_PW })
+  check('setting it to the one you already have is refused', same.status === 400 && /already have/.test(same.body))
+
+  // Still the old password after all that: a refused change changes nothing.
+  const stillOld = client()
+  await stillOld.post('/sign-in', { email: 'director@example.test', password: OWNER_PW })
+  check('none of those changed anything', (await stillOld.get('/')).status === 200)
+
+  const NEW_PW = 'a-much-longer-passphrase'
+  f = csrfOf((await owner.get('/password')).body)
+  const done = await owner.post('/password', { _csrf: f, current: OWNER_PW, next: NEW_PW, confirm: NEW_PW })
+  check('a good change goes through', done.status === 302 && String(done.location).includes('ok='))
+
+  check('the session that changed it still works', (await owner.get('/')).status === 200)
+  const other = await elsewhere.get('/')
+  check('every other session was signed out', other.status === 302 && String(other.location).startsWith('/sign-in'), String(other.status))
+
+  const old = client()
+  const refused = await old.post('/sign-in', { email: 'director@example.test', password: OWNER_PW })
+  check('the old password no longer signs in', refused.status === 401)
+  const fresh = client()
+  const accepted = await fresh.post('/sign-in', { email: 'director@example.test', password: NEW_PW })
+  check('the new one does', accepted.status === 302 && accepted.location === '/')
+
+  // A viewer's account is a way into the registry too, so it may change its own.
+  const vpage = await viewer.get('/password')
+  check('a reader may change their own password too', vpage.status === 200 && /Your password/.test(vpage.body))
+}
+
+// ---------------------------------------------------------------------------
+section('set-password is the way back in from a shell')
+{
+  const RESET = 'reset-by-the-operator'
+  run('set-password', { OWNER_EMAIL: 'director@example.test', OWNER_PASSWORD: RESET })
+  const after = client()
+  const res = await after.post('/sign-in', { email: 'director@example.test', password: RESET })
+  check('the new password signs in', res.status === 302, String(res.status))
+
+  let refusedShort = ''
+  try { run('set-password', { OWNER_EMAIL: 'director@example.test', OWNER_PASSWORD: 'tiny' }) }
+  catch (err) { refusedShort = String(err.stderr ?? err) }
+  check('it refuses a password under the floor', /at least 8 characters/.test(refusedShort), refusedShort.slice(0, 80))
+
+  let refusedMissing = ''
+  try { run('set-password', { OWNER_EMAIL: 'nobody@example.test', OWNER_PASSWORD: 'a-long-enough-one' }) }
+  catch (err) { refusedMissing = String(err.stderr ?? err) }
+  check('and refuses an account that does not exist', /No account for/.test(refusedMissing), refusedMissing.slice(0, 80))
+}
+
+// ---------------------------------------------------------------------------
 section('signing out ends the session for good')
 {
   await owner.get('/sign-out')

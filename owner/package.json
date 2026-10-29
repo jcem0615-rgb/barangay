@@ -10,7 +10,8 @@
     "seed": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/seed.ts",
     "provision": "npm run migrate && npm run seed",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/owner.mjs"
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/owner.mjs",
+    "set-password": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/set-password.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

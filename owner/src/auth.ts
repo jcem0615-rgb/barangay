@@ -18,6 +18,50 @@ export const hashPassword = (plain: string) => bcrypt.hash(plain, ROUNDS)
 export const verifyPassword = (plain: string, hash: string) => bcrypt.compare(plain, hash)
 
 /**
+ * The floor, which is a floor and not a recommendation.
+ *
+ * Eight characters is the common minimum and it is what this refuses below —
+ * it exists to stop something trivially guessable, not to certify what is
+ * left. The console holds every customer's ops token, so the honest advice is
+ * a passphrase from a password manager, and the screen says so rather than
+ * implying that clearing the bar is the same as being safe.
+ */
+export const MIN_PASSWORD = 8
+
+export function checkPassword(plain: string): string | null {
+  if (plain.length < MIN_PASSWORD) return `A password needs at least ${MIN_PASSWORD} characters.`
+  if (plain.length > 200) return 'That password is too long.'
+  if (plain.trim() !== plain) return 'A password cannot start or end with a space.'
+  return null
+}
+
+/**
+ * Sets a password and **ends every other session that account has open.**
+ *
+ * Changing a password is the one thing somebody does when they think a
+ * password is known, so leaving the other sessions alive would make the act
+ * useless exactly when it matters. The portal one tier down enforces the same
+ * thing through `users.password_changed_at` on every request; here there is a
+ * session table, so the rows are simply deleted.
+ *
+ * `keep` is the session doing the changing, so the person is not signed out of
+ * the tab they are standing in.
+ */
+export async function setPassword(userId: string, plain: string, keepTokenHash?: string): Promise<void> {
+  await query(`update owner_users set password_hash = $2 where id = $1`, [userId, await hashPassword(plain)])
+  await query(
+    `delete from owner_sessions where user_id = $1 and ($2::text is null or token_hash <> $2)`,
+    [userId, keepTokenHash ?? null]
+  )
+}
+
+/** The hash of the session cookie on this request, for `setPassword`'s `keep`. */
+export const sessionTokenHash = (req: Request): string | undefined => {
+  const token = req.cookies?.[SESSION_COOKIE]
+  return typeof token === 'string' && token.length > 20 ? hashToken(token) : undefined
+}
+
+/**
  * Sessions are random tokens in a cookie, with only their hash stored.
  *
  * Not a JWT, and that is the one place this service deliberately differs from

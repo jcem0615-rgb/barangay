@@ -5,7 +5,7 @@ import { env } from './env.ts'
 import { pool, query } from './db.ts'
 import {
   loadSession, requireOwner, requireWrite, requireCsrf, csrfToken,
-  startSession, endSession, verifyPassword,
+  startSession, endSession, verifyPassword, checkPassword, setPassword, sessionTokenHash,
 } from './auth.ts'
 import {
   addDeployment, decommission, editDeployment, editDeploymentSchema, eventsFor, checksFor,
@@ -86,6 +86,43 @@ app.post('/sign-in', async (req, res) => {
   }
   await startSession(res, user.id)
   res.redirect(next)
+})
+
+/**
+ * Changing your own password, which both roles may do.
+ *
+ * A viewer's account is still a way into the registry, so being unable to
+ * change its password would be the wrong kind of read-only.
+ */
+app.get('/password', requireOwner, (req, res) => {
+  html(res, view.password({
+    user: req.owner!, csrf: csrfToken(req),
+    ok: typeof req.query.ok === 'string' ? req.query.ok : undefined,
+  }))
+})
+
+app.post('/password', requireOwner, requireCsrf, async (req, res) => {
+  const current = String(req.body.current ?? '')
+  const next = String(req.body.next ?? '')
+  const confirm = String(req.body.confirm ?? '')
+  const fail = (error: string) =>
+    html(res, view.password({ user: req.owner!, csrf: csrfToken(req), error }), 400)
+
+  const row = await one<{ password_hash: string }>(
+    `select password_hash from owner_users where id = $1`, [req.owner!.id]
+  )
+  // The current password, every time. A console left open on a desk is the
+  // ordinary way an account is taken over.
+  if (!row || !(await verifyPassword(current, row.password_hash))) {
+    return fail('That is not your current password.')
+  }
+  if (next !== confirm) return fail('The two new passwords do not match.')
+  const problem = checkPassword(next)
+  if (problem) return fail(problem)
+  if (next === current) return fail('That is the password you already have.')
+
+  await setPassword(req.owner!.id, next, sessionTokenHash(req))
+  res.redirect(`/password?ok=${encodeURIComponent('Changed. Every other session for this account has been signed out.')}`)
 })
 
 app.get('/sign-out', async (req, res) => {

@@ -124,7 +124,7 @@ export function page(opts: {
   ${opts.user ? `<nav>
     <a href="/">Deployments</a>
     <a href="/activity">Activity</a>
-    <span class="who">${esc(opts.user.name)}${opts.user.role === 'viewer' ? ' · read only' : ''}</span>
+    <a href="/password" class="who" style="color:#94a3c4;text-decoration:none">${esc(opts.user.name)}${opts.user.role === 'viewer' ? ' · read only' : ''}</a>
     <a href="/sign-out">Sign out</a>
   </nav>` : ''}
 </div></header>

@@ -491,6 +491,47 @@ export function activity(opts: {
   })
 }
 
+/**
+ * Changing your own password.
+ *
+ * The current one is required, which is the whole point: a console left open
+ * on a desk is the ordinary way an account is taken over, and without it
+ * anybody who walks past could lock the owner out of the service that holds
+ * every customer's ops token.
+ */
+export function password(opts: { user: OwnerUser; csrf: string } & Flash): string {
+  return page({
+    title: 'Your password', user: opts.user,
+    body: `
+    <p class="crumb"><a href="/">&larr; Deployments</a></p>
+    <h1 style="font-size:20px;font-weight:800;color:#111c44">Your password</h1>
+    <p class="sub">${esc(opts.user.email)}</p>
+
+    <div class="card" style="margin-top:16px;max-width:460px">
+      ${opts.ok ? `<div class="ok">${esc(opts.ok)}</div>` : ''}
+      ${opts.error ? `<div class="err">${esc(opts.error)}</div>` : ''}
+      <form method="post" action="/password">
+        <input type="hidden" name="_csrf" value="${esc(opts.csrf)}">
+        <input type="hidden" name="username" value="${esc(opts.user.email)}" autocomplete="username" style="display:none">
+        <label><span class="lbl">Current password</span>
+          <input type="password" name="current" required autocomplete="current-password"></label>
+        <label><span class="lbl">New password</span>
+          <input type="password" name="next" required autocomplete="new-password" minlength="8">
+          <span class="help">At least 8 characters &mdash; but that is a floor, not a recommendation. This
+          console holds every customer's ops token, so use a passphrase from a password manager.</span></label>
+        <label><span class="lbl">New password again</span>
+          <input type="password" name="confirm" required autocomplete="new-password"></label>
+        <div class="actions"><button class="btn primary" type="submit">Change it</button>
+          <a class="btn" href="/">Cancel</a></div>
+      </form>
+    </div>
+
+    <p class="note" style="margin-top:14px;max-width:460px">Changing it signs out every other session for
+    this account, on every other device. Somebody changes a password when they think it is known, and
+    leaving the other sessions alive would make the act useless exactly when it matters.</p>`,
+  })
+}
+
 export function notFound(user?: OwnerUser): string {
   return page({
     title: 'Not found', user,

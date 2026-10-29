@@ -18,6 +18,33 @@ decommission anything. There is no sign-up form, deliberately: this service
 holds every customer's ops token, and an open door onto it is the worst one in
 the system.
 
+## Passwords
+
+Everyone changes their own from **Your password** (their name in the top bar).
+The current one is required — a console left open on a desk is the ordinary way
+an account is taken over — and a change **signs out every other session that
+account has open**, on every device. Somebody changes a password when they
+think it is known, so leaving the others alive would make the act useless
+exactly when it matters. A viewer may change theirs too: a read-only account is
+still a way into the registry.
+
+Lost one? There is no reset-by-email, because mail from this service would be
+one more thing to configure correctly on the box holding every customer's ops
+token. Somebody with shell access runs:
+
+```bash
+OWNER_EMAIL=… OWNER_PASSWORD=… npm run set-password
+```
+
+A script of its own rather than a flag on `seed`, because a provision that
+quietly resets a password every time it re-runs is a very bad surprise. It
+refuses an account that does not exist rather than creating one.
+
+**The floor is eight characters and it is a floor, not a recommendation.** It
+exists to refuse something trivially guessable; it certifies nothing about what
+clears it. This console holds every customer's ops token, so the honest advice —
+which the screen gives — is a passphrase out of a password manager.
+
 ## It never reads a customer's database
 
 The portal's whole isolation model is that two municipalities share no rows and
@@ -132,7 +159,7 @@ different product.
 ## Tests
 
 ```bash
-npm test                   # 61 assertions; provisions its own database
+npm test                   # 77 assertions; provisions its own database
 cd ../server && npm run test:ops   # 27; the deployment side of the same contract
 ```
 
