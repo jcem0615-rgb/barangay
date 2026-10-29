@@ -14,6 +14,18 @@ import {
   SECTORAL_PROGRAMS, SERVICES, SERVICE_CATEGORIES,
 } from '../data/mockData'
 import { addWorkingDays } from './schedule'
+
+/**
+ * Which tier this demo build is.
+ *
+ * `VITE_DEMO_TIER=barangay npm run build` with `VITE_DEMO=1` produces the
+ * barangay product's demo; anything else is the municipal one. It is a build
+ * flag rather than a toggle in the page because the real thing is a *separate
+ * deployment* — a switch here would teach somebody that one instance serves
+ * both, which is the opposite of how the system works.
+ */
+const DEMO_TIER: 'municipal' | 'barangay' =
+  import.meta.env.VITE_DEMO_TIER === 'barangay' ? 'barangay' : 'municipal'
 import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../types'
 
 // Bumped whenever the seeded shape changes: a store written by an older build
@@ -1916,6 +1928,16 @@ async function route(
       status: 200,
       body: {
         municipality: MUNICIPALITY,
+        // Which product this demo is.
+        //
+        // The real server reads it from DEPLOYMENT_TIER; a demo has no server,
+        // so it comes from the build. Without it the barangay demo would ship
+        // the barangay manifest and icon and then render the *municipal* app —
+        // a demo that is wrong about which product it is would be worse than
+        // no demo, because the person it misleads is a customer.
+        tier: DEMO_TIER,
+        productName: DEMO_TIER === 'barangay' ? 'eBarangay Portal' : 'eLGU Citizen Portal',
+        barangay: DEMO_TIER === 'barangay' ? { id: BARANGAYS[0]!.id, name: BARANGAYS[0]!.name } : null,
         // Offices merge their editable contact details over the seeded
         // catalogue, so an address corrected in the console shows up here.
         departments: SERVICE_CATEGORIES.map((c) => ({ ...c, ...(state.offices[c.id] ?? {}) })),

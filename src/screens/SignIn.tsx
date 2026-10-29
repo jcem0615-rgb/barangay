@@ -26,6 +26,7 @@ export default function SignIn() {
   const [barangays, setBarangays] = useState<Array<{ id: string; name: string }>>([])
   const [residesHere, setResidesHere] = useState(false)
   const { municipality, productName, tier, servedBarangay } = useCatalogue()
+  const demoAccounts = DEMO_ACCOUNTS.filter((g) => !(g.municipalOnly && tier === 'barangay'))
 
   // Public, and needed before anybody has an account. Fetched once rather than
   // on switching to the register tab, so the list is there the moment it is
@@ -286,7 +287,7 @@ export default function SignIn() {
               sides to be on.
             */}
             <div className="mt-2 text-[calc(12.5px_*_var(--text-scale))] text-navy-900">
-              {DEMO_ACCOUNTS.map((group) => (
+              {demoAccounts.map((group) => (
                 <section key={group.tier}>
                   <h3 className="pb-0.5 pt-2 text-[calc(11px_*_var(--text-scale))] font-bold uppercase tracking-wide text-slate-500">
                     {t(group.tier)}
@@ -309,10 +310,12 @@ export default function SignIn() {
             <p className="mt-2.5 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
               {t('demo.switching')}
             </p>
-            <p className="mt-1.5 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
-              {t('demo.otherBarangays')}{' '}
-              <span className="font-mono">admin.&lt;barangay&gt;@malasiqui.gov.ph</span>
-            </p>
+            {tier !== 'barangay' && (
+              <p className="mt-1.5 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
+                {t('demo.otherBarangays')}{' '}
+                <span className="font-mono">admin.&lt;barangay&gt;@malasiqui.gov.ph</span>
+              </p>
+            )}
             <p className="mt-1.5 text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
               {t('demo.noServerHere')}
             </p>
@@ -347,9 +350,19 @@ export default function SignIn() {
  * names Poblacion's pair, which is the one with both roles, and says the rest
  * follow the same shape.
  */
+/**
+ * The logins the demo lists.
+ *
+ * A barangay demo shows the resident and the barangay's three roles and
+ * nothing else: there is no municipal console in that product, and an account
+ * on this panel that signs in to a console the deployment does not have is the
+ * demo teaching somebody something the real system would refuse — which is the
+ * one thing it exists not to do.
+ */
 const DEMO_ACCOUNTS: Array<{
   tier: StringKey
   accounts: Array<[StringKey, string]>
+  municipalOnly?: boolean
 }> = [
   {
     tier: 'demo.tierResident',
@@ -360,6 +373,7 @@ const DEMO_ACCOUNTS: Array<{
   },
   {
     tier: 'demo.tierMunicipal',
+    municipalOnly: true,
     accounts: [
       ['demo.roleTreasury', 'treasury@malasiqui.gov.ph'],
       ['demo.roleAdmin', 'admin@malasiqui.gov.ph'],

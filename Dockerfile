@@ -15,6 +15,13 @@ COPY src ./src
 # when the API serves this bundle.
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
+# Which product this image is. The manifest's name and icon and the iOS
+# home-screen label are all baked in here and cannot be corrected by anything
+# the running app renders, so the tier has to be known at build time even
+# though everything else about it comes off the catalogue at runtime.
+#   docker build --build-arg VITE_PRODUCT=barangay .
+ARG VITE_PRODUCT=municipal
+ENV VITE_PRODUCT=$VITE_PRODUCT
 RUN npm run build
 
 # ---- install server production deps ----
