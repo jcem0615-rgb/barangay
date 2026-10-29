@@ -441,6 +441,50 @@ The main pre-launch list applies, minus the parts that belong to a hall. In part
       nowhere else; 911 and 143 are correct nationwide
 - [ ] The administrator changed the `SEED_PASSWORD` on first sign-in
 
+## Deploying on Render
+
+`render.yaml` is a Blueprint that stands up the two demos and the owner portal
+in one apply: **Render -> New -> Blueprint -> this repository**.
+
+**It needs Render's GitHub App to have access to this repository first.**
+Render -> Settings -> GitHub -> Configure -> add this repo to the selected
+list. Without it Render reports the repository as *"invalid or unfetchable"*
+even though it exists and you can push to it, which reads like a broken URL and
+is not one.
+
+### What the blueprint includes, and what it does not
+
+| | Why |
+| --- | --- |
+| `elgu-demo` | Static. The demo build answers every API call in the browser, so there is no server and no database - it opens instantly, with no cold start to apologise for while somebody is holding a phone in front of a mayor. |
+| `ebarangay-demo` | The same build with `VITE_PRODUCT=barangay` and `VITE_DEMO_TIER=barangay`. Both are needed: the first decides the manifest, the icon and the iOS label, the second makes the demo's own catalogue report the tier. Set only the first and you ship the barangay's name over the municipal app. |
+| `elgu-owner` + a database | A real service with a real registry, so a container with Postgres behind it. |
+| **No production LGU instance** | Render allows **one free Postgres per workspace** and the blueprint spends it on the owner portal. A town needs its own database and should not sit on a tier that expires after thirty days. |
+
+### What the free tier costs you
+
+- **Services sleep after 15 minutes idle** and the next request waits roughly
+  50 seconds. Fine for a demo you open deliberately - warm it up before a
+  meeting - and wrong for anything a resident is told to use.
+- **A free database expires after 30 days.** Render emails first; the data goes.
+- The owner portal's probe sweep is set to half an hour here rather than five
+  minutes, because on a sleeping service a five-minute poll spends the whole
+  budget keeping itself awake. Put it back on a paid plan.
+
+### Standing up a real customer
+
+Not from the blueprint. Follow *Standing up a second municipality* or *Standing
+up a barangay* above; on Render that is a web service from `./Dockerfile` with
+`--build-arg VITE_PRODUCT` set for a barangay, its **own** paid Postgres, and
+the environment from the owner portal's **Setup** tab, which generates it from
+the registry row.
+
+**Set `PUBLIC_URL` to the customer's real domain before the first document is
+issued.** Every certificate's QR is built from it and the rendered PDF is
+stored rather than re-rendered, so a document issued under an `onrender.com`
+address carries that address for ever - the one setting in the whole system
+that cannot be corrected afterwards.
+
 ## The owner portal
 
 Adding a customer is **provisioning a deployment**, not creating a row — the runbooks above

@@ -1,0 +1,153 @@
+# Render Blueprint — everything this repository deploys, in one apply.
+#
+#   Render dashboard -> New -> Blueprint -> pick this repository
+#
+# Before it will work, Render's GitHub App needs access to this repository:
+# Render -> Settings -> GitHub -> Configure -> add `LGU` to the selected
+# repositories. Without that, Render reports the repo as "invalid or
+# unfetchable" even though it exists and you can push to it.
+#
+# ---------------------------------------------------------------------------
+# What is here, and what is deliberately not
+#
+# The two demos and the owner portal. A **production LGU instance is not in
+# this file**, and that is the free tier's doing rather than an oversight:
+# Render allows one free Postgres per workspace and this blueprint spends it on
+# the owner portal, which is the one thing here that holds real state. A real
+# municipality or barangay needs its own database — see "Standing up a second
+# municipality" and "Standing up a barangay" in DEPLOY.md, and expect to pay
+# for the database, because a town's records should not sit on a tier that
+# expires after thirty days.
+#
+# ---------------------------------------------------------------------------
+# Why the demos are static and the owner portal is not
+#
+# The demo build answers every API call in the browser, so it needs no server
+# and no database at all. That makes it a CDN upload: it opens instantly, with
+# no cold start to apologise for when somebody is holding a phone in front of a
+# mayor. The owner portal is a real service with a real registry, so it is a
+# container with a database behind it.
+
+databases:
+  - name: elgu-owner-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "16"
+    # Only the owner service connects. Render's free tier has no IP allow list
+    # to narrow beyond that; the paid tiers do, and a production database
+    # should use one.
+
+services:
+  # -------------------------------------------------------------- the demos
+  #
+  # Singapore is the nearest region to the Philippines that Render offers.
+  # Static sites are served from the CDN, so the region matters less here than
+  # it does for the services below — but keeping them together means one less
+  # thing to think about.
+
+  - type: web
+    runtime: static
+    name: elgu-demo
+    branch: claude/app-setup-github-lgu-m3kmd7
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_DEMO
+        value: "1"
+    headers:
+      # The service worker must never be served from cache, or a visitor keeps
+      # whichever build they first saw for as long as the cache lives.
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+    routes:
+      # The app is a single page and reads `?verify=` and `?doc=` off the query
+      # string, so every path has to land on index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
+    runtime: static
+    name: ebarangay-demo
+    branch: claude/app-setup-github-lgu-m3kmd7
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_DEMO
+        value: "1"
+      # The manifest, the icon and the iOS home-screen label are baked in at
+      # build time and cannot be corrected at runtime.
+      - key: VITE_PRODUCT
+        value: barangay
+      # And the demo's own catalogue has to report the tier, or this build
+      # would carry the barangay's name and icon and render the municipal app.
+      - key: VITE_DEMO_TIER
+        value: barangay
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # -------------------------------------------------------- the owner portal
+
+  - type: web
+    runtime: docker
+    name: elgu-owner
+    branch: claude/app-setup-github-lgu-m3kmd7
+    plan: free
+    region: singapore
+    dockerfilePath: ./owner/Dockerfile
+    dockerContext: ./owner
+    healthCheckPath: /health
+    envVars:
+      - key: OWNER_DATABASE_URL
+        fromDatabase:
+          name: elgu-owner-db
+          property: connectionString
+      # Seals every deployment's ops token at rest. Generated once by Render
+      # and never printed here — a dump of the registry on its own is then a
+      # list of customers rather than a working key to every status endpoint.
+      #
+      # **Changing it makes every stored ops token unreadable.** The portal
+      # reports that per deployment and the fix is to rotate each token and set
+      # the new one on the instance, so treat this value as permanent.
+      - key: OWNER_TOKEN_KEY
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4500"
+      # Render terminates TLS one hop in front of the container.
+      - key: TRUST_PROXY
+        value: "1"
+      # The free tier sleeps after fifteen minutes, so a five-minute probe
+      # sweep would spend the whole budget keeping itself awake. Half an hour
+      # is honest for a console somebody opens deliberately; on a paid plan,
+      # put it back to five minutes.
+      - key: OWNER_PROBE_INTERVAL_MS
+        value: "1800000"
+
+# ---------------------------------------------------------------------------
+# After the first apply
+#
+#   1. The owner portal has no account yet. Open a shell on the service
+#      (Render -> elgu-owner -> Shell) and run:
+#
+#        OWNER_EMAIL=you@example.com OWNER_NAME="Your Name" \
+#          node --experimental-strip-types src/seed.ts
+#
+#      It prints a generated password once. Change it from "Your password" in
+#      the console afterwards.
+#
+#   2. The demos carry sample data for a town called Malasiqui and every
+#      hotline in them is invented. They are for showing, never for use.
+#
+#   3. Nothing here is a production LGU. When you have a customer and their
+#      domain, follow DEPLOY.md — and set PUBLIC_URL to the domain *before*
+#      the first document is issued, because every certificate's QR is built
+#      from it and the PDF is stored rather than re-rendered.
