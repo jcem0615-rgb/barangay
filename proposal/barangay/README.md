@@ -1,12 +1,32 @@
-# The eBarangay Portal proposal
+# The eBarangay Portal documents
 
 ```bash
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --no-save playwright
 
-node proposal/barangay/build.mjs              # the blank, for any barangay
+node proposal/barangay/build-overview.mjs     # -> proposal/eBarangay-Overview.pdf
+node proposal/barangay/build.mjs              # the blank proposal, for any barangay
 node proposal/barangay/build.mjs poblacion    # a copy naming one
 node proposal/barangay/build.mjs --all        # all 73 in the roster
 ```
+
+## Two documents, one inventory
+
+`controls.mjs` is the feature list and both documents render it.
+
+**The overview** (`overview.mjs`) is the feature reference: a cover, the four
+portals with every control and the icon it actually carries, and a closing page
+headed *What it does not do*. It names no barangay, so it is the document to
+hand somebody who has already said yes and wants to know exactly what they are
+getting, or who is comparing it against what they run now.
+
+**The proposal** (`proposal.mjs`) wraps the same inventory in a covering letter
+to a Punong Barangay, with the addressing rules below.
+
+That closing page is in the *overview* and not only in the proposal on purpose.
+It is the document somebody reads after buying, and every item on it — no online
+payment, a signature that is a picture, email needing a service, a photocopy
+that still verifies — is something a barangay would otherwise meet in its first
+week. Meeting it then is what makes a working system feel broken.
 
 Output lands in `proposal/barangay-lgu/`. Each document is a covering letter to
 the Punong Barangay, a one-page overview, then every control in each of the four
