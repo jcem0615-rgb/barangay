@@ -550,6 +550,31 @@ Treat it as a walkthrough, never as a pilot — a municipality evaluating this
 should run the container against a real database before putting a resident near
 it.
 
+### Both products from one repository, without them colliding
+
+The two demos are the same repository, the same branch and the same
+`vercel.json`. What makes one of them the barangay product is **two project-level
+environment variables**, set in Vercel on that project only:
+
+| | |
+| --- | --- |
+| `VITE_PRODUCT` | `barangay` |
+| `VITE_DEMO_TIER` | `barangay` |
+
+**Both, or neither.** `VITE_PRODUCT` decides the manifest, the icon and the iOS
+home-screen label; `VITE_DEMO_TIER` makes the demo's own catalogue report the
+tier. Set only the first and the build ships the barangay's name and icon over
+the municipal app — which is the one failure a demo must not have, because the
+person it misleads is a customer.
+
+**They belong in the project's settings and not in `vercel.json`.** That file is
+shared by every project built from this repository, so putting the barangay
+flags in its `buildCommand` would quietly turn the eLGU demo into a second
+barangay one. Project settings keep the two apart by construction rather than by
+somebody remembering.
+
+Nothing else differs: same branch, same build command, same output directory.
+
 ## Still simulated
 
 Deploying does not make these real, and residents will notice:
