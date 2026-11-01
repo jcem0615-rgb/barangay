@@ -35,11 +35,17 @@ decision rather than how things always were.
 **So the whole design of this split is aimed at that one sentence.** Divergence
 is what turns "integrate later" into a rewrite, so the diff against upstream is
 kept as small as it can be while still making this repository honestly the
-barangay product: **four code files, three deployment files, and the docs.**
-No deletions, no moved code, no renamed symbols, and **nothing changed under
+barangay product. **`npm run check:drift` prints the authoritative list** —
+every file that differs and what integration must do to it — so this file does
+not carry a count that goes stale the moment anything changes; see *Keeping the
+two in step* below.
+
+What is worth stating as an invariant rather than a tally: no deletions of
+upstream code, no moved code, no renamed symbols, and **nothing changed under
 `server/src/` or `src/screens/` at all** — the places where a real fix will
-land on either side. `diff -rq` against the eLGU tree reports exactly three
-differing files under `src/` and `server/` combined.
+land on either side. Across `src/` and `server/` combined, `diff -rq` against
+the eLGU tree reports four files: three in `src/lib` and `src/i18n`, and
+`server/.env.example`.
 
 ---
 
@@ -142,23 +148,25 @@ the tree so a merge back is a merge rather than a reconstruction — they are
 simply absent from this repository's `render.yaml`. Prune them if you would
 rather, but deleting is the move that costs something later.
 
-Two known rough edges, both left alone deliberately.
+One known rough edge: `owner/src/provision.ts` emits `npm run build` for a
+municipal tier and `VITE_PRODUCT=barangay npm run build` for a barangay one. The
+second is still right; the first would now build the *barangay* app if it were
+ever run against this tree. It is not — the owner portal provisions from the
+eLGU repository — but it is the first thing to fix if that ever changes.
 
-`owner/src/provision.ts` emits `npm run build` for a municipal tier and
-`VITE_PRODUCT=barangay npm run build` for a barangay one. The second is still
-right; the first would now build the *barangay* app if it were ever run against
-this tree. It is not — the owner portal provisions from the eLGU repository —
-but it is the first thing to fix if that ever changes.
+**`'auth.title'` is gone from both dictionaries**, and with it the last trace of
+the municipal product name: the built bundle now contains the string **zero**
+times, down from five before the `catalogue.tsx` fix and two after it. The key
+was dead — `SignIn.tsx` takes its heading from `productName` on the catalogue,
+which is precisely why the cold-load bug surfaced there — so nothing rendered
+it and removing it changes no screen. It was a trap rather than a bug: the next
+person adding a sign-in title would have reached for `auth.title` and got the
+other product's name. `StringKey` is `keyof typeof en`, so `tsc -b` is what
+proves nothing referenced it.
 
-`src/i18n/strings.ts` still carries `'auth.title': 'eLGU Citizen Portal'` in
-**both** dictionaries. Nothing reads it — `SignIn.tsx` takes its heading from
-`productName` on the catalogue, which is why the cold-load bug above showed up
-there — so it is invisible rather than wrong, and the two remaining occurrences
-of the municipal name in the built bundle are this one key. It is left because
-editing that file buys nothing a user can see and costs merge surface on a long
-shared dictionary. It is a trap for the next person, though: somebody adding a
-sign-in title would reach for `auth.title` and get the other product's name.
-Delete it on the next merge that touches `strings.ts` anyway.
+That removal is tier-neutral and belongs upstream too — the key is just as dead
+in the eLGU tree — which is why its two files are marked `keep` rather than
+`revert` in the drift manifest.
 
 **The test suite is untouched**, including `server/test/tier.mjs` and
 `server/test/isolation.mjs`. Those two are the reason nothing was stripped out:

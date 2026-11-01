@@ -61,6 +61,11 @@ const DIVERGENCE = {
   'package.json': ['revert', 'name goes back to elgu-citizen-portal'],
   'package-lock.json': ['revert', 'same name field'],
 
+  // Tier-neutral cleanups that belong upstream too, and are only here because
+  // this is where they were noticed.
+  'src/i18n/strings.ts': ['keep', "removed the dead 'auth.title' key; right upstream as well"],
+  'scripts/check-i18n.mjs': ['keep', 'its SAME_IN_BOTH entry for that key went with it'],
+
   // Documentation.
   'SPLIT.md': ['drop', 'it describes the split; there is no split once merged'],
   'README.md': ['human', 'upstream README covers both tiers'],

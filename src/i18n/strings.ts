@@ -27,7 +27,6 @@ export const en = {
   'common.offlineShort': "You're offline. Changes are saved on this device.",
 
   // sign in
-  'auth.title': 'eLGU Citizen Portal',
   'auth.municipalityOf': 'Municipality of {name}',
   'auth.barangayOf': 'Barangay {barangay}, {name}',
   'auth.birthDate': 'Date of birth',
@@ -684,7 +683,6 @@ export const fil: Record<StringKey, string> = {
   'common.offline': 'Wala kang koneksyon. Ang isusumite mo ay itatago at ipapadala kapag bumalik ang internet.',
   'common.offlineShort': 'Wala kang koneksyon. Naitatago sa device na ito ang mga binago mo.',
 
-  'auth.title': 'eLGU Citizen Portal',
   'auth.municipalityOf': 'Munisipyo ng {name}',
   'auth.barangayOf': 'Barangay {barangay}, {name}',
   'auth.birthDate': 'Petsa ng kapanganakan',

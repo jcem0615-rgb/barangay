@@ -39,7 +39,7 @@ const CONSOLE_FILES = [
  * the reminder.
  */
 const SAME_IN_BOTH = new Set([
-  'auth.title', 'id.cardLabel', 'id.cardLabelBarangay',
+  'id.cardLabel', 'id.cardLabelBarangay',
   'auth.barangay', 'mydata.barangay', 'tier.barangay', 'brgy.title', 'brgy.hallCaptain',
   'auth.email', 'profile.email', 'help.email', 'auth.password', 'profile.account',
   'nav.profile', 'profile.title', 'notif.kindAdvanced', 'incident.videoFile',
