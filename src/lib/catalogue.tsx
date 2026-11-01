@@ -56,8 +56,8 @@ interface CatalogueValue {
    *
    * It comes off the catalogue rather than a build flag because the same bundle
    * serves both, and it is read before the first paint because it decides what
-   * the shell draws. Defaults to `municipal` so an older cached catalogue, or a
-   * server that has not been upgraded, renders what it always did.
+   * the shell draws. What it falls back to when nothing has said yet is
+   * `DEFAULT_TIER` below — `barangay` in this repository.
    */
   tier: DeploymentTier
   /**
@@ -88,6 +88,30 @@ interface CatalogueValue {
   findProgram: (code: string) => SectoralProgram | undefined
 }
 
+/**
+ * What this build is before anything has told it otherwise.
+ *
+ * **This repository is the barangay product** (see SPLIT.md), so these are the
+ * barangay's. Upstream they were `municipal` and `eLGU Citizen Portal`, which
+ * was right there and wrong here in a way nothing would have caught: the
+ * values are read at the *first paint*, before the catalogue has answered, and
+ * `document.title` is written from `productName` below. So a cold load of the
+ * barangay app — a first-ever visit, or one after cleared site data, where
+ * `readCache()` finds nothing — drew the municipal two-tier dashboard and
+ * *overwrote* the correct build-time title in `index.html` with the other
+ * product's name, before flipping to the right one a moment later.
+ *
+ * They are constants rather than five literals because five is how they came
+ * to disagree: the two `useState` seeds, the two setters on the catalogue
+ * response and the copy written to the cache all repeated the same pair.
+ *
+ * The fallback on the response is not dead either — a server that does not
+ * publish `tier` at all is an older one, and in this repository the honest
+ * reading of its silence is "barangay", not "the hall".
+ */
+const DEFAULT_TIER: DeploymentTier = 'barangay'
+const DEFAULT_PRODUCT_NAME = 'eBarangay Portal'
+
 const CatalogueContext = createContext<CatalogueValue | null>(null)
 
 /** The office and service catalogue comes from the server, not a local file. */
@@ -95,8 +119,8 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
   // Seeded from the cache so the first paint already has something, rather
   // than an empty shell that fills in once the network answers.
   const cached = readCache()
-  const [tier, setTier] = useState<DeploymentTier>(cached?.tier ?? 'municipal')
-  const [productName, setProductName] = useState<string>(cached?.productName ?? 'eLGU Citizen Portal')
+  const [tier, setTier] = useState<DeploymentTier>(cached?.tier ?? DEFAULT_TIER)
+  const [productName, setProductName] = useState<string>(cached?.productName ?? DEFAULT_PRODUCT_NAME)
   const [servedBarangay, setServedBarangay] = useState<ServedBarangay | null>(cached?.servedBarangay ?? null)
   const [municipality, setMunicipality] = useState<Municipality | null>(cached?.municipality ?? null)
   const [departments, setDepartments] = useState<ServiceCategory[]>(cached?.departments ?? [])
@@ -113,8 +137,8 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
       .catalogue()
       .then((c) => {
         const holidayDates = (c.holidays ?? []).map((h) => h.date)
-        setTier(c.tier ?? 'municipal')
-        setProductName(c.productName ?? 'eLGU Citizen Portal')
+        setTier(c.tier ?? DEFAULT_TIER)
+        setProductName(c.productName ?? DEFAULT_PRODUCT_NAME)
         setServedBarangay(c.barangay ?? null)
         setMunicipality(c.municipality ?? null)
         setDepartments(c.departments)
@@ -123,8 +147,8 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
         setEmergencyContacts(c.emergencyContacts ?? [])
         setHolidays(new Set(holidayDates))
         writeCache({
-          tier: c.tier ?? 'municipal',
-          productName: c.productName ?? 'eLGU Citizen Portal',
+          tier: c.tier ?? DEFAULT_TIER,
+          productName: c.productName ?? DEFAULT_PRODUCT_NAME,
           servedBarangay: c.barangay ?? null,
           municipality: c.municipality ?? null,
           departments: c.departments,
@@ -142,7 +166,9 @@ export function CatalogueProvider({ children }: { children: ReactNode }) {
   // The tab, and the window title of an installed copy.
   //
   // index.html carries a build-time title, which is right for the first paint
-  // and wrong the moment one bundle is pointed at the other tier's server. The
+  // — and now agrees with `DEFAULT_PRODUCT_NAME`, so a cold load no longer
+  // overwrites it with the other product's name — and wrong the moment one
+  // bundle is pointed at the other tier's server. The
   // catalogue knows which product this actually is, so it says so — the same
   // reasoning as <html lang> following the language rather than the last tap.
   useEffect(() => {

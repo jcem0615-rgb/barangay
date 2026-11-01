@@ -35,17 +35,17 @@ decision rather than how things always were.
 **So the whole design of this split is aimed at that one sentence.** Divergence
 is what turns "integrate later" into a rewrite, so the diff against upstream is
 kept as small as it can be while still making this repository honestly the
-barangay product: **three code files, three deployment files, and the docs.**
+barangay product: **four code files, three deployment files, and the docs.**
 No deletions, no moved code, no renamed symbols, and **nothing changed under
 `server/src/` or `src/screens/` at all** — the places where a real fix will
-land on either side. `diff -rq` against the eLGU tree reports exactly two
+land on either side. `diff -rq` against the eLGU tree reports exactly three
 differing files under `src/` and `server/` combined.
 
 ---
 
 ## Everything that differs from upstream
 
-### The build is barangay by default (3 files)
+### The build is barangay by default (4 files)
 
 Upstream, the barangay product was built by setting two environment variables
 on the Vercel/Render service, and the commit that set that up said why they
@@ -60,7 +60,26 @@ So the default moved into the code, where it cannot be forgotten:
 | --- | --- |
 | `vite.config.ts` | `VITE_PRODUCT` defaults to `barangay`; `municipal` opts out |
 | `src/lib/demoServer.ts` | `VITE_DEMO_TIER` defaults to `barangay`; `municipal` opts out |
+| `src/lib/catalogue.tsx` | The cold-start tier and product name, via two new constants |
 | `package.json` | `name` is now `ebarangay-portal` |
+
+**`catalogue.tsx` was found by checking the deployed app rather than by
+reading the diff**, and it is the one of the four that was a live bug. Those
+values are read at the *first paint*, before the catalogue has answered, and
+`document.title` is written from `productName` — so a cold load of the
+barangay deployment, where `readCache()` finds nothing, drew the municipal
+two-tier dashboard and **overwrote the correct build-time title in
+`index.html`** with "eLGU Citizen Portal" before flipping to the right name a
+moment later. Upstream that default is correct; here it was the exact failure
+the split was meant to remove, surviving in the one place a build flag does
+not reach.
+
+The pair is now two constants rather than five literals, because five is how
+they came to disagree: the two `useState` seeds, the two setters on the
+catalogue response, and the copy written to the cache all repeated them. The
+fallback on the response is not dead either — a server that does not publish
+`tier` is an older one, and in this repository the honest reading of its
+silence is "barangay", not "the hall".
 
 This closes a real failure rather than a tidy one. The manifest, the icon and
 the iOS home-screen label are baked in at build time and **cannot be corrected
@@ -123,11 +142,23 @@ the tree so a merge back is a merge rather than a reconstruction — they are
 simply absent from this repository's `render.yaml`. Prune them if you would
 rather, but deleting is the move that costs something later.
 
-One known rough edge: `owner/src/provision.ts` emits `npm run build` for a
-municipal tier and `VITE_PRODUCT=barangay npm run build` for a barangay one. The
-second is still right; the first would now build the *barangay* app if it were
-ever run against this tree. It is not — the owner portal provisions from the
-eLGU repository — but it is the first thing to fix if that ever changes.
+Two known rough edges, both left alone deliberately.
+
+`owner/src/provision.ts` emits `npm run build` for a municipal tier and
+`VITE_PRODUCT=barangay npm run build` for a barangay one. The second is still
+right; the first would now build the *barangay* app if it were ever run against
+this tree. It is not — the owner portal provisions from the eLGU repository —
+but it is the first thing to fix if that ever changes.
+
+`src/i18n/strings.ts` still carries `'auth.title': 'eLGU Citizen Portal'` in
+**both** dictionaries. Nothing reads it — `SignIn.tsx` takes its heading from
+`productName` on the catalogue, which is why the cold-load bug above showed up
+there — so it is invisible rather than wrong, and the two remaining occurrences
+of the municipal name in the built bundle are this one key. It is left because
+editing that file buys nothing a user can see and costs merge surface on a long
+shared dictionary. It is a trap for the next person, though: somebody adding a
+sign-in title would reach for `auth.title` and get the other product's name.
+Delete it on the next merge that touches `strings.ts` anyway.
 
 **The test suite is untouched**, including `server/test/tier.mjs` and
 `server/test/isolation.mjs`. Those two are the reason nothing was stripped out:
