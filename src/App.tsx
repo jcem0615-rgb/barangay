@@ -6,6 +6,8 @@ import { AuthProvider, useAuth } from './lib/auth'
 import { CatalogueProvider } from './lib/catalogue'
 import { I18nProvider } from './lib/i18n'
 import { TextScaleProvider } from './lib/textScale'
+import { ThemeProvider } from './lib/theme'
+import { BarangayLogoProvider } from './lib/barangayLogo'
 import BottomNav from './components/BottomNav'
 import Dashboard from './screens/Dashboard'
 import Services from './screens/Services'
@@ -178,15 +180,19 @@ function RoleShell() {
 export default function App() {
   return (
     <I18nProvider>
-      <TextScaleProvider>
-        <AuthProvider>
-          <CatalogueProvider>
+      <ThemeProvider>
+        <TextScaleProvider>
+            <AuthProvider>
+            <BarangayLogoProvider>
+            <CatalogueProvider>
             <AppDataProvider>
               <RoleShell />
             </AppDataProvider>
-          </CatalogueProvider>
-        </AuthProvider>
-      </TextScaleProvider>
+            </CatalogueProvider>
+            </BarangayLogoProvider>
+          </AuthProvider>
+        </TextScaleProvider>
+      </ThemeProvider>
     </I18nProvider>
   )
 }

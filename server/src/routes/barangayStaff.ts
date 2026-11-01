@@ -100,12 +100,14 @@ async function officeState(userId: string) {
   const row = await one<BarangayOfficeRow & {
     id: string; name: string
     seal_key: string | null; seal_updated_at: Date | null
+    logo_key: string | null; logo_updated_at: Date | null
     captain_signature_key: string | null; captain_signature_updated_at: Date | null
     secretary_signature_key: string | null; secretary_signature_updated_at: Date | null
   }>(
     `select b.id, b.name, b.captain, b.secretary,
             b.hall_address, b.office_hours, b.phone, b.email,
             b.seal_key, b.seal_updated_at,
+            b.logo_key, b.logo_updated_at,
             b.captain_signature_key, b.captain_signature_updated_at,
             b.secretary_signature_key, b.secretary_signature_updated_at
        from users u join barangays b on b.id = u.barangay_id
@@ -117,6 +119,8 @@ async function officeState(userId: string) {
     id: row.id, name: row.name, ...serializeBarangayOffice(row),
     hasSeal: row.seal_key !== null,
     sealUpdatedAt: row.seal_updated_at?.toISOString() ?? null,
+    hasLogo: row.logo_key !== null,
+    logoUpdatedAt: row.logo_updated_at?.toISOString() ?? null,
     hasCaptainSignature: row.captain_signature_key !== null,
     captainSignatureUpdatedAt: row.captain_signature_updated_at?.toISOString() ?? null,
     hasSecretarySignature: row.secretary_signature_key !== null,
@@ -164,6 +168,13 @@ const MARKS = {
   seal: {
     key: 'seal_key', type: 'seal_type', stamp: 'seal_updated_at',
     what: 'A seal', action: 'barangay_seal',
+  },
+  // The one mark residents see. Stored exactly like the other three — same
+  // store, same sniffing, same audit — and read by a different route, because
+  // the seal is console-only and this is the barangay's face in the app.
+  logo: {
+    key: 'logo_key', type: 'logo_type', stamp: 'logo_updated_at',
+    what: 'A logo', action: 'barangay_logo',
   },
   captain: {
     key: 'captain_signature_key', type: 'captain_signature_type',
@@ -302,13 +313,30 @@ barangayStaffRouter.delete(
   (req, res) => clearMark(req, res, 'seal')
 )
 
+// The logo. Written by the administrator, read by both roles — the same line
+// the seal draws — and separately readable by residents, which the seal is not.
+barangayStaffRouter.put(
+  '/office/logo',
+  requireRole('barangay_admin'),
+  markUpload.single('file'),
+  (req, res) => storeMark(req, res, 'logo', 'the app')
+)
+
+barangayStaffRouter.get('/office/logo', (req, res) => readMark(req, res, 'logo'))
+
+barangayStaffRouter.delete(
+  '/office/logo',
+  requireRole('barangay_admin'),
+  (req, res) => clearMark(req, res, 'logo')
+)
+
 barangayStaffRouter.put(
   '/office/signature/:who',
   requireRole('barangay_admin'),
   markUpload.single('file'),
   async (req, res) => {
     const mark = markNamed(req.params.who)
-    if (!mark || mark === 'seal') {
+    if (!mark || mark === 'seal' || mark === 'logo') {
       return res.status(404).json({ error: 'Only the captain and the secretary sign a certificate.' })
     }
     await storeMark(req, res, mark, 'a certificate')
@@ -317,7 +345,7 @@ barangayStaffRouter.put(
 
 barangayStaffRouter.get('/office/signature/:who', async (req, res) => {
   const mark = markNamed(req.params.who)
-  if (!mark || mark === 'seal') return res.status(404).json({ error: 'Not found.' })
+  if (!mark || mark === 'seal' || mark === 'logo') return res.status(404).json({ error: 'Not found.' })
   await readMark(req, res, mark)
 })
 

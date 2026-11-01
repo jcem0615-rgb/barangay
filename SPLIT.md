@@ -246,21 +246,47 @@ the declared files are the only places a conflict can arise:
 git cherry-pick <sha>
 ```
 
-### One hazard the complaint feature introduces
+### Migration numbers: upstream owns 000-599, this repository owns 600-999
 
-`server/migrations/042_barangay_complaints.sql` takes the next number in a
-sequence **both repositories are now advancing independently.** If upstream
-also reaches 042, a merge produces two different migrations claiming the same
-number, and the runner orders by filename — so which one applies first becomes
-alphabetical accident rather than a decision, on a database that may already
-have run one of them.
+Both repositories add migrations and both were counting from the same sequence,
+so the first time upstream reached 042 a merge would have produced two
+different files claiming that number. **Nothing about that is a git conflict**
+— the files have different names, so both merge cleanly, both apply, and which
+goes first is alphabetical accident on a database that may already have run
+one of them. `migrate.ts` keys `schema_migrations` on the filename and applies
+in sorted order.
 
-Check this before merging, not after. If upstream has an 042, renumber this one
-to the next free number and leave the already-applied row in whatever
-`migrations` table records it alone — a renumbered file that re-runs is worse
-than the collision. The same applies to every migration either side adds from
-here on, so it is worth settling a convention (odd numbers here, even upstream,
-or a per-tier prefix) rather than discovering it twice.
+So the ranges are split, and the first barangay migration was renumbered from
+042 to **600** before anything could run it in anger:
+
+| | |
+| --- | --- |
+| `000`–`599` | upstream's. Inherited files sit here and stay where they are. |
+| `600`–`999` | this repository's. New barangay migrations take the next free number from 600 up. |
+
+**Numeric rather than a letter prefix, because the order has to stay right.**
+A barangay migration references `barangays(id)` and `users(id)` from `001` and
+`027`; `600_` sorts after every `0xx_` and applies against tables that exist,
+while `b01_` would sort *before* them and fail.
+
+```bash
+npm run check:migrations
+```
+
+That enforces both halves. **No two files sharing a number** — the collision
+itself, detectable from the filenames alone with no network, which is what a
+merge needs. And **nothing added here landing in upstream's range**, which
+needs the fork point, so it runs only where upstream is reachable and says so
+rather than passing quietly when it is not. It compares against the fork-point
+*tree* rather than `git diff base HEAD`, because a migration added and not yet
+committed reads as absent to a commit diff — and before the commit is exactly
+when renaming it is still free.
+
+**Renumbering is only free before a database has run the file.** The runner
+keys on the filename, so a rename makes an applied migration look unapplied
+and it runs again. Nothing had run 042 when it moved — this repository deploys
+the static demo, which has no database at all — but check that before
+renumbering anything else.
 
 **The data half is the part that is genuinely not built**, and it is described
 in *"Integrating a standalone barangay into an LGU deployment"* at the end of

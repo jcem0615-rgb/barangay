@@ -100,3 +100,107 @@ input[type='search']::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
 }
+
+/* ===========================================================================
+ * Dark mode
+ *
+ * Set from Profile as one attribute on <html>; see src/lib/theme.tsx. **No
+ * screen carries a `dark:` class**, which is the whole point — a theme each
+ * screen has to opt into is a theme the next screen forgets, exactly as
+ * `--text-scale` would be if every font size had to remember it.
+ *
+ * It works because Tailwind v4 compiles every colour utility to
+ * `var(--color-…)`, so `.bg-white` is `background-color: var(--color-white)`
+ * rather than a literal. That leaves two ways to flip a colour, and which one
+ * is correct depends on whether the token has one job or two:
+ *
+ *   **One job -> remap the variable.** `--color-slate-200` is a border in 289
+ *   places and text in none, so moving the variable is safe and covers every
+ *   `hover:`, `focus:`, `active:` and `disabled:` variant for free, including
+ *   ones added later.
+ *
+ *   **Two jobs -> override the utility class.** `--color-white` is a card
+ *   surface in 256 places *and* the label on a navy button in 115. Remapping
+ *   it would turn every primary button into dark text on a dark fill. So only
+ *   `.bg-white` moves and `.text-white` is left alone — and the variants of
+ *   `.bg-white` have to be listed, since the variable they share is untouched.
+ *
+ * The counts above are what decided each line; they came from grepping `src/`
+ * rather than from taste.
+ * ======================================================================== */
+
+:root[data-theme="dark"] {
+  /* Surfaces, from the page up. Navy-tinted rather than neutral grey, so the
+   * dark theme still reads as the same government app. */
+  --dark-canvas: #080c18;
+  --dark-surface: #121a2e;
+  --dark-raised: #1b2540;
+  --dark-border: #27324f;
+
+  /* Single-role tokens: every variant follows automatically. */
+  --color-slate-canvas: var(--dark-canvas);
+  --color-slate-50: var(--dark-raised);
+  --color-slate-100: var(--dark-raised);
+  --color-slate-200: var(--dark-border);
+  /* Secondary text, lightened to hold the 4.5:1 the light theme already
+   * meets — the reason `text-slate-500` was chosen over `slate-400` there. */
+  --color-slate-600: #b9c4dc;
+  --color-slate-400: #8b97b4;
+}
+
+/* Ambiguous tokens: the class moves, the variable does not. */
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .focus\:bg-white:focus,
+:root[data-theme="dark"] .hover\:bg-white:hover {
+  background-color: var(--dark-surface);
+}
+
+/*
+ * A translucent white is its own class — `.bg-white\/95`, not `.bg-white` — so
+ * the rule above does not reach it, and the bar across the bottom of the app
+ * stayed bright white over a black page. That was found by looking at a
+ * screenshot rather than by the scan beside it, which only parsed `rgb()` and
+ * read `color-mix(...)` as "no colour here".
+ *
+ * **Only the ones that are a surface.** `/95` is chrome — the bottom nav, the
+ * top bar, the sticky footer under a form — and has to follow the page.
+ * `active:bg-white/50` is the tier switch's pressed state on a track that is
+ * now dark. But `/15` sits inside the red emergency button and `/10` is the ID
+ * portrait's own `onDark` branch: both are highlights *on* a coloured or dark
+ * fill, already correct, and darkening them would erase them.
+ */
+:root[data-theme="dark"] .bg-white\/95 {
+  background-color: color-mix(in oklab, var(--dark-surface) 95%, transparent);
+}
+
+:root[data-theme="dark"] .active\:bg-white\/50:active {
+  background-color: color-mix(in oklab, var(--dark-raised) 50%, transparent);
+}
+
+:root[data-theme="dark"] .text-navy-950,
+:root[data-theme="dark"] .text-navy-900 {
+  color: #eaeefb;
+}
+
+:root[data-theme="dark"] .text-slate-500 {
+  color: #a8b4cf;
+}
+
+/* `bg-navy-50` and `bg-navy-100` are tint panels that go nearly white in dark
+ * mode and swallow the text on them. */
+:root[data-theme="dark"] .bg-navy-50,
+:root[data-theme="dark"] .bg-navy-100 {
+  background-color: var(--dark-raised);
+}
+
+/* The one place a literal white is baked in rather than tokenised. */
+:root[data-theme="dark"] .id-texture {
+  background-color: var(--dark-surface);
+}
+
+/* A photograph or a seal at full brightness is the one thing that glares on a
+ * dark screen, so they are taken down a little — not inverted, because an
+ * inverted face on an ID card is worse than a bright one. */
+:root[data-theme="dark"] img {
+  filter: brightness(0.92);
+}

@@ -148,6 +148,26 @@ export default function BarangayOffice({ readOnly }: { readOnly: boolean }) {
         on every certificate this barangay releases.
       */}
       <div className="mb-4 space-y-4">
+        {/*
+          The logo sits above the seal because it is the one here residents
+          actually see. The three below it are for the PDF writer — printed on
+          paper, read at a bank — and this one is the barangay's face in the
+          app on every resident's phone.
+        */}
+        <MarkUpload
+          title="Barangay logo"
+          blurb="The one mark here residents see. It is drawn faintly behind the dashboard and behind the digital ID, and appears on the bar at the top of the app. PNG or JPEG only, and a transparent PNG looks best — a photograph with a white background shows as a pale square. It does NOT change the icon of an app somebody has already added to their home screen: that is fixed when they install it and cannot be changed afterwards."
+          present={office.hasLogo ?? false}
+          updatedAt={office.logoUpdatedAt}
+          keepsNote="Changing it changes the app everywhere at once. Nothing already issued is affected — the logo is not printed on certificates."
+          readOnly={readOnly}
+          readOnlyNote="The barangay administrator uploads this."
+          load={api.barangayLogo}
+          upload={(file) => api.uploadBarangayLogo(file)}
+          remove={() => api.removeBarangayLogo()}
+          onChanged={load}
+        />
+
         <MarkUpload
           title="Barangay seal"
           blurb="Printed at the head of every certificate this barangay releases, and faintly behind it. PNG or JPEG only — those are the two a certificate can actually be printed with, so anything else is refused rather than accepted and silently left off. A transparent PNG looks best."

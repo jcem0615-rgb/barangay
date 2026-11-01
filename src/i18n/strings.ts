@@ -715,6 +715,13 @@ export const en = {
   'brgyComplaint.cat.peace': 'Peace and order',
   'brgyComplaint.cat.other': 'Something else',
   'brgyComplaint.failed': 'Could not send that. Try again in a moment.',
+
+  // light / dark, and following the phone
+  'profile.theme': 'Appearance',
+  'profile.themeBlurb': 'Light for daytime, dark for a dim room.',
+  'profile.themeLight': 'Light',
+  'profile.themeDark': 'Dark',
+  'profile.themeSystem': 'Phone',
 } as const
 
 export type StringKey = keyof typeof en
@@ -1382,4 +1389,11 @@ export const fil: Record<StringKey, string> = {
   'brgyComplaint.cat.peace': 'Kapayapaan at kaayusan',
   'brgyComplaint.cat.other': 'Iba pa',
   'brgyComplaint.failed': 'Hindi naipadala. Subukan muli maya-maya.',
+
+  // light / dark, and following the phone
+  'profile.theme': 'Anyo',
+  'profile.themeBlurb': 'Maliwanag kung araw, madilim kung madilim ang silid.',
+  'profile.themeLight': 'Maliwanag',
+  'profile.themeDark': 'Madilim',
+  'profile.themeSystem': 'Telepono',
 }

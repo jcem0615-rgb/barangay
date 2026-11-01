@@ -32,6 +32,15 @@ export type MarkCheck =
 export async function checkMark(
   file: Express.Multer.File | undefined,
   what: string,
+  /**
+   * Where the mark ends up, as a noun phrase that completes "the two ___ can
+   * use" — `'a certificate'`, `'the app'`.
+   *
+   * It used to complete two frames and could not satisfy both: the damaged-PNG
+   * message said "missing from every a certificate", which was wrong for the
+   * seal from the day it shipped and only ever reachable on the 422 path. That
+   * sentence no longer interpolates anything, so this has one job.
+   */
   printedOn: string
 ): Promise<MarkCheck> {
   if (!file) return { ok: false, status: 400, error: 'Choose an image to upload.' }
@@ -41,7 +50,7 @@ export async function checkMark(
     return {
       ok: false,
       status: 415,
-      error: `${what} has to be a ${SEAL_DESCRIPTION} image — those are the two ${printedOn} can be printed with.`,
+      error: `${what} has to be a ${SEAL_DESCRIPTION} image — those are the two ${printedOn} can use.`,
     }
   }
 
@@ -54,8 +63,8 @@ export async function checkMark(
       ok: false,
       status: 422,
       error:
-        `${what} looks like a damaged PNG — it cannot be read, so it would be missing from ` +
-        `every ${printedOn}. Try exporting or scanning it again.`,
+        `${what} looks like a damaged PNG — it cannot be read, so it would not appear ` +
+        `at all. Try exporting or scanning it again.`,
     }
   }
 

@@ -35,7 +35,7 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v30'
+const STORE_KEY = 'elgu-demo-state-v31'
 
 interface DemoBrgyComplaintStep {
   from: string | null
@@ -304,6 +304,8 @@ interface DemoState {
   sealUpdatedAt: string | null
   /** barangay id -> its own seal, as a downscaled data URL. */
   barangaySeals: Record<string, { seal: string; updatedAt: string }>
+  /** The one mark residents see. Same store, different readers. */
+  barangayLogos: Record<string, { logo: string; updatedAt: string }>
   /**
    * Every uploaded signature, downscaled the same way, keyed by whose it is:
    * `municipality:treasurer`, `office:<id>`, `barangay:<id>:captain`,
@@ -618,6 +620,7 @@ function seed(): DemoState {
     seal: null,
     sealUpdatedAt: null,
     barangaySeals: {},
+    barangayLogos: {},
     signatures: {},
     checks: {},
     receiptCounter: 0,
@@ -2066,6 +2069,13 @@ async function route(
   if (parts[0] === 'barangay') {
     const user = need('resident')
 
+    // The logo as the app draws it: the resident's own barangay, no id to name.
+    if (parts[1] === 'logo' && method === 'GET') {
+      const held = user.barangayId ? state.barangayLogos[user.barangayId] : undefined
+      if (!held) throw new DemoError(404, 'No logo.')
+      return { status: 200, blob: dataUrlToBlob(held.logo, 'image/png') }
+    }
+
     if (parts[1] === 'me') {
       if (method === 'PUT') {
         const chosen = BARANGAYS.find((b) => b.id === body?.barangayId)
@@ -2081,7 +2091,11 @@ async function route(
         body: {
           // The hall's details ride along here, because this is the screen that
           // has to answer "come and collect it".
-          barangay: { id: own.id, name: own.name, ...barangayOffice(own.id) },
+          barangay: {
+            id: own.id, name: own.name, ...barangayOffice(own.id),
+            hasLogo: Boolean(state.barangayLogos[own.id]),
+            logoUpdatedAt: state.barangayLogos[own.id]?.updatedAt ?? null,
+          },
           certificates: certificatesFor(own.id)
             .filter((c) => c.active)
             .map((c) => ({
@@ -2226,6 +2240,8 @@ async function route(
     const sealState = () => ({
       hasSeal: Boolean(state.barangaySeals[own.id]),
       sealUpdatedAt: state.barangaySeals[own.id]?.updatedAt ?? null,
+      hasLogo: Boolean(state.barangayLogos[own.id]),
+      logoUpdatedAt: state.barangayLogos[own.id]?.updatedAt ?? null,
       hasCaptainSignature: signatureState(`barangay:${own.id}:captain`).has,
       captainSignatureUpdatedAt: signatureState(`barangay:${own.id}:captain`).updatedAt,
       hasSecretarySignature: signatureState(`barangay:${own.id}:secretary`).has,
@@ -2440,6 +2456,56 @@ async function route(
             id: state.audit.length + 1, actorName: user.fullName,
             action: `barangay_signature.${who}.remove`, target: own.id,
             before: { held: true }, after: { held: false },
+            createdAt: new Date().toISOString(),
+          })
+          persist()
+          return { status: 200, body: { id: own.id, name: own.name, ...barangayOffice(own.id), ...sealState() } }
+        }
+        throw new DemoError(404, 'Not found.')
+      }
+
+      // ---- the barangay's own logo ----
+      //
+      // The only mark here a resident reads. Stored like the seal; served by
+      // this route for the console's preview and by `/barangay/logo` for the
+      // app itself.
+      if (parts[2] === 'logo') {
+        if (method === 'PUT') {
+          adminOnly()
+          if (!file) throw new DemoError(400, 'Choose an image to upload.')
+          if (file.size > 2 * 1024 * 1024) {
+            throw new DemoError(413, 'That file is too large. The limit is 2 MB.')
+          }
+          const kind = sniff(new Uint8Array(await file.slice(0, 12).arrayBuffer()))
+          if (!kind || (kind.mime !== 'image/png' && kind.mime !== 'image/jpeg')) {
+            throw new DemoError(415, 'A logo has to be a PNG or JPEG image.')
+          }
+          state.barangayLogos[own.id] = {
+            logo: await shrinkToDataUrl(file, 240),
+            updatedAt: new Date().toISOString(),
+          }
+          state.audit.unshift({
+            id: state.audit.length + 1, actorName: user.fullName,
+            action: 'barangay_logo.update', target: own.id,
+            before: { hasLogo: false }, after: { hasLogo: true },
+            createdAt: new Date().toISOString(),
+          })
+          persist()
+          return { status: 200, body: { id: own.id, name: own.name, ...barangayOffice(own.id), ...sealState() } }
+        }
+        if (method === 'GET') {
+          const held = state.barangayLogos[own.id]
+          if (!held) throw new DemoError(404, 'No logo has been uploaded.')
+          return { status: 200, blob: dataUrlToBlob(held.logo, 'image/png') }
+        }
+        if (method === 'DELETE') {
+          adminOnly()
+          if (!state.barangayLogos[own.id]) throw new DemoError(404, 'No logo has been uploaded.')
+          delete state.barangayLogos[own.id]
+          state.audit.unshift({
+            id: state.audit.length + 1, actorName: user.fullName,
+            action: 'barangay_logo.remove', target: own.id,
+            before: { hasLogo: true }, after: { hasLogo: false },
             createdAt: new Date().toISOString(),
           })
           persist()

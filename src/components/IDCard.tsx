@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 import type { ResidentProfile } from '../types'
 import { useT } from '../lib/i18n'
+import { useBarangayLogo } from '../lib/barangayLogo'
 import { useCatalogue } from '../lib/catalogue'
 import { IdPortraitFrame } from './IdPortrait'
 import { useResidentPhoto } from '../lib/useResidentPhoto'
@@ -14,6 +15,7 @@ import { addressLine } from '../lib/resident'
 const BADGES_ON_CARD = 3
 
 export default function IDCard({ profile, onTap }: { profile: ResidentProfile; onTap?: () => void }) {
+  const { url: logoUrl } = useBarangayLogo()
   const { t, locale } = useT()
   const { findProgram, tier } = useCatalogue()
   const { url: photoUrl } = useResidentPhoto()
@@ -32,6 +34,23 @@ export default function IDCard({ profile, onTap }: { profile: ResidentProfile; o
       {/* signature: guilloche seal ring, echoing PH government ID security print */}
       <div className="seal-ring pointer-events-none absolute -right-16 -top-16 h-56 w-56 opacity-90" />
       <div className="id-texture pointer-events-none absolute inset-0" />
+      {/*
+        The barangay's own logo, watermarked behind the card.
+        **Under the texture and over nothing**, at 12% — a government ID has a
+        mark showing through the print, not a picture with text on top of it.
+        Anything heavier and the name, the barangay and the date of birth stop
+        being the first things read, which is the whole job of this card at a
+        counter. `aria-hidden` because it carries no information the card does
+        not already say in words.
+      */}
+      {logoUrl && (
+        <img
+          src={logoUrl}
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute -bottom-8 -left-8 h-44 w-44 object-contain opacity-[0.12]"
+        />
+      )}
 
       <div className="relative flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">

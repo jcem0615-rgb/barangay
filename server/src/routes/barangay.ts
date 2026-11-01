@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { one, query, transaction } from '../db.ts'
+import { getFile } from '../storage.ts'
 import { authenticate, requireRole } from '../auth.ts'
 import { toPesos } from '../serialize.ts'
 import { liveAnnouncementsFor } from './announcements.ts'
@@ -36,10 +37,23 @@ export interface BarangayOfficeRow {
   office_hours: string | null
   phone: string | null
   email: string | null
+  /**
+   * Whether this barangay has uploaded a logo, and when.
+   *
+   * The key itself never leaves the server — the app asks for the image on its
+   * own route — but the *stamp* has to, because it is what lets the app cache
+   * the picture and know when to go and fetch it again. Without it the only
+   * honest options are re-fetching on every screen or never noticing a barangay
+   * changed its logo.
+   */
+  logo_key?: string | null
+  logo_updated_at?: Date | null
 }
 
 export function serializeBarangayOffice(row: BarangayOfficeRow) {
   return {
+    hasLogo: row.logo_key != null,
+    logoUpdatedAt: row.logo_updated_at?.toISOString() ?? null,
     captain: row.captain,
     secretary: row.secretary,
     hallAddress: row.hall_address,
@@ -92,7 +106,8 @@ barangayRouter.use(authenticate, requireRole('resident'))
 barangayRouter.get('/me', async (req, res) => {
   const row = await one<BarangayOfficeRow & { id: string; name: string }>(
     `select b.id, b.name, b.captain, b.secretary,
-            b.hall_address, b.office_hours, b.phone, b.email
+            b.hall_address, b.office_hours, b.phone, b.email,
+            b.logo_key, b.logo_updated_at
        from users u join barangays b on b.id = u.barangay_id
       where u.id = $1`,
     [req.user!.id]
@@ -201,6 +216,48 @@ barangayRouter.post('/requests', async (req, res) => {
     typeName: type.name,
     fee: toPesos(type.fee_centavos),
   })
+})
+
+/**
+ * The barangay's logo, as the app draws it.
+ *
+ * **This is the only one of the four marks a resident can fetch**, and the
+ * difference is what it is for: the seal and the two signatures exist for the
+ * PDF writer and are console-only reads, while the logo is the barangay's face
+ * on the dashboard, behind the digital ID and on the top bar.
+ *
+ * Scoped to the barangay on the resident's own record, like everything else
+ * here — there is no id to name, so another barangay's logo is not reachable
+ * rather than refused. It is still behind a session: the app fetches it as a
+ * blob and hands it to the DOM as an object URL, because `<img src>` cannot
+ * carry a bearer token, which is the same thing the ID portrait does.
+ *
+ * Cached rather than `no-store`, unlike `sendMark`'s default: this image is
+ * drawn on nearly every screen, it changes about once an election, and the
+ * `logoUpdatedAt` stamp on `/barangay/me` is what tells the app to come back
+ * for it. `private` because it is still per-resident-barangay.
+ */
+barangayRouter.get('/logo', async (req, res) => {
+  const row = await one<{ logo_key: string | null; logo_type: string | null }>(
+    `select b.logo_key, b.logo_type
+       from users u join barangays b on b.id = u.barangay_id
+      where u.id = $1`,
+    [req.user!.id]
+  )
+  if (!row?.logo_key) return res.status(404).json({ error: 'No logo.' })
+  let content: Buffer
+  try {
+    content = await getFile(row.logo_key)
+  } catch {
+    // A row pointing at a file that is gone is a broken picture, never a
+    // broken screen: the app falls back to the seal ring it already draws.
+    return res.status(404).json({ error: 'No logo.' })
+  }
+  res.setHeader('Content-Type', row.logo_type ?? 'image/png')
+  res.setHeader('Content-Disposition', 'inline')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Cache-Control', 'private, max-age=300')
+  res.send(content)
 })
 
 /**

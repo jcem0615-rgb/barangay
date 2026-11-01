@@ -275,6 +275,29 @@ whose head is only a column cannot count its own population. Removing them is re
 head is the household, so changing who it is is an edit to the household rather than a
 member removal.
 
+## Migration numbers are split between the two repositories
+
+`server/src/migrate.ts` keys `schema_migrations` on the **filename** and applies
+files in sorted order. This repository and the eLGU one both add migrations, so
+counting from the same sequence meant the first time upstream reached 042 a
+merge would have produced two files claiming it — and that is not a git
+conflict: different names merge cleanly, both apply, and which goes first is
+alphabetical accident on a database that may have run one already.
+
+**Upstream owns `000`–`599`; this repository owns `600`–`999`.** New barangay
+migrations take the next free number from 600 up. Numeric rather than a letter
+prefix because the order has to stay right: a barangay migration references
+`barangays(id)` and `users(id)` from `001` and `027`, and `600_` sorts after
+every `0xx_` while `b01_` would sort before them and apply against tables that
+do not exist yet.
+
+`npm run check:migrations` enforces it — no number claimed twice (offline, from
+the filenames, which is what a merge needs) and nothing added here below 600
+(against the fork-point tree rather than a commit diff, so an uncommitted file
+is still caught while renaming it is free). **Renumbering is only free before a
+database has run the file**, since the runner keys on the name and would re-run
+it.
+
 ## The barangay complaint
 
 The barangay had two books and neither ran in this direction. The **blotter** is

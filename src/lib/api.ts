@@ -79,6 +79,9 @@ export interface FeeChange {
 }
 
 export interface BarangayOffice {
+  /** Whether this barangay has uploaded a logo, and when it last changed. */
+  hasLogo?: boolean
+  logoUpdatedAt?: string | null
   id: string
   name: string
   captain: string | null
@@ -1067,6 +1070,28 @@ export const api = {
 
   removeBarangaySeal: () =>
     request<BarangayOffice>('/barangay-staff/office/seal', { method: 'DELETE' }),
+
+  /**
+   * The barangay's logo — the one mark residents see.
+   *
+   * The seal and the signatures exist for the PDF writer and are console-only;
+   * this is the barangay's face in the app, so it has a resident route of its
+   * own (`residentBarangayLogo` below) as well as the console preview here.
+   */
+  barangayLogo: () => fetchBlob('/barangay-staff/office/logo'),
+
+  uploadBarangayLogo: (file: File) =>
+    uploadFile<BarangayOffice>('/barangay-staff/office/logo', file, undefined, 'PUT'),
+
+  removeBarangayLogo: () =>
+    request<BarangayOffice>('/barangay-staff/office/logo', { method: 'DELETE' }),
+
+  /**
+   * The same logo, as a resident fetches it: scoped to the barangay on their
+   * own record, with no id to name. Fetched as a blob because `<img src>`
+   * cannot carry the bearer token — the rule the ID portrait already follows.
+   */
+  residentBarangayLogo: () => fetchBlob('/barangay/logo'),
 
   /**
    * The two officials' signatures, printed above their names on a certificate.

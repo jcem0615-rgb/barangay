@@ -1,6 +1,7 @@
 import { ChevronLeft } from 'lucide-react'
 import { useNav } from '../lib/nav'
 import { useT } from '../lib/i18n'
+import { useBarangayLogo } from '../lib/barangayLogo'
 import type { ReactNode } from 'react'
 
 interface TopBarProps {
@@ -13,6 +14,7 @@ interface TopBarProps {
 export default function TopBar({ title, subtitle, transparent, right }: TopBarProps) {
   const { canGoBack, pop } = useNav()
   const { t } = useT()
+  const { url: logoUrl } = useBarangayLogo()
 
   return (
     <header
@@ -20,6 +22,22 @@ export default function TopBar({ title, subtitle, transparent, right }: TopBarPr
         transparent ? 'bg-transparent' : 'border-b border-slate-200 bg-white/95 backdrop-blur'
       }`}
     >
+      {/*
+        The barangay's logo as the app's own mark, where a back arrow is not
+        already taking the slot. It is the closest the running app gets to "the
+        app's logo": the installed icon on a home screen is baked into the
+        manifest at install and cannot be changed afterwards — see
+        `server/BARANGAY-TIER.md` — so this and the favicon are what a logo
+        actually reaches.
+      */}
+      {!canGoBack && logoUrl && (
+        <img
+          src={logoUrl}
+          alt=""
+          aria-hidden
+          className="-ml-0.5 h-8 w-8 shrink-0 rounded-lg object-contain"
+        />
+      )}
       {canGoBack ? (
         <button
           onClick={pop}

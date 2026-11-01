@@ -1,5 +1,26 @@
 -- A resident's complaint to their own barangay, with proof attached.
 --
+-- ---------------------------------------------------------------------------
+-- Numbered 600 rather than 042, and that is the convention rather than a gap
+--
+-- This repository and the eLGU one both add migrations, and both were counting
+-- from the same sequence — so the first time upstream reached 042 a merge would
+-- have produced two different files claiming that number. The runner keys
+-- `schema_migrations` on the **filename** and applies files in sorted order, so
+-- a collision is not a conflict git would show: both files would be applied,
+-- in alphabetical order of whatever each happened to be called.
+--
+-- **So the ranges are split. Upstream owns 000-599; this repository owns
+-- 600-999.** New barangay migrations take the next free number from 600 up.
+--
+-- 600 rather than a letter prefix because the order has to stay right: this
+-- file references `barangays(id)` and `users(id)` from 001 and 027, and
+-- `600_` sorts after every `0xx_` while `b01_` would sort before them and
+-- apply against tables that do not exist yet.
+--
+-- `npm run check:migrations` enforces both halves — no two files sharing a
+-- number, and nothing this repository adds landing in upstream's range.
+--
 -- The barangay already had two books and neither was this one. The **blotter**
 -- is Katarungang Pambarangay — a dispute brought to the counter and written
 -- down by the secretary, so it starts with staff. The **notice board** runs the

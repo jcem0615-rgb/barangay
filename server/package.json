@@ -54,7 +54,8 @@
     "test:ready-dates": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/ready-dates.mjs",
     "test:tier": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/tier.mjs",
     "test:ops": "node --experimental-strip-types --disable-warning=ExperimentalWarning test/ops.mjs",
-    "test:barangay-complaints": "node test/barangay-complaints.mjs"
+    "test:barangay-complaints": "node test/barangay-complaints.mjs",
+    "test:barangay-logo": "node test/barangay-logo.mjs"
   },
   "dependencies": {
     "@types/compression": "^1.8.1",

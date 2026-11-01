@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Bell, Building, Landmark, ShieldAlert } from 'lucide-react'
 import { api } from '../lib/api'
 import { useCatalogue } from '../lib/catalogue'
+import { useBarangayLogo } from '../lib/barangayLogo'
 import { useResidentProfile } from '../lib/resident'
 import IDCard from '../components/IDCard'
 import { useNav } from '../lib/nav'
@@ -17,6 +18,7 @@ export default function Dashboard() {
   const { departments, tier, servedBarangay } = useCatalogue()
   const resident = useResidentProfile()
   const { t } = useT()
+  const { url: logoUrl } = useBarangayLogo()
   const [unread, setUnread] = useState(0)
 
   // Refreshed on each visit to the dashboard; offices act while the app is closed.
@@ -28,7 +30,24 @@ export default function Dashboard() {
   const recent = applications.slice(0, 2)
 
   return (
-    <div className="animate-tap-in px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)]">
+    <div className="animate-tap-in relative px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)]">
+      {/*
+        The barangay's logo behind the dashboard.
+        **Fixed rather than absolute**, so it stays put while the page scrolls
+        instead of sliding up past the content — a watermark that moves reads
+        as a picture somebody forgot to position. Centred, large, and at 5%:
+        enough to be the barangay's screen, far too little to compete with the
+        emergency button, which is the one thing on here that must be found
+        without reading. `-z-10` keeps it behind every card.
+      */}
+      {logoUrl && (
+        <img
+          src={logoUrl}
+          alt=""
+          aria-hidden
+          className="pointer-events-none fixed left-1/2 top-1/2 -z-10 h-72 w-72 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.07]"
+        />
+      )}
       <div className="mb-5 flex items-start justify-between">
         <div>
           <p className="text-[calc(14px_*_var(--text-scale))] text-slate-500">{t('home.greeting')}</p>

@@ -7,6 +7,7 @@ import LanguageToggle from '../components/LanguageToggle'
 import PushToggle from '../components/PushToggle'
 import InstallAppButton from '../components/InstallAppButton'
 import TextSizeToggle from '../components/TextSizeToggle'
+import ThemeToggle from '../components/ThemeToggle'
 import { useNav } from '../lib/nav'
 import { useOnlineStatus } from '../lib/useOnlineStatus'
 import { useT } from '../lib/i18n'
@@ -73,6 +74,7 @@ export default function Profile() {
 
         <p className="mb-2 mt-6 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">{t('profile.display')}</p>
         <div className="space-y-2.5">
+          <ThemeToggle />
           <TextSizeToggle />
           <LanguageToggle />
         </div>

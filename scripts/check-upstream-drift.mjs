@@ -76,7 +76,27 @@ const DIVERGENCE = {
   // worked by the captain and the clerk. Entirely new surface: it takes
   // nothing away from the municipal tier and adds nothing to it, so every row
   // integrates as-is.
-  'server/migrations/042_barangay_complaints.sql': ['feature', 'RENUMBER if upstream also reached 042 — see SPLIT.md'],
+  'server/migrations/600_barangay_complaints.sql': ['feature', 'in this repo\'s reserved 600+ range, so it cannot collide with upstream\'s'],
+  'scripts/check-migrations.mjs': ['feature', 'enforces the range split; keep it until the sequences are one again'],
+
+  // ---- dark mode ----------------------------------------------------------
+  // One attribute on <html>, no `dark:` class in any screen. Tier-neutral:
+  // the municipal app wants it just as much.
+  'src/lib/theme.tsx': ['feature', 'the provider; system-aware and persisted'],
+  'src/components/ThemeToggle.tsx': ['feature', 'Light / Dark / Phone, beside the text-size control'],
+  'src/index.css': ['feature', 'the dark block — variable remaps and the ambiguous-class overrides'],
+
+  // ---- the barangay logo --------------------------------------------------
+  'server/migrations/601_barangay_logo.sql': ['feature', 'logo_key/type/updated_at on barangays'],
+  'src/lib/barangayLogo.tsx': ['feature', 'fetched once, shared by the three places that draw it'],
+  'server/test/barangay-logo.mjs': ['feature', '27 checks'],
+  'src/components/IDCard.tsx': ['feature', 'the logo watermarked behind the card'],
+  'src/screens/Dashboard.tsx': ['feature', 'the logo behind the dashboard'],
+  'src/components/TopBar.tsx': ['feature', "the logo as the app's mark where no back arrow is"],
+  'src/screens/barangay/BarangayOffice.tsx': ['feature', 'the logo upload, above the seal'],
+  'src/screens/Profile.tsx': ['feature', 'the appearance control'],
+  'server/src/marks.ts': ['keep', 'fixed "missing from every a certificate" — wrong for the seal upstream too'],
+  'server/src/routes/barangay.ts': ['feature', 'the resident logo read'],
   'server/src/barangayComplaints.ts': ['feature', 'the status machine, serialiser and history writer both sides share'],
   'server/src/routes/barangayComplaints.ts': ['feature', 'the resident side'],
   'server/src/routes/barangayComplaintsStaff.ts': ['feature', 'the console side, mounted below the barangay gate'],
