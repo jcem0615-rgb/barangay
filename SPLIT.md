@@ -181,23 +181,81 @@ git remote add upstream https://github.com/jcem0615-rgb/LGU.git
 git fetch upstream
 ```
 
-**Taking a fix from upstream.** The shared history makes this a normal
-cherry-pick, and the four changed files above are the only places a conflict
-can arise:
+### `npm run check:drift` is what holds this line
+
+The argument quoted at the top of this file is the one real risk, and prose
+cannot hold it. So the divergence is **declared** in
+`scripts/check-upstream-drift.mjs` and checked:
+
+```bash
+npm run check:drift
+```
+
+It compares against the **fork point** — the merge-base with upstream, not
+upstream's tip, which would also count upstream's own later work and make its
+gap look like ours — and fails two ways. A file changed here that is not
+declared means divergence grew: allowed, as a decision, never silently. A
+declared file that no longer differs means the manifest overstates the gap,
+which is how a manifest stops being read.
+
+The manifest also carries **what integration must do to each file**, because
+that is the real question at a merge and it is not "did it change". Three rows
+are marked `revert` and they are the dangerous ones — `vite.config.ts`,
+`src/lib/demoServer.ts` and `src/lib/catalogue.tsx` flip the product to
+barangay, which is right in a one-product repository and would turn the eLGU
+demo into a second barangay one in a combined tree. A fast-forward carries
+them straight in, so they are named rather than left to be noticed.
+
+Run it against anything with `UPSTREAM_REF=<ref> npm run check:drift`.
+
+### Where integration stands today
+
+**The code half is a fast-forward, right now.** Upstream has not advanced
+since the fork, this repository is a few commits ahead, and `git merge-base
+--is-ancestor` confirms it: there is nothing to reconcile, only the `revert`
+rows to undo. `check:drift` prints this on every run, because it is the fact
+that decides what integration costs and it is invisible from inside this
+repository. **That window closes the first time either side moves** — then it
+is a real merge, still confined to the declared files.
+
+Taking a single fix from upstream meanwhile is an ordinary cherry-pick, and
+the declared files are the only places a conflict can arise:
 
 ```bash
 git cherry-pick <sha>
 ```
 
-**Integrating back.** The data-model half of this is already described in
-*"Integrating a standalone barangay into an LGU deployment"* at the end of
-`server/BARANGAY-TIER.md` — it is an **import**, not a redesign, because the
-barangay tier never invented a different shape. The code half is this file's
-four entries, each of which is a default to put back.
+**The data half is the part that is genuinely not built**, and it is described
+in *"Integrating a standalone barangay into an LGU deployment"* at the end of
+`server/BARANGAY-TIER.md`. It is an **import** rather than a redesign, because
+the barangay tier never invented a different shape — but it is real work, and
+the shape of that work is now known rather than guessed:
 
-The open question is the one upstream already named and this split does not
-change: reconciling ids that collide, two barangays that both sold standalone
-and both have a `household 1`. That is real work rather than a setting.
+| | |
+| --- | --- |
+| **Does not collide** | Every row-heavy table is keyed on a `uuid` — `barangay_requests`, `blotter_entries`, `blotter_summons`, `households`, `household_members`, `barangay_announcements`, `barangay_documents`. Verification codes are long and random. These move as they are. |
+| **Collides: reference numbers** | `barangay_requests.reference_no` and `blotter_entries.reference_no` are `unique` and drawn from counters that are **one per municipality** — so a standalone barangay and the hall have both issued `BRGY-2026-00001`. |
+| **Collides: household numbers** | `households` is `unique (barangay_id, household_no)` from a per-barangay counter, so it collides only where the hall already recorded households for that same barangay. |
+| **Collides: certificate types** | `barangay_certificate_types.id` is a `text` primary key. Standalone they are stamped with the barangay; in the hall the shared rows are the same ids with `barangay_id` null. |
+| **Collides: accounts** | The seeded `admin.<barangay>@…` addresses exist on both sides. |
+
+What that leaves is not code but **policy**, and three decisions have to be
+made by the hall before an importer can be written, because each one changes
+what the script does rather than how it does it:
+
+1. **Renumber or prefix?** A reference number is quoted down a phone and typed
+   into a search box, and a resident is holding paper with the old one on it.
+   Renumbering invalidates their copy; prefixing keeps it and makes the series
+   non-uniform for ever.
+2. **Do the imported certificate types become the hall's shared rows, or stay
+   that barangay's own?** Shared is the municipal model and means this barangay
+   loses documents it invented; its own means the hall cannot edit them.
+3. **What happens to a colliding account?** The standalone administrator and
+   the hall's seeded one for that barangay are two credentials for one office.
+
+Until those are answered an importer would be guessing, and guessing wrong
+here moves a blotter — which names people accused of things — into the wrong
+barangay's book.
 
 ---
 
