@@ -18,14 +18,18 @@ import { addWorkingDays } from './schedule'
 /**
  * Which tier this demo build is.
  *
- * `VITE_DEMO_TIER=barangay npm run build` with `VITE_DEMO=1` produces the
- * barangay product's demo; anything else is the municipal one. It is a build
+ * **`barangay` is the default in this repository**, which is the barangay
+ * product; `VITE_DEMO_TIER=municipal` gives the municipal one. It is a build
  * flag rather than a toggle in the page because the real thing is a *separate
  * deployment* — a switch here would teach somebody that one instance serves
  * both, which is the opposite of how the system works.
+ *
+ * It defaults alongside `VITE_PRODUCT` in `vite.config.ts` on purpose: the two
+ * had to be set together, and setting only one shipped the barangay's name
+ * over the municipal app.
  */
 const DEMO_TIER: 'municipal' | 'barangay' =
-  import.meta.env.VITE_DEMO_TIER === 'barangay' ? 'barangay' : 'municipal'
+  import.meta.env.VITE_DEMO_TIER === 'municipal' ? 'municipal' : 'barangay'
 import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../types'
 
 // Bumped whenever the seeded shape changes: a store written by an older build

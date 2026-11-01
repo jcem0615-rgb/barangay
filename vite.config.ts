@@ -5,8 +5,17 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 /**
- * What the built app calls itself. `VITE_PRODUCT=barangay` builds the barangay
- * product; anything else builds the municipal one.
+ * What the built app calls itself.
+ *
+ * **This repository is the barangay product, so `barangay` is the default.**
+ * It used to be the other way round, and the flag had to be set on every
+ * build — which is exactly the footgun the split was meant to remove: a
+ * barangay build that forgot it shipped the municipal app's name and icon,
+ * and an installed app's name cannot be corrected at runtime.
+ *
+ * `VITE_PRODUCT=municipal` still builds the municipal one, because the
+ * municipal tier is present-but-switched-off here rather than deleted (see
+ * SPLIT.md) and the test suite builds both.
  */
 const PRODUCTS = {
   municipal: {
@@ -29,7 +38,7 @@ const PRODUCTS = {
   },
 } as const
 
-const PRODUCT = PRODUCTS[process.env.VITE_PRODUCT === 'barangay' ? 'barangay' : 'municipal']
+const PRODUCT = PRODUCTS[process.env.VITE_PRODUCT === 'municipal' ? 'municipal' : 'barangay']
 
 /**
  * `index.html` is served before any JavaScript runs, so everything in its head
@@ -77,7 +86,7 @@ export default defineConfig({
       // a bundle built for one tier and pointed at the other still *reads*
       // correctly, it is only the home-screen label that would be wrong.
       //
-      //   VITE_PRODUCT=barangay npm run build
+      //   VITE_PRODUCT=municipal npm run build   # the other tier
       manifest: {
         // Stated rather than left to default to `start_url`, so the install
         // identity is a decision instead of a consequence of the path the

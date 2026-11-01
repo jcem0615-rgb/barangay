@@ -1,4 +1,5 @@
-# Local production-shaped stack: Postgres plus the app image.
+# Local production-shaped stack for the BARANGAY product: Postgres plus the
+# app image.
 #   docker compose up --build
 #   docker compose run --rm app npm run migrate
 #   docker compose run --rm app npm run seed
@@ -27,6 +28,11 @@ services:
       args:
         VITE_API_URL: /api
     environment:
+      # This repository is the barangay product. Both of these, never one —
+      # and the server defaults to `municipal` (see SPLIT.md), so a stack that
+      # omitted them would come up as a municipal hall holding barangay data.
+      DEPLOYMENT_TIER: ${DEPLOYMENT_TIER:-barangay}
+      BARANGAY_ID: ${BARANGAY_ID:-poblacion}
       DATABASE_URL: postgres://elgu:${POSTGRES_PASSWORD:-change-me-locally}@db:5432/elgu
       # Required. Generate with:
       #   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"

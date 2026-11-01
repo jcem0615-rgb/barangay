@@ -1,6 +1,11 @@
-# CLAUDE.md — eLGU Citizen Portal
+# CLAUDE.md — eBarangay Portal
 
 Handoff notes for continuing this project in Claude Code.
+
+> **This repository is the barangay half of `jcem0615-rgb/LGU`, split out so it
+> can be worked on on its own and integrated back later.** Four files differ
+> from upstream and the municipal tier is present-but-switched-off rather than
+> deleted. Read [SPLIT.md](SPLIT.md) before changing either tier's defaults.
 
 ## What this is
 

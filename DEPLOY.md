@@ -1,5 +1,10 @@
 # Deploying the eLGU Citizen Portal
 
+> **This repository is the barangay half of `jcem0615-rgb/LGU`, split out so it
+> can be worked on on its own and integrated back later.** Four files differ
+> from upstream and the municipal tier is present-but-switched-off rather than
+> deleted. Read [SPLIT.md](SPLIT.md) before changing either tier's defaults.
+
 The app ships as **one container**: the API serves the built web app from the
 same origin. That means no CORS to configure in production, one thing to deploy,
 and no chance of the web build and the API drifting apart.
