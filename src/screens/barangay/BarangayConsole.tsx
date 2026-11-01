@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  BadgeCheck, Ban, BookText, Building, FileDown, Home, Landmark, Megaphone, CheckCircle2, Inbox,
-  Loader2, LogOut, PhilippinePeso, RefreshCw, UserPlus, Users,
+  BadgeCheck, Ban, BookText, Building, CheckCircle2, FileDown, Home, Inbox, Landmark, Loader2, LogOut, Megaphone, MessageSquareWarning, PhilippinePeso, RefreshCw, UserPlus, Users,
 } from 'lucide-react'
 import { api, ApiError, type BarangayRequest, type CertificateType } from '../../lib/api'
 import BarangayBlotter from './BarangayBlotter'
+import BarangayComplaintsConsole from './BarangayComplaints'
 import BarangayHouseholds from './BarangayHouseholds'
 import BarangayAnnouncements from './BarangayAnnouncements'
 import BarangayOffice from './BarangayOffice'
@@ -60,7 +60,7 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 type View =
-  | 'queue' | 'announcements' | 'blotter' | 'households' | 'office'
+  | 'queue' | 'announcements' | 'complaints' | 'blotter' | 'households' | 'office'
   | 'summary' | 'fees' | 'officers'
 
 export default function BarangayConsole() {
@@ -81,6 +81,12 @@ export default function BarangayConsole() {
     // The only tab here residents see the output of, so it sits second —
     // close to the work rather than buried with the administrator's tools.
     ['announcements', 'Notices', Megaphone],
+    // Both roles read what residents have complained about; only the
+    // administrator answers one, because resolving and closing are final and
+    // are what the resident is told happened. Third, right after the notices:
+    // the board is what the barangay tells residents and this is what they
+    // tell the barangay, so the two belong together.
+    ['complaints', 'Complaints', MessageSquareWarning],
     // Both roles: the clerk writes the book, the administrator calls hearings
     // on it. The split lives inside the screen rather than in who may open it.
     ['blotter', 'Blotter', BookText],
@@ -151,6 +157,7 @@ export default function BarangayConsole() {
         )}
         {view === 'queue' && <Queue />}
         {view === 'announcements' && <BarangayAnnouncements />}
+        {view === 'complaints' && <BarangayComplaintsConsole />}
         {view === 'blotter' && <BarangayBlotter />}
         {view === 'households' && <BarangayHouseholds />}
         {view === 'office' && <BarangayOffice readOnly={!isAdmin} />}

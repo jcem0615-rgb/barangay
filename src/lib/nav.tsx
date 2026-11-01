@@ -22,6 +22,8 @@ export type Screen =
   | { name: 'report-incident' }
   | { name: 'barangay' }
   | { name: 'barangay-request'; typeId: string }
+  | { name: 'barangay-complaint-form' }
+  | { name: 'barangay-complaints' }
   // One document's route, whichever tier issues it. Exactly one id is set.
   | { name: 'service-guide'; serviceId?: string; certificateId?: string }
 

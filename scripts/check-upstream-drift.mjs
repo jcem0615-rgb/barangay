@@ -42,11 +42,16 @@ const git = (...args) =>
  *   keep   — barangay-specific, and harmless or useful upstream.
  *   drop   — exists only because this is a separate repository.
  *   human  — documentation that has to be read and reconciled, not merged.
+ *   feature— work done here that belongs upstream as-is. The barangay tier
+ *            exists in both products, so a barangay feature is not something
+ *            the eLGU tree has to be protected from — it is something it wants.
+ *            These are the rows that make integration a merge rather than a
+ *            fast-forward, and that is the cost the split was accepted for.
  */
 const DIVERGENCE = {
   // The three that flip the product. These are the dangerous ones.
   'vite.config.ts': ['revert', 'VITE_PRODUCT must default to municipal again'],
-  'src/lib/demoServer.ts': ['revert', 'VITE_DEMO_TIER must default to municipal again'],
+  'src/lib/demoServer.ts': ['revert', 'VITE_DEMO_TIER default to municipal again — but KEEP the complaint routes it also carries'],
   'src/lib/catalogue.tsx': [
     'revert',
     'DEFAULT_TIER / DEFAULT_PRODUCT_NAME must go back to municipal — they are read at first paint',
@@ -63,8 +68,37 @@ const DIVERGENCE = {
 
   // Tier-neutral cleanups that belong upstream too, and are only here because
   // this is where they were noticed.
-  'src/i18n/strings.ts': ['keep', "removed the dead 'auth.title' key; right upstream as well"],
-  'scripts/check-i18n.mjs': ['keep', 'its SAME_IN_BOTH entry for that key went with it'],
+  'scripts/check-i18n.mjs': ['keep', "SAME_IN_BOTH entry for the dead 'auth.title' key went with it"],
+
+  // ---- the barangay complaint feature -------------------------------------
+  //
+  // A resident complaining to their own barangay, with photo and video proof,
+  // worked by the captain and the clerk. Entirely new surface: it takes
+  // nothing away from the municipal tier and adds nothing to it, so every row
+  // integrates as-is.
+  'server/migrations/042_barangay_complaints.sql': ['feature', 'RENUMBER if upstream also reached 042 — see SPLIT.md'],
+  'server/src/barangayComplaints.ts': ['feature', 'the status machine, serialiser and history writer both sides share'],
+  'server/src/routes/barangayComplaints.ts': ['feature', 'the resident side'],
+  'server/src/routes/barangayComplaintsStaff.ts': ['feature', 'the console side, mounted below the barangay gate'],
+  'server/test/barangay-complaints.mjs': ['feature', '58 checks'],
+  'src/screens/BarangayComplaintForm.tsx': ['feature', 'file one, with proof'],
+  'src/screens/BarangayComplaints.tsx': ['feature', "the resident's own list and history"],
+  'src/screens/barangay/BarangayComplaints.tsx': ['feature', 'the console tab: queue, figures, records'],
+
+  // Existing files the feature touches. Each is additive.
+  'server/src/index.ts': ['feature', 'mounts the resident router — and adds the media-src CSP fix, which belongs upstream on its own'],
+  'server/src/uploads.ts': ['feature', 'MAX_COMPLAINT_VIDEO_SECONDS = 300'],
+  'server/src/notifications.ts': ['feature', 'two notification kinds'],
+  'server/src/push.ts': ['feature', 'both kinds are private on a lock screen'],
+  'server/src/routes/barangayStaff.ts': ['feature', 'mounts the complaints sub-router below its gate'],
+  'server/test/isolation.mjs': ['feature', 'registers the sub-router so its routes are walked — 44 routes became 48'],
+  'server/package.json': ['feature', 'the test script'],
+  'src/App.tsx': ['feature', 'two screens routed'],
+  'src/lib/nav.tsx': ['feature', 'two screens declared'],
+  'src/lib/api.ts': ['feature', 'the client methods and types'],
+  'src/screens/BarangayHub.tsx': ['feature', 'the entry point residents actually look at'],
+  'src/screens/barangay/BarangayConsole.tsx': ['feature', 'the Complaints tab'],
+  'src/i18n/strings.ts': ['feature', "50 bilingual keys, plus the dead 'auth.title' removal"],
 
   // Documentation.
   'SPLIT.md': ['drop', 'it describes the split; there is no split once merged'],
@@ -147,10 +181,10 @@ if (stale.length) {
 if (undeclared.length || stale.length) process.exit(1)
 
 const width = Math.max(...changed.map((f) => f.length))
-const order = { revert: 0, drop: 1, human: 2, keep: 3 }
+const order = { revert: 0, feature: 1, drop: 2, human: 3, keep: 4 }
 console.log(`\n${changed.length} file(s) diverge, all declared. At integration:\n`)
 for (const f of changed.sort((a, b) => order[DIVERGENCE[a][0]] - order[DIVERGENCE[b][0]] || a.localeCompare(b))) {
   const [action, why] = DIVERGENCE[f]
-  console.log(`  ${action.padEnd(6)} ${f.padEnd(width)}  ${why}`)
+  console.log(`  ${action.padEnd(7)} ${f.padEnd(width)}  ${why}`)
 }
 console.log('\nupstream drift ok\n')

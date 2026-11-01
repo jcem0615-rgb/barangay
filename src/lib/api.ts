@@ -684,6 +684,48 @@ export interface NotificationPreferences {
   phone: string | null
 }
 
+/** Must match the server's enum. Final at `resolved` and `closed`. */
+export type ComplaintStatus =
+  | 'new' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed'
+
+/** One step in what the barangay did about a complaint. */
+export interface ComplaintHistoryStep {
+  from: ComplaintStatus | null
+  to: ComplaintStatus
+  note: string | null
+  /** The name, never the account id — a resident reading their own trail has
+   *  no business being handed one, and a stored name survives a revoked clerk. */
+  actorName: string
+  actorRole: string
+  at: string
+}
+
+export interface ComplaintProof {
+  id: string
+  contentType: string
+  byteSize: number
+  /** Null for a photograph. */
+  durationSeconds: number | null
+  uploadedAt: string
+}
+
+export interface BarangayComplaint {
+  id: string
+  referenceNo: string
+  category: string
+  details: string
+  location: string | null
+  status: ComplaintStatus
+  filedAt: string
+  handledAt: string | null
+  /** What the barangay wrote back, shown to the resident as written. */
+  response: string | null
+  /** Resolved or closed. Nothing moves after this. */
+  final: boolean
+  history?: ComplaintHistoryStep[]
+  evidence?: ComplaintProof[]
+}
+
 export const api = {
   catalogue: () =>
     request<{
@@ -1371,6 +1413,88 @@ export const api = {
   /** Evidence as a blob, because <video src> cannot carry the bearer token. */
   incidentEvidence: (incidentId: string, evidenceId: string) =>
     fetchBlob(`/staff/incidents/${incidentId}/evidence/${evidenceId}`),
+
+  // ---- barangay complaints ----
+  //
+  // A resident complaining to their own barangay, with proof. Everything on the
+  // resident side is scoped to their own account server-side, so there is no id
+  // here that could reach somebody else's.
+
+  fileBarangayComplaint: (body: { category: string; details: string; location?: string }) =>
+    request<BarangayComplaint>('/barangay-complaints', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  myBarangayComplaints: () =>
+    request<{ complaints: BarangayComplaint[] }>('/barangay-complaints'),
+
+  /** Their own, with the trail of what the barangay did and the proof attached. */
+  myBarangayComplaint: (id: string) =>
+    request<BarangayComplaint>(`/barangay-complaints/${id}`),
+
+  /**
+   * Proof goes up one file at a time, after the complaint exists, so a failed
+   * upload leaves a filed complaint rather than losing what they wrote. The
+   * duration the browser read off the video rides along and the server bounds
+   * it rather than trusting it — five minutes for a complaint.
+   */
+  addComplaintProof: async (complaintId: string, file: File, durationSeconds: number | null) => {
+    if (DEMO) {
+      const { handleDemoRequest } = await import('./demoServer')
+      const out = await handleDemoRequest(
+        'POST', `/barangay-complaints/${complaintId}/evidence`, getToken(),
+        { durationSeconds }, file
+      )
+      if (out.status >= 400) {
+        throw new ApiError((out.body as { error?: string })?.error ?? 'Could not attach that file.', out.status)
+      }
+      return out.body as { id: string }
+    }
+    const form = new FormData()
+    form.append('file', file)
+    if (durationSeconds !== null) form.append('durationSeconds', String(Math.round(durationSeconds)))
+    const token = getToken()
+    const res = await fetch(`${BASE}/barangay-complaints/${complaintId}/evidence`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+    const body = await res.json().catch(() => null)
+    if (!res.ok) throw new ApiError(body?.error ?? 'Could not attach that file.', res.status)
+    return body as { id: string }
+  },
+
+  /** Their own proof as a blob, because <img>/<video> src cannot carry the token. */
+  myComplaintProof: (complaintId: string, proofId: string) =>
+    fetchBlob(`/barangay-complaints/${complaintId}/evidence/${proofId}`),
+
+  // ---- the barangay console's side ----
+
+  /** The queue, open-first, with the counts the screen leads on. */
+  staffBarangayComplaints: () =>
+    request<{
+      figures: {
+        total: number; open: number; new: number; acknowledged: number
+        inProgress: number; resolved: number; closed: number; withProof: number
+      }
+      complaints: Array<BarangayComplaint & { residentName: string | null; evidenceCount: number }>
+    }>('/barangay-staff/complaints'),
+
+  staffBarangayComplaint: (id: string) =>
+    request<BarangayComplaint & { residentName: string | null; residentPhone: string | null }>(
+      `/barangay-staff/complaints/${id}`
+    ),
+
+  /** The administrator's. Closing needs a reason; resolving does not. */
+  moveBarangayComplaint: (id: string, body: { status: string; note?: string }) =>
+    request<BarangayComplaint>(`/barangay-staff/complaints/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  staffComplaintProof: (complaintId: string, proofId: string) =>
+    fetchBlob(`/barangay-staff/complaints/${complaintId}/evidence/${proofId}`),
 
   /** The treasurer's book, for reconciliation. */
   paymentsBook: (from: string, to: string) =>

@@ -30,6 +30,8 @@ import ReportIncident from './screens/ReportIncident'
 import DataPrivacy from './screens/DataPrivacy'
 import BarangayHub from './screens/BarangayHub'
 import BarangayRequestForm from './screens/BarangayRequestForm'
+import BarangayComplaintForm from './screens/BarangayComplaintForm'
+import BarangayComplaints from './screens/BarangayComplaints'
 import DocumentGuide from './screens/DocumentGuide'
 import BarangayConsole from './screens/barangay/BarangayConsole'
 import VerifyDocument from './screens/VerifyDocument'
@@ -80,6 +82,10 @@ function ScreenRouter() {
       return <BarangayHub />
     case 'barangay-request':
       return <BarangayRequestForm typeId={screen.typeId} />
+    case 'barangay-complaint-form':
+      return <BarangayComplaintForm />
+    case 'barangay-complaints':
+      return <BarangayComplaints />
     case 'service-guide':
       return <DocumentGuide serviceId={screen.serviceId} certificateId={screen.certificateId} />
     default:

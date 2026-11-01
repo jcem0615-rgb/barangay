@@ -22,6 +22,7 @@ import {
 import { getFile, putFile, removeFile } from '../storage.ts'
 import { checkMark, markUpload, sendMark } from '../marks.ts'
 import { loadReplaceable, revokeDocument } from '../verification.ts'
+import { barangayComplaintsStaffRouter } from './barangayComplaintsStaff.ts'
 import { blotterRouter } from './blotter.ts'
 import { householdsRouter } from './households.ts'
 import { announcementsStaffRouter } from './announcements.ts'
@@ -60,6 +61,11 @@ async function ownBarangay(userId: string) {
 // The blotter hangs off this router rather than beside it, so it inherits the
 // authentication, the two roles and — the part that matters — the habit of
 // taking the barangay from the account rather than from the caller.
+// Mounted here, below this router's requireRole line, exactly like the three
+// sub-routers beside it — so a kagawad cannot reach a complaint and neither can
+// any municipal account. isolation.mjs reads this file to check that placement
+// rather than trusting it.
+barangayStaffRouter.use('/complaints', barangayComplaintsStaffRouter)
 barangayStaffRouter.use('/blotter', blotterRouter)
 barangayStaffRouter.use('/households', householdsRouter)
 barangayStaffRouter.use('/announcements', announcementsStaffRouter)

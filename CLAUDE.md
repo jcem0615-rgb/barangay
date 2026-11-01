@@ -275,6 +275,135 @@ whose head is only a column cannot count its own population. Removing them is re
 head is the household, so changing who it is is an edit to the household rather than a
 member removal.
 
+## The barangay complaint
+
+The barangay had two books and neither ran in this direction. The **blotter** is
+Katarungang Pambarangay — a dispute brought to the counter and written down by
+the secretary, so it starts with staff. The **notice board** runs barangay to
+resident. What was missing is the direction a resident needs most: something is
+wrong, here is a photograph of it, and the captain should see it without my
+walking to the hall.
+
+So `barangay_complaints` is a resident's own complaint, with proof attached,
+worked by the captain and the clerk.
+
+**It is deliberately universal free text.** Uncollected rubbish, a streetlight
+out, a flooded path — or a neighbour, by name. Capping it at **1500
+characters** is the deployment's decision and it is enforced in three places
+for one reason: that field is the only place the resident says what is actually
+wrong, so truncating it anywhere loses the thing they came to say. The browser
+counts down, the zod schema refuses, and the column carries a `check`
+constraint underneath both.
+
+**That it may name somebody is what decides every other rule here**, because it
+makes this table hold the same kind of thing the blotter holds: a person accused
+of something who has been found to have done nothing.
+
+**But the resident wrote it, and that is the difference from the blotter.** A
+blotter entry is the barangay's own account of a quarrel between two people, so
+showing it to either of them discloses the other's side — which is why no
+resident route reads it at all. A complaint is its author's own words, so
+reading it back to that author discloses nothing they do not already know.
+Hence the inversion: unlike the blotter, this has a resident read, a status they
+follow, and a history they can see. What would be wrong is the reverse, and the
+schema refuses it:
+
+- **Whoever is named stays prose inside `details`.** There is no respondent
+  column at all, the same decision the blotter's parties and the register's
+  members make, and for the same reason — a foreign key here would turn the
+  table into a way to ask what a named resident stands accused of. The test
+  suite asserts the field does not exist rather than trusting that nobody adds
+  one.
+- **Nobody is notified but the author.** The one notification this produces goes
+  to `resident_id`, about their own complaint. Nothing reaches the person
+  complained about, because there is nothing to reach.
+- **Both kinds are in `PRIVATE_KINDS`** (`server/src/push.ts`), so a lock screen
+  gets the title and "open the app to read it" and never the text. What the
+  barangay wrote back about a neighbour is the last thing that should appear in
+  front of whoever is holding the phone.
+
+**Both roles read; only the administrator moves it.** The line the blotter
+already draws — recording is the clerk's work, deciding is the captain's. The
+clerk needs the queue or nothing is looked at while the captain is away; what
+the clerk does not get is the move that tells a resident their complaint is
+finished. The console says who does that rather than showing a button that
+answers 403, and the API refuses it either way.
+
+**No kagawad.** `barangayComplaintsStaffRouter` carries no gate of its own and
+is mounted *inside* `barangayStaffRouter`, below its
+`requireRole('barangay_admin', 'barangay_officer')` line — exactly like the
+blotter, the register and the notice board. So the council cannot reach it,
+which is right: a kagawad sees figures and never individuals, and handing seven
+elected politicians their constituents' complaints about each other is the same
+political weapon the blotter is kept from them to avoid.
+`server/test/isolation.mjs` **registers this sub-router explicitly**, which is
+not optional — it reads a hard-coded list of router files, so a sub-router left
+off it has its routes silently unchecked. Adding it took the walk from 44
+barangay-console routes to 48.
+
+**`resolved` and `closed` are final**, like `released` and `rejected` on a
+request. A resident told their complaint was dealt with, who then watches it
+reopen, has been told two incompatible things by the same barangay; a recurrence
+is a new complaint with its own reference, which is also the honest record of it
+having happened twice. **Closing needs a reason and resolving does not** — the
+blotter's distinction, for the blotter's reason: "closed" with no reason is the
+row somebody reconstructs from memory a year later with a resident in front of
+them.
+
+### Records and history
+
+`handled_by` and `handled_at` answer who touched it last, which is the wrong
+question a week later. What a resident asks is *what has been done about it*,
+and what a barangay has to answer at an assembly is *how long did we take* —
+both of which are a sequence rather than a latest value. So
+`barangay_complaint_history` takes one row per move, written **in the same
+transaction as the move**, the rule every notification and audit entry here
+follows: there is no half state where the status changed and nothing records it.
+
+**The first row is the filing itself**, with the resident as the actor, so the
+trail starts where the complaint does. Without it an untouched complaint has an
+empty history and reads as nothing having happened, when what happened is that
+somebody filed it.
+
+**`actor_name` is stored beside `actor_id`**, the decision `admin_audit` makes:
+a clerk whose account is revoked next year must not erase who acted. The id goes
+null with the account and the name stays. Only the name is published — a
+resident reading their own trail has no business being handed an account id.
+
+The console's **Records** view is the same rows with the finished ones in it,
+kept apart from the queue because the queue is what to work on and the records
+are what the barangay did. **The figures lead the screen**, computed on every
+read rather than stored, like the register's and the municipal reports' — a
+stored count is wrong the moment anything moves.
+
+### Proof
+
+The same pipeline as incident evidence, which was already careful: type decided
+by magic bytes rather than the filename, photos virus-scanned in memory, video
+streamed to disk and hashed by streaming so one upload cannot hold a gigabyte.
+Watched inline and **ranged** in the console, so a clip can be scrubbed to the
+ten seconds that matter.
+
+**The ceiling is five minutes** (`MAX_COMPLAINT_VIDEO_SECONDS`), not the
+incident report's thirty, and it is a separate constant rather than a lowered
+global because narrowing the municipal surface was not asked for. Five is also
+the first of these numbers **honest about the byte cap above it**: thirty
+minutes of 1080p is 1–2 GB and hits `MAX_EVIDENCE_BYTES` long before the clock,
+so that limit was advice the server could not keep. Five minutes is a few
+hundred megabytes, which fits inside 512 MB and is an upload a phone on mobile
+data can finish.
+
+**Proof cannot be added once a complaint is finished.** Changing the record
+behind a decision that cites it is refused rather than quietly accepted.
+
+**`media-src` had to be added to the CSP for any of this to be visible, and
+that was a pre-existing bug.** `imgSrc` named `blob:` and there was no
+`mediaSrc` directive at all, so `<video src="blob:…">` fell back to
+`default-src 'self'` and was blocked in production with nothing but a console
+warning — which means **incident-evidence video has never played either**, from
+the day it shipped. Found by driving the console in a real browser: the
+photograph rendered and the video did not.
+
 ## The blotter and the summons
 
 Katarungang Pambarangay (RA 7160, Chapter 7): a dispute is brought to the barangay, the

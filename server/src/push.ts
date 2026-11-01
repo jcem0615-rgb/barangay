@@ -43,6 +43,13 @@ export function pushEnabled(): boolean {
  */
 const PRIVATE_KINDS: ReadonlySet<string> = new Set<NotificationKind>([
   'program_granted', 'program_revoked', 'complaint_answered',
+  // A barangay complaint is free text and may name a neighbour, so what the
+  // barangay wrote back about it is the last thing that should appear on a
+  // lock screen in front of whoever is holding the phone. The filing
+  // confirmation is private for the same reason — it quotes nothing, but the
+  // title alone beside a reference is enough to tell a room that somebody
+  // complained.
+  'barangay_complaint_filed', 'barangay_complaint_updated',
 ])
 
 export function pushBodyFor(kind: NotificationKind, body: string): string {

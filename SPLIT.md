@@ -40,12 +40,25 @@ every file that differs and what integration must do to it — so this file does
 not carry a count that goes stale the moment anything changes; see *Keeping the
 two in step* below.
 
-What is worth stating as an invariant rather than a tally: no deletions of
-upstream code, no moved code, no renamed symbols, and **nothing changed under
-`server/src/` or `src/screens/` at all** — the places where a real fix will
-land on either side. Across `src/` and `server/` combined, `diff -rq` against
-the eLGU tree reports four files: three in `src/lib` and `src/i18n`, and
-`server/.env.example`.
+What is worth stating as an invariant rather than a tally: **no deletions of
+upstream code, nothing moved, nothing renamed.** Every row in the manifest is
+either a default to put back or work to carry over.
+
+**The stronger claim this file used to make — that nothing under `server/src/`
+or `src/screens/` changed at all — is no longer true, and the thing that broke
+it is the point of the split rather than a failure of it.** The barangay
+complaint feature (see *The barangay complaint* in `CLAUDE.md`) adds a
+migration, three server modules, three screens and a test suite, and touches a
+dozen existing files. Integration is now a real merge instead of a
+fast-forward. That was the trade accepted the moment this repository was made:
+the window was open, holding it open was chosen over spending it, and the first
+feature closed it.
+
+What the manifest does instead is keep the merge *mechanical*. Every one of
+those rows is marked `feature`, meaning it belongs upstream as-is — the
+barangay tier exists in both products, so none of this is something the eLGU
+tree needs protecting from. The rows that still need a decision are the seven
+`revert` ones, and they have not grown.
 
 ---
 
@@ -232,6 +245,22 @@ the declared files are the only places a conflict can arise:
 ```bash
 git cherry-pick <sha>
 ```
+
+### One hazard the complaint feature introduces
+
+`server/migrations/042_barangay_complaints.sql` takes the next number in a
+sequence **both repositories are now advancing independently.** If upstream
+also reaches 042, a merge produces two different migrations claiming the same
+number, and the runner orders by filename — so which one applies first becomes
+alphabetical accident rather than a decision, on a database that may already
+have run one of them.
+
+Check this before merging, not after. If upstream has an 042, renumber this one
+to the next free number and leave the already-applied row in whatever
+`migrations` table records it alone — a renumbered file that re-runs is worse
+than the collision. The same applies to every migration either side adds from
+here on, so it is worth settling a convention (odd numbers here, even upstream,
+or a per-tier prefix) rather than discovering it twice.
 
 **The data half is the part that is genuinely not built**, and it is described
 in *"Integrating a standalone barangay into an LGU deployment"* at the end of

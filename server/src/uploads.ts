@@ -79,6 +79,26 @@ export const MAX_SEAL_BYTES = 2 * 1024 * 1024
  */
 export const MAX_EVIDENCE_SECONDS = 30 * 60
 
+/**
+ * The ceiling for a **barangay complaint's** video, which is five minutes
+ * rather than thirty.
+ *
+ * It is a separate constant rather than a lower global because the two are
+ * different promises to different people: an incident report is a municipal
+ * surface with its own history, and narrowing it here would quietly shorten
+ * what residents of a municipal deployment have already been told they can
+ * send.
+ *
+ * Five is also the first of these numbers that is **honest about the byte cap
+ * above it.** Thirty minutes of 1080p is 1–2 GB and hits `MAX_EVIDENCE_BYTES`
+ * long before the clock, so the duration limit was advice the server could not
+ * keep; five minutes is a few hundred megabytes, which fits inside 512 MB and
+ * is an upload a phone on mobile data can actually finish. A limit that agrees
+ * with the one underneath it is the point — a resident whose proof is rejected
+ * after five minutes of uploading stops sending proof.
+ */
+export const MAX_COMPLAINT_VIDEO_SECONDS = 5 * 60
+
 export const MAX_EVIDENCE_BYTES =
   Number(process.env.MAX_EVIDENCE_MB ?? 512) * 1024 * 1024
 

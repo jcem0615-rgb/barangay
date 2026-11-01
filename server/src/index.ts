@@ -14,6 +14,7 @@ import { requestsRouter } from './routes/requests.ts'
 import { paymentsRouter, paymentWebhookRouter } from './routes/payments.ts'
 import { incidentsRouter } from './routes/incidents.ts'
 import { barangayRouter, barangayPublicRouter } from './routes/barangay.ts'
+import { barangayComplaintsRouter } from './routes/barangayComplaints.ts'
 import { barangayStaffRouter } from './routes/barangayStaff.ts'
 import { barangayKagawadRouter } from './routes/barangayKagawad.ts'
 import { appointmentsRouter } from './routes/appointments.ts'
@@ -52,6 +53,16 @@ app.use(
         // on the receipt screen. Without this they are all silently blocked in
         // production and render as broken images with only a console warning.
         imgSrc: ["'self'", 'data:', 'blob:'],
+        // And **video needs saying separately**, which is the half this policy
+        // was missing. `<video src>` is governed by `media-src`, not
+        // `img-src`, and with no `media-src` here it fell back to
+        // `default-src 'self'` — so every blob-backed clip was blocked in
+        // production with nothing but a console warning, exactly the failure
+        // the line above was written to prevent for images. That covered
+        // incident evidence in the municipal console from the day it shipped,
+        // and barangay complaint proof now. Found by driving the console in a
+        // real browser: the photograph rendered and the video did not.
+        mediaSrc: ["'self'", 'blob:'],
         connectSrc: ["'self'"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
@@ -120,6 +131,11 @@ app.use('/api/auth', authRouter)
 app.use('/api/catalogue', catalogueRouter)
 app.use('/api/barangays', barangayPublicRouter)
 app.use('/api/barangay', barangayRouter)
+// Not inside the municipal guard: a resident of a municipal deployment lives
+// in a barangay too and complains to it the same way. This is barangay-tier
+// surface, so it is mounted in both products rather than switched off with
+// the hall.
+app.use('/api/barangay-complaints', barangayComplaintsRouter)
 app.use('/api/barangay-staff', barangayStaffRouter)
 // Its own mount, not a branch of the staff router: see barangayKagawad.ts.
 app.use('/api/barangay-kagawad', barangayKagawadRouter)

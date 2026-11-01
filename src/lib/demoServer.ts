@@ -35,7 +35,54 @@ import { WORKFLOW_STEPS, type ServiceDefinition, type ServiceField } from '../ty
 // Bumped whenever the seeded shape changes: a store written by an older build
 // would be missing fields this one reads, so it is discarded rather than
 // patched. Losing a demo's clicked-through state is the cheaper failure.
-const STORE_KEY = 'elgu-demo-state-v29'
+const STORE_KEY = 'elgu-demo-state-v30'
+
+interface DemoBrgyComplaintStep {
+  from: string | null
+  to: string
+  note: string | null
+  actorName: string
+  actorRole: string
+  at: string
+}
+
+/**
+ * A resident's complaint to their own barangay, demo-side.
+ *
+ * Named `Brgy` throughout because `DemoComplaint` is already taken by the
+ * municipal RA 11032 complaint, which is a different thing against a different
+ * body: that one is filed against an office about a service it published, and
+ * the barangay tier seeds no offices at all. Keeping the two apart here is the
+ * same decision the server makes by giving this its own table.
+ *
+ * Whoever a complaint names stays prose inside `details`, exactly as on the
+ * real server — there is no respondent field, so nothing in the demo teaches
+ * that a complaint is a way to look somebody up.
+ */
+interface DemoBrgyComplaint {
+  id: string
+  referenceNo: string
+  barangayId: string
+  residentId: string
+  residentName: string
+  category: string
+  details: string
+  location: string | null
+  status: 'new' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed'
+  filedAt: string
+  handledAt: string | null
+  response: string | null
+  history: DemoBrgyComplaintStep[]
+  evidence: Array<{
+    id: string
+    contentType: string
+    byteSize: number
+    durationSeconds: number | null
+    uploadedAt: string
+    /** A data URL. The demo has nowhere else to put bytes. */
+    data: string
+  }>
+}
 
 interface DemoIncident {
   id: string
@@ -228,6 +275,7 @@ interface DemoState {
   notifications: DemoNotification[]
   payments: DemoPayment[]
   incidents: DemoIncident[]
+  brgyComplaints: DemoBrgyComplaint[]
   counters: Record<string, number>
   /**
    * The municipal facts an administrator can edit. Held in state rather than
@@ -551,6 +599,7 @@ function seed(): DemoState {
     queueCounters: {},
     feedback: [],
     complaints: [],
+    brgyComplaints: [],
     complaintCounter: 0,
     // Seeded from the authored municipality, exactly as the real seed does, and
     // editable from the Municipality tab after that.
@@ -1742,6 +1791,41 @@ async function takeMark(file: File | undefined, what: string, printedOn: string)
   return shrinkToDataUrl(file, 320)
 }
 
+/** The barangay a demo resident belongs to when their row carries none. */
+const DEMO_BARANGAY_ID = BARANGAYS[0]!.id
+
+/**
+ * One barangay complaint as both sides read it. The history and the proof ride
+ * on the detail read only, like the real server — a resident with a dozen
+ * complaints should not pull every trail to see the one they tapped.
+ */
+function serializeBrgyComplaint(c: DemoBrgyComplaint, full = false) {
+  return {
+    id: c.id,
+    referenceNo: c.referenceNo,
+    category: c.category,
+    details: c.details,
+    location: c.location,
+    status: c.status,
+    filedAt: c.filedAt,
+    handledAt: c.handledAt,
+    response: c.response,
+    final: c.status === 'resolved' || c.status === 'closed',
+    ...(full
+      ? {
+          history: c.history.map((h) => ({
+            from: h.from, to: h.to, note: h.note,
+            actorName: h.actorName, actorRole: h.actorRole, at: h.at,
+          })),
+          evidence: c.evidence.map((e) => ({
+            id: e.id, contentType: e.contentType, byteSize: e.byteSize,
+            durationSeconds: e.durationSeconds, uploadedAt: e.uploadedAt,
+          })),
+        }
+      : {}),
+  }
+}
+
 /** What a console reads back about one signature slot. */
 const signatureState = (slot: string) => ({
   has: state.signatures[slot] !== undefined,
@@ -2150,6 +2234,111 @@ async function route(
     const adminOnly = () => {
       if (user.role !== 'barangay_admin') {
         throw new DemoError(403, 'You do not have access to this area.')
+      }
+    }
+
+    // ---- what residents have complained about ----
+    //
+    // Both roles read; `adminOnly()` guards the move, which is the split the
+    // real console draws — resolving and closing are final and are what the
+    // resident is told happened. Every statement scopes on `own.id`, so
+    // another barangay's complaint is not found rather than refused.
+    if (parts[1] === 'complaints') {
+      const mine = () => state.brgyComplaints.filter((c) => c.barangayId === own.id)
+
+      if (parts[2] && parts[3] === 'evidence' && parts[4] && method === 'GET') {
+        const complaint = mine().find((c) => c.id === parts[2])
+        const found = complaint?.evidence.find((e) => e.id === parts[4])
+        if (!found) throw new DemoError(404, 'Evidence not found.')
+        return { status: 200, blob: dataUrlToBlob(found.data, found.contentType), fileName: 'proof' }
+      }
+
+      if (parts[2] && method === 'PATCH') {
+        adminOnly()
+        const complaint = mine().find((c) => c.id === parts[2])
+        if (!complaint) throw new DemoError(404, 'Complaint not found.')
+        const to = String(body.status ?? '') as DemoBrgyComplaint['status']
+        const note = body.note ? String(body.note).trim() : ''
+        const NEXT: Record<string, string[]> = {
+          new: ['acknowledged', 'in_progress', 'resolved', 'closed'],
+          acknowledged: ['in_progress', 'resolved', 'closed'],
+          in_progress: ['resolved', 'closed'],
+          resolved: [], closed: [],
+        }
+        if (to === 'closed' && !note) {
+          throw new DemoError(400, 'Closing a complaint needs a reason the resident can read — it is the record of why the barangay did not act.')
+        }
+        if (!NEXT[complaint.status]!.includes(to)) {
+          throw new DemoError(409, complaint.status === to
+            ? `This complaint is already ${complaint.status}.`
+            : NEXT[complaint.status]!.length === 0
+              ? `This complaint was ${complaint.status}, which is final. A recurrence is a new complaint, so it keeps its own reference and its own history.`
+              : `A complaint cannot go from ${complaint.status} to ${to}.`)
+        }
+        const now = new Date().toISOString()
+        complaint.history.push({
+          from: complaint.status, to, note: note || null,
+          actorName: user.fullName, actorRole: user.role, at: now,
+        })
+        complaint.status = to
+        complaint.handledAt = now
+        if (note) complaint.response = note
+        state.notifications.unshift({
+          id: uid(), userId: complaint.residentId, requestId: null,
+          kind: 'barangay_complaint_updated',
+          title: to === 'resolved' ? 'Your complaint was resolved'
+            : to === 'closed' ? 'Your complaint was closed'
+            : to === 'in_progress' ? 'Your barangay is working on your complaint'
+            : 'Your barangay has seen your complaint',
+          body: `${complaint.referenceNo} — open the app to read it.`,
+          readAt: null, createdAt: now,
+        })
+        persist()
+        return { status: 200, body: serializeBrgyComplaint(complaint) }
+      }
+
+      if (parts[2] && method === 'GET') {
+        const complaint = mine().find((c) => c.id === parts[2])
+        if (!complaint) throw new DemoError(404, 'Complaint not found.')
+        return {
+          status: 200,
+          body: {
+            ...serializeBrgyComplaint(complaint, true),
+            residentName: complaint.residentName,
+            residentPhone:
+              state.users.find((u) => u.id === complaint.residentId)?.profile.phone ?? null,
+          },
+        }
+      }
+
+      if (method === 'GET') {
+        const rows = mine()
+        const isOpen = (c: DemoBrgyComplaint) => c.status !== 'resolved' && c.status !== 'closed'
+        const rank = (c: DemoBrgyComplaint) =>
+          c.status === 'new' ? 0 : c.status === 'acknowledged' ? 1 : c.status === 'in_progress' ? 2 : 3
+        return {
+          status: 200,
+          body: {
+            figures: {
+              total: rows.length,
+              open: rows.filter(isOpen).length,
+              new: rows.filter((c) => c.status === 'new').length,
+              acknowledged: rows.filter((c) => c.status === 'acknowledged').length,
+              inProgress: rows.filter((c) => c.status === 'in_progress').length,
+              resolved: rows.filter((c) => c.status === 'resolved').length,
+              closed: rows.filter((c) => c.status === 'closed').length,
+              withProof: rows.filter((c) => c.evidence.length > 0).length,
+            },
+            complaints: rows
+              .slice()
+              .sort((a, b) => rank(a) - rank(b) || a.filedAt.localeCompare(b.filedAt))
+              .map((c) => ({
+                ...serializeBrgyComplaint(c),
+                residentName: c.residentName,
+                evidenceCount: c.evidence.length,
+              })),
+          },
+        }
       }
     }
 
@@ -3138,6 +3327,105 @@ async function route(
   //
   // The same rules the server enforces: a video over thirty minutes is refused,
   // the queue is the administrator's, and updating one tells the resident.
+  // ---- a resident complaining to their own barangay ----
+  //
+  // Mirrors the real routes, including the two rules that matter: everything is
+  // scoped to the signed-in resident, and the video ceiling is **five** minutes
+  // rather than the incident report's thirty. A demo that allowed thirty would
+  // teach a limit the server refuses.
+  if (parts[0] === 'barangay-complaints') {
+    const user = need('resident')
+    const myBarangay = user.barangayId ?? DEMO_BARANGAY_ID
+
+    if (!parts[1] && method === 'POST') {
+      const details = String(body.details ?? '').trim()
+      if (details.length < 10) throw new DemoError(400, 'Say what is wrong, in a sentence or two.')
+      if (details.length > 1500) throw new DemoError(400, 'Keep it under 1500 characters.')
+      const year = new Date().getFullYear()
+      state.counters[`bcom-${year}`] = (state.counters[`bcom-${year}`] ?? 0) + 1
+      const now = new Date().toISOString()
+      const complaint: DemoBrgyComplaint = {
+        id: uid(),
+        referenceNo: `BCOM-${year}-${String(state.counters[`bcom-${year}`]).padStart(5, '0')}`,
+        barangayId: myBarangay,
+        residentId: user.id,
+        residentName: user.fullName,
+        category: String(body.category ?? 'other'),
+        details,
+        location: body.location ? String(body.location) : null,
+        status: 'new',
+        filedAt: now,
+        handledAt: null,
+        response: null,
+        // The trail starts where the complaint does, with the resident as the
+        // actor — otherwise an untouched complaint has an empty history and
+        // reads as nothing having happened.
+        history: [{ from: null, to: 'new', note: null, actorName: user.fullName, actorRole: 'resident', at: now }],
+        evidence: [],
+      }
+      state.brgyComplaints.unshift(complaint)
+      state.notifications.unshift({
+        id: uid(), userId: user.id, requestId: null, kind: 'barangay_complaint_filed',
+        title: 'Complaint received',
+        body: `${complaint.referenceNo} — open the app to read it.`,
+        readAt: null, createdAt: now,
+      })
+      persist()
+      return { status: 201, body: serializeBrgyComplaint(complaint) }
+    }
+
+    if (!parts[1] && method === 'GET') {
+      return {
+        status: 200,
+        body: {
+          complaints: state.brgyComplaints
+            .filter((c) => c.residentId === user.id)
+            .map((c) => serializeBrgyComplaint(c)),
+        },
+      }
+    }
+
+    if (parts[1] && parts[2] === 'evidence' && parts[3] && method === 'GET') {
+      const complaint = state.brgyComplaints.find((c) => c.id === parts[1] && c.residentId === user.id)
+      const found = complaint?.evidence.find((e) => e.id === parts[3])
+      if (!found) throw new DemoError(404, 'Evidence not found.')
+      return { status: 200, blob: dataUrlToBlob(found.data, found.contentType), fileName: 'proof' }
+    }
+
+    if (parts[1] && parts[2] === 'evidence' && method === 'POST') {
+      const complaint = state.brgyComplaints.find((c) => c.id === parts[1] && c.residentId === user.id)
+      if (!complaint) throw new DemoError(404, 'Complaint not found.')
+      if (complaint.status === 'resolved' || complaint.status === 'closed') {
+        throw new DemoError(409, 'This complaint is already finished, so it cannot take new proof. File a new one if it has happened again.')
+      }
+      if (complaint.evidence.length >= 6) throw new DemoError(409, 'At most 6 files per complaint.')
+      if (!file) throw new DemoError(400, 'Choose a photo or video.')
+      const duration = Number(body?.durationSeconds)
+      const seconds = Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null
+      if (file.type.startsWith('video/') && seconds !== null && seconds > 5 * 60) {
+        throw new DemoError(413, 'Videos can be up to 5 minutes.')
+      }
+      return asDataUrl(file).then((data) => {
+        const stored = {
+          id: uid(), contentType: file.type || 'application/octet-stream',
+          byteSize: file.size, durationSeconds: seconds,
+          uploadedAt: new Date().toISOString(), data,
+        }
+        complaint.evidence.push(stored)
+        persist()
+        return { status: 201, body: { id: stored.id } }
+      })
+    }
+
+    if (parts[1] && method === 'GET') {
+      const complaint = state.brgyComplaints.find((c) => c.id === parts[1] && c.residentId === user.id)
+      if (!complaint) throw new DemoError(404, 'Complaint not found.')
+      return { status: 200, body: serializeBrgyComplaint(complaint, true) }
+    }
+
+    throw new DemoError(404, 'Not found.')
+  }
+
   if (parts[0] === 'incidents') {
     const user = need('resident')
 

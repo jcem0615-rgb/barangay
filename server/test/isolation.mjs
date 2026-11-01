@@ -81,6 +81,7 @@ const concrete = (path) =>
 // a sub-router mounted above the gate would be open to anybody.
 const BARANGAY_SIDE = [
   ['barangayStaff.ts', 'barangayStaffRouter', '/barangay-staff', '', null],
+  ['barangayComplaintsStaff.ts', 'barangayComplaintsStaffRouter', '/barangay-staff', '/complaints', 'barangayStaffRouter'],
   ['blotter.ts', 'blotterRouter', '/barangay-staff', '/blotter', 'barangayStaffRouter'],
   ['households.ts', 'householdsRouter', '/barangay-staff', '/households', 'barangayStaffRouter'],
   ['announcements.ts', 'announcementsStaffRouter', '/barangay-staff', '/announcements', 'barangayStaffRouter'],

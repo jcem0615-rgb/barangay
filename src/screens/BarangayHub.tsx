@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Building, CalendarClock, CheckCircle2, ChevronRight, Clock, Download, Loader2 } from 'lucide-react'
+import { Building, CalendarClock, CheckCircle2, ChevronRight, Clock, Download, Loader2, MessageSquareWarning } from 'lucide-react'
 import TopBar from '../components/TopBar'
 import TierSwitch from '../components/TierSwitch'
 import AnnouncementBoard from '../components/AnnouncementBoard'
@@ -128,6 +128,31 @@ function BarangayView({
       <>
         {/* What the barangay is telling you, before what you can ask it for. */}
         <AnnouncementBoard />
+
+        {/*
+          Complaining runs the other way to everything below it — this is the
+          resident telling the barangay rather than asking it for a document —
+          so it sits above the catalogue and reads as an action rather than a
+          row in a list. A resident who has just seen the notice board is the
+          one most likely to have something to report back.
+        */}
+        <button
+          onClick={() => push({ name: 'barangay-complaints' })}
+          className="mb-5 flex w-full items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-left active:bg-emerald-100"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white">
+            <MessageSquareWarning size={17} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[calc(13.5px_*_var(--text-scale))] font-semibold text-navy-950">
+              {t('brgyComplaint.hubLabel')}
+            </span>
+            <span className="block text-[calc(12px_*_var(--text-scale))] leading-snug text-slate-600">
+              {t('brgyComplaint.hubHint')}
+            </span>
+          </span>
+          <ChevronRight size={16} className="shrink-0 text-slate-400" />
+        </button>
 
         <p className="mb-2 px-1 text-[calc(12.5px_*_var(--text-scale))] font-semibold uppercase tracking-wide text-slate-500">
           {t('brgy.certificates')}
