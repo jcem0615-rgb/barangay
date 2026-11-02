@@ -11,6 +11,7 @@ import ThemeToggle from '../components/ThemeToggle'
 import { useNav } from '../lib/nav'
 import { useOnlineStatus } from '../lib/useOnlineStatus'
 import { useT } from '../lib/i18n'
+import { versionLine } from '../lib/version'
 import { useCatalogue } from '../lib/catalogue'
 
 /**
@@ -38,7 +39,7 @@ const BARANGAY_TIER_SETTINGS = SETTINGS.filter((s) => s.label !== 'profile.compl
 export default function Profile() {
   const resident = useResidentProfile()
   const { logout } = useAuth()
-  const { t } = useT()
+  const { t, locale } = useT()
   const { productName, tier } = useCatalogue()
   // Above the early return, not below it: hooks must run in the same order on
   // every render, and a null profile used to skip these two — which is the
@@ -114,7 +115,16 @@ export default function Profile() {
           <LogOut size={16} /> {t('profile.signOut')}
         </button>
 
-        <p className="mt-6 text-center text-[calc(12px_*_var(--text-scale))] text-slate-500">{productName} &middot; v1.0.0</p>
+        {/*
+          The build, not a number somebody typed. This line said `v1.0.0` from
+          the day it was written and would have gone on saying it for ever —
+          which is the whole failure the stamp replaces: the question it is
+          here to answer is whether this screen is the last thing deployed,
+          and a literal cannot answer that. See src/lib/version.ts.
+        */}
+        <p className="mt-6 text-center text-[calc(12px_*_var(--text-scale))] text-slate-500">
+          {productName} &middot; {versionLine(locale)}
+        </p>
       </div>
     </div>
   )

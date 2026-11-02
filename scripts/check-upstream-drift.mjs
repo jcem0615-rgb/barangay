@@ -50,7 +50,6 @@ const git = (...args) =>
  */
 const DIVERGENCE = {
   // The three that flip the product. These are the dangerous ones.
-  'vite.config.ts': ['revert', 'VITE_PRODUCT must default to municipal again'],
   'src/lib/demoServer.ts': ['revert', 'VITE_DEMO_TIER default to municipal again — but KEEP the complaint routes it also carries'],
   'src/lib/catalogue.tsx': [
     'revert',
@@ -86,6 +85,14 @@ const DIVERGENCE = {
   'src/components/ThemeToggle.tsx': ['feature', 'Light / Dark / Phone, beside the text-size control'],
   'src/index.css': ['feature', 'the dark block — variable remaps and the ambiguous-class overrides'],
 
+  // ---- the build stamp ----------------------------------------------------
+  // Tier-neutral: the municipal app wants to know which build it is just as
+  // much, and the literal v1.0.0 this replaced was wrong in both.
+  'src/lib/version.ts': ['feature', 'the three stamped values and the one-line form'],
+  'src/screens/Profile.tsx': ['feature', 'appearance control, and the real version in place of a literal v1.0.0'],
+  'src/screens/barangay/BarangayConsole.tsx': ['feature', 'the Complaints tab and the build footer'],
+  'vite.config.ts': ['revert', 'VITE_PRODUCT default to municipal — but KEEP the define block that stamps the build'],
+
   // ---- the barangay logo --------------------------------------------------
   'server/migrations/601_barangay_logo.sql': ['feature', 'logo_key/type/updated_at on barangays'],
   'src/lib/barangayLogo.tsx': ['feature', 'fetched once, shared by the three places that draw it'],
@@ -94,7 +101,6 @@ const DIVERGENCE = {
   'src/screens/Dashboard.tsx': ['feature', 'the logo behind the dashboard'],
   'src/components/TopBar.tsx': ['feature', "the logo as the app's mark where no back arrow is"],
   'src/screens/barangay/BarangayOffice.tsx': ['feature', 'the logo upload, above the seal'],
-  'src/screens/Profile.tsx': ['feature', 'the appearance control'],
   'server/src/marks.ts': ['keep', 'fixed "missing from every a certificate" — wrong for the seal upstream too'],
   'server/src/routes/barangay.ts': ['feature', 'the resident logo read'],
   'server/src/barangayComplaints.ts': ['feature', 'the status machine, serialiser and history writer both sides share'],
@@ -117,7 +123,6 @@ const DIVERGENCE = {
   'src/lib/nav.tsx': ['feature', 'two screens declared'],
   'src/lib/api.ts': ['feature', 'the client methods and types'],
   'src/screens/BarangayHub.tsx': ['feature', 'the entry point residents actually look at'],
-  'src/screens/barangay/BarangayConsole.tsx': ['feature', 'the Complaints tab'],
   'src/i18n/strings.ts': ['feature', "50 bilingual keys, plus the dead 'auth.title' removal"],
 
   // Documentation.

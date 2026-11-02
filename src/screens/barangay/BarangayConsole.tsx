@@ -10,6 +10,7 @@ import BarangayAnnouncements from './BarangayAnnouncements'
 import BarangayOffice from './BarangayOffice'
 import CertificateCatalogue, { type CatalogueDraft } from '../../components/CertificateCatalogue'
 import { useAuth } from '../../lib/auth'
+import { versionLine } from '../../lib/version'
 import { saveBlob } from '../../lib/download'
 import { formatPeso } from '../../lib/money'
 
@@ -164,6 +165,17 @@ export default function BarangayConsole() {
         {view === 'summary' && <Summary />}
         {view === 'fees' && <Fees />}
         {view === 'officers' && <Officers />}
+        {/*
+          The build, so a clerk reading this out on the phone is reading a fact
+          rather than "the latest one, I think". English like the rest of this
+          console. `en-PH` is deliberate and is not the mistake check:i18n
+          looks for: the barangay console is not translated, so a fixed locale
+          here is the same decision as the English labels around it — and the
+          checker excludes this directory for exactly that reason.
+        */}
+        <p className="mt-10 text-center text-[12px] text-slate-400">
+          eBarangay Portal &middot; {versionLine('en-PH')}
+        </p>
       </div>
     </div>
   )

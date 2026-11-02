@@ -1,7 +1,61 @@
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+/**
+ * Which build this is, stamped in at build time.
+ *
+ * **The point is that it changes on its own.** A version somebody has to
+ * remember to bump is a version that says 0.2.0 for six months, and the
+ * question it exists to answer — "is the thing I just deployed actually the
+ * thing I am looking at?" — is exactly the one this app has got wrong before:
+ * `registerType: 'autoUpdate'` installs a new service worker without reloading
+ * the page, so a deployed change can sit live for half a day and still look
+ * missing. See *Getting a new version onto a phone* in CLAUDE.md. The commit
+ * and the build time answer it without anybody's discipline; the semver in
+ * package.json is the human-readable half beside them.
+ *
+ * The commit is read from three places in order, because the build does not
+ * always happen where the git directory is:
+ *
+ *   1. `VERCEL_GIT_COMMIT_SHA` — on Vercel, which is authoritative there.
+ *   2. `git rev-parse` — a normal checkout, including a local build.
+ *   3. `'local'` — a tarball, a Docker context with no `.git`, anything else.
+ *
+ * Never throws. A build that cannot name its commit is still a build, and
+ * failing one over a version string would be the tail wagging the dog.
+ */
+function buildCommit(): string {
+  const fromEnv = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA
+  if (fromEnv) return fromEnv.slice(0, 7)
+  try {
+    return execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return 'local'
+  }
+}
+
+const PKG_VERSION: string = (() => {
+  try {
+    return JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
+  } catch {
+    return '0.0.0'
+  }
+})()
+
+const BUILD = {
+  version: PKG_VERSION,
+  commit: buildCommit(),
+  // Second precision: this is read by a person comparing two deploys, and
+  // milliseconds are noise in that comparison.
+  builtAt: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+}
 
 // https://vite.dev/config/
 /**
@@ -65,6 +119,14 @@ const htmlProduct = () => ({
 })
 
 export default defineConfig({
+  // Injected as literals rather than read at runtime: there is no `process` in
+  // the browser, and an import of package.json would pull its whole contents
+  // — scripts, dependencies and all — into the bundle.
+  define: {
+    __APP_VERSION__: JSON.stringify(BUILD.version),
+    __APP_COMMIT__: JSON.stringify(BUILD.commit),
+    __APP_BUILT_AT__: JSON.stringify(BUILD.builtAt),
+  },
   // The demo build is published as a single self-contained page, so its dynamic
   // import of the in-browser server has to be inlined rather than split out
   // into a chunk the page would try to fetch.

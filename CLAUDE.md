@@ -2392,6 +2392,50 @@ year of validity the barangay never granted.
   than only when somebody refreshes. See *Getting a new version onto a phone*. A router
   would fix both at once.
 
+## Which build is this
+
+Every screen that can answer a support call shows the build: the resident's
+Profile footer and the foot of the barangay console. `v0.2.0 · bfb5877 ·
+2 Nov 2026`.
+
+**The point is that it moves without anybody remembering.** The line it
+replaced was a literal `v1.0.0` that had said `v1.0.0` since the day it was
+written, which is precisely useless for the question it exists to answer: *is
+the thing on this screen the thing that was last deployed?* That question is
+not idle in this app — `registerType: 'autoUpdate'` installs a new service
+worker without reloading the page, so a returning visitor can be looking at
+the previous precached shell while the new one waits behind it. See *Getting a
+new version onto a phone* below; a version printed on screen is what makes
+that diagnosable from a photograph of somebody's phone.
+
+`vite.config.ts` stamps three values in at build time and
+`src/lib/version.ts` formats them:
+
+| | |
+| --- | --- |
+| `version` | semver from `package.json`. Moves when a person decides it does. |
+| `commit` | the short SHA. **Moves on every deploy whether anybody remembered or not**, which is why it is shown beside the version rather than hidden behind it. |
+| `builtAt` | ISO, to the second. Milliseconds are noise to somebody comparing two deploys. |
+
+**The commit is read from three places in order**, because the build does not
+always happen where the git directory is: `VERCEL_GIT_COMMIT_SHA` (which is
+authoritative on Vercel and takes precedence over git), then `git rev-parse`,
+then the literal `local` for a tarball or a Docker context with no `.git`.
+**It never throws** — a build that cannot name its commit is still a build,
+and failing one over a version string would be the tail wagging the dog.
+
+They are injected as literals through `define` rather than read at runtime:
+there is no `process` in the browser, and importing `package.json` would pull
+its scripts and dependencies into the bundle.
+
+`versionLine(locale)` takes the locale as a **required** argument, for the
+reason `formatReadyRange` had to be changed — a defaulted locale compiles at
+every call site and is passed at none, and the date then prints in English in
+the middle of a Filipino screen. The barangay console passes `'en-PH'`
+deliberately: that console is not translated, so a fixed locale there is the
+same decision as the English labels around it, and `check:i18n` excludes the
+directory for exactly that reason.
+
 ## Getting a new version onto a phone
 
 `registerType: 'autoUpdate'` installs and activates a new service worker in the
